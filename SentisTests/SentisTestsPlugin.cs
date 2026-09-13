@@ -1,0 +1,137 @@
+﻿using System;
+using System.IO;
+using NLog;
+using SentisTests.Core;
+using SentisTests.Scenarios;
+using Torch;
+using Torch.API;
+using Torch.API.Managers;
+using Torch.API.Session;
+using Torch.Session;
+
+namespace SentisTests
+{
+    /// <summary>
+    /// Live integration-test harness: runs scenarios (game-thread coroutines) against the running
+    /// server, driving real game systems (spawning, projectors, welders, physics) and asserting
+    /// outcomes. Control: /test list|run|stop|status|results  or AutoRun in SentisTests.cfg.
+    /// </summary>
+    public class SentisTestsPlugin : TorchPluginBase
+    {
+        public static readonly Logger Log = LogManager.GetCurrentClassLogger();
+
+        private static Persistent<MainConfig> _config;
+        public static MainConfig Config => _config?.Data;
+
+        private TorchSessionManager _sessionManager;
+        private DateTime _autoRunEarliest = DateTime.MaxValue;
+
+        public override void Init(ITorchBase torch)
+        {
+            try
+            {
+                _config = Persistent<MainConfig>.Load(Path.Combine(StoragePath, "SentisTests.cfg"));
+                ResolveReportDirectory();
+
+                ScenarioRegistry.Register(SmokeScenario.ScenarioName, () => new SmokeScenario());
+                ScenarioRegistry.Register(ProjectorWeldScenario.ScenarioName, () => new ProjectorWeldScenario());
+                ScenarioRegistry.Register(HandWeldScenario.ScenarioName, () => new HandWeldScenario());
+
+                _sessionManager = torch.Managers.GetManager<TorchSessionManager>();
+                if (_sessionManager != null)
+                    _sessionManager.SessionStateChanged += OnSessionStateChanged;
+
+                Log.Info("SentisTests ready; scenarios: {0}", string.Join(", ", ScenarioRegistry.Names));
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "SentisTests Init failed");
+            }
+        }
+
+        private void ResolveReportDirectory()
+        {
+            var dir = Config?.ReportDirectory;
+            if (string.IsNullOrEmpty(dir))
+                dir = "SentisTests";
+            TestRunner.ReportDirectory = Path.IsPathRooted(dir)
+                ? dir
+                : Path.Combine(StoragePath, dir);
+        }
+
+        private void OnSessionStateChanged(ITorchSession session, TorchSessionState state)
+        {
+            try
+            {
+                if (state == TorchSessionState.Unloading)
+                {
+                    TestRunner.StopActive("world unloading");
+                    _autoRunEarliest = DateTime.MaxValue;
+                }
+                else if (state == TorchSessionState.Loaded && Config != null && Config.AutoRun)
+                {
+                    _autoRunEarliest = DateTime.UtcNow.AddSeconds(Math.Max(5, Config.AutoRunDelaySeconds));
+                    Log.Info("SentisTests AutoRun scheduled in {0}s: {1}", Config.AutoRunDelaySeconds,
+                        Config.AutoScenarios == null || Config.AutoScenarios.Count == 0
+                            ? "all"
+                            : string.Join(", ", Config.AutoScenarios));
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "session state handling failed");
+            }
+        }
+
+        /// <summary>Called by Torch once per game-loop tick (game thread on a dedicated server).</summary>
+        public override void Update()
+        {
+            TickMetrics.FrameBegin();
+            try
+            {
+                MaybeStartAutoRun();
+                TestRunner.Tick();
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "SentisTests update failed");
+            }
+            finally
+            {
+                TickMetrics.FrameEnd();
+            }
+        }
+
+        private void MaybeStartAutoRun()
+        {
+            if (_autoRunEarliest == DateTime.MaxValue)
+                return;
+            if (DateTime.UtcNow < _autoRunEarliest)
+                return;
+
+            _autoRunEarliest = DateTime.MaxValue;
+            var names = Config?.AutoScenarios;
+            if (names == null || names.Count == 0)
+                TestRunner.EnqueueAll();
+            else
+                TestRunner.Enqueue(names);
+        }
+
+        public override void Dispose()
+        {
+            try
+            {
+                TestRunner.StopActive("plugin unloading");
+                if (_sessionManager != null)
+                    _sessionManager.SessionStateChanged -= OnSessionStateChanged;
+                _config?.Save(Path.Combine(StoragePath, "SentisTests.cfg"));
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "dispose failed");
+            }
+
+            base.Dispose();
+        }
+    }
+}
