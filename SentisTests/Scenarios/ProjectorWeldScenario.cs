@@ -64,7 +64,7 @@ namespace SentisTests.Scenarios
 
             Note("spawning static platform with projector");
             var platform = WorldApi.SpawnGrid(
-                WorldApi.GridOb("ST-platform", MyCubeSize.Large, true,
+                WorldApi.GridOb(WorldApi.EntityPrefix + "platform", MyCubeSize.Large, true,
                     PlatformPos = TestRunner.RunOrigin ?? PlatformPos, platformBlocks));
             Track(platform);
 
@@ -126,7 +126,7 @@ namespace SentisTests.Scenarios
             // -------------------------------------------------------- blueprint
             var blueprint = new MyObjectBuilder_CubeGrid
             {
-                Name = "ST-target",
+                Name = WorldApi.EntityPrefix + "target",
                 GridSizeEnum = MyCubeSize.Large,
                 IsStatic = false,
                 CubeBlocks = new List<MyObjectBuilder_CubeBlock>(),
@@ -210,7 +210,7 @@ namespace SentisTests.Scenarios
 
             var shipPos = PlatformPos + ShipSpawnOffset;
             Note("spawning welder ship at " + shipPos.ToString("F0"));
-            var ship = WorldApi.SpawnGrid(WorldApi.GridOb("ST-welder-ship", MyCubeSize.Large, false, shipPos, shipBlocks));
+            var ship = WorldApi.SpawnGrid(WorldApi.GridOb(WorldApi.EntityPrefix + "welder-ship", MyCubeSize.Large, false, shipPos, shipBlocks));
             Track(ship);
 
             yield return WaitForTicks(120); // fat-block promotion must finish before the distributor pass

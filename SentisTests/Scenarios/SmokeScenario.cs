@@ -37,7 +37,7 @@ namespace SentisTests.Scenarios
                     blocks.Add(new BlockSpec(armor, new Vector3I(x, 0, z)));
 
             Note("spawning 4-block dynamic grid");
-            var smokeOb = WorldApi.GridOb("ST-smoke", MyCubeSize.Large, false, spawn, blocks);
+            var smokeOb = WorldApi.GridOb(WorldApi.EntityPrefix + "smoke", MyCubeSize.Large, false, spawn, blocks);
             smokeOb.LinearVelocity = new SerializableVector3(15f, 0f, 0f);
             var grid = WorldApi.SpawnGrid(smokeOb);
             Track(grid);

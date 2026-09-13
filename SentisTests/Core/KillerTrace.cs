@@ -45,7 +45,7 @@ namespace SentisTests.Core
                 {
                     if (__instance.MarkedForClose) return;      // only the first Close matters
                     var name = __instance.DisplayName;
-                    if (string.IsNullOrEmpty(name) || !name.StartsWith("ST-")) return;
+                    if (string.IsNullOrEmpty(name) || !name.StartsWith("ST-47351-")) return;
 
                     var sb = new StringBuilder();
                     sb.Append("[STKILL] Close(").Append(name).Append(") id=").Append(__instance.EntityId);

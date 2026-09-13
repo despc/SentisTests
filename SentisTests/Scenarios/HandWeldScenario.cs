@@ -59,7 +59,7 @@ namespace SentisTests.Scenarios
             SitePos = TestRunner.RunOrigin ?? SitePos;
             Note("spawning construction site (3x3 base + 6-block 0% wall) at " + SitePos.ToString("F0"));
             var site = WorldApi.SpawnGrid(
-                WorldApi.GridOb("ST-hand-site", MyCubeSize.Large, true, SitePos, blocks));
+                WorldApi.GridOb(WorldApi.EntityPrefix + "hand-site", MyCubeSize.Large, true, SitePos, blocks));
             Track(site);
 
             yield return WaitForTicks(30);
@@ -76,8 +76,8 @@ namespace SentisTests.Scenarios
 
             // ------------------------------------------------------- characters
             Note("spawning 2 engineers with steel plates");
-            var charA = SpawnEngineer("ST-engineer-A", SitePos + new Vector3D(-6, 3, -6));
-            var charB = SpawnEngineer("ST-engineer-B", SitePos + new Vector3D(6, 3, -6));
+            var charA = SpawnEngineer(WorldApi.EntityPrefix + "engineer-A", SitePos + new Vector3D(-6, 3, -6));
+            var charB = SpawnEngineer(WorldApi.EntityPrefix + "engineer-B", SitePos + new Vector3D(6, 3, -6));
             Track(charA);
             Track(charB);
 

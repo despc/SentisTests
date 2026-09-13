@@ -145,6 +145,13 @@ namespace SentisTests.Core
         /// <summary>Call once per game tick from the plugin Update().</summary>
         private static bool _purgedStale;
 
+        /// <summary>Names used before the unique prefix existed; matched exactly.</summary>
+        private static readonly HashSet<string> LegacyNames = new HashSet<string>
+        {
+            "ST-smoke", "ST-platform", "ST-welder-ship", "ST-target", "ST-hand-site",
+            "ST-engineer-A", "ST-engineer-B",
+        };
+
         /// <summary>
         /// Test entities replicate via InScene and therefore land in autosaves; after a restart
         /// the old platforms/ships sit on the fixed spawn coordinates and the next run trips over
@@ -160,7 +167,8 @@ namespace SentisTests.Core
                 foreach (var entity in Sandbox.Game.Entities.MyEntities.GetEntities())
                 {
                     var ename = entity.Name ?? (entity as Sandbox.Game.Entities.Character.MyCharacter)?.DisplayName;
-                    if (string.IsNullOrEmpty(ename) || !ename.StartsWith("ST-")) continue;
+                    if (string.IsNullOrEmpty(ename)) continue;
+                    if (!ename.StartsWith(Game.WorldApi.EntityPrefix) && !LegacyNames.Contains(ename)) continue;
                     if (entity.MarkedForClose) continue;
                     entity.Close();
                     closed++;
