@@ -254,6 +254,118 @@ namespace SentisTests.Game
             }
         }
 
+        /// <summary>
+        /// Adds one real, fully functional block to an existing grid through the engine's live-add
+        /// path (private MyCubeGrid.AddBlock). The object-builder spawn path silently strips some
+        /// fat blocks (e.g. LargeShipWelder: 18 in OB -> 17 in grid); the live-add path used by
+        /// actual in-game construction does not.
+        /// </summary>
+        public static Sandbox.Game.Entities.MyCubeBlock AddRealBlock(MyCubeGrid grid, string subtypeId,
+            Vector3I min, float buildAmount = 1f)
+        {
+            // the serializer creates the DERIVED object-builder type (e.g. ShipWelder); the
+            // base MyObjectBuilder_CubeBlock makes MyCubeBlockFactory produce a thin block
+            // resolve the definition to get the DERIVED object-builder type the serializer needs
+            var defId = Sandbox.Definitions.MyDefinitionManager.Static
+                .GetDefinitionsOfType<Sandbox.Definitions.MyCubeBlockDefinition>()
+                .Where(d => string.Equals(d.Id.SubtypeName, subtypeId, StringComparison.OrdinalIgnoreCase))
+                .Select(d => d.Id)
+                .FirstOrDefault();
+            if (string.IsNullOrEmpty(defId.SubtypeName))
+                throw new InvalidOperationException("no cube-block definition for subtype " + subtypeId);
+
+            var blockOb = VRage.ObjectBuilders.Private.MyObjectBuilderSerializerKeen.CreateNewObject(defId)
+                as VRage.Game.MyObjectBuilder_CubeBlock;
+            if (blockOb == null)
+                throw new InvalidOperationException("no object-builder type for subtype " + subtypeId);
+            blockOb.Min = new VRage.SerializableVector3I(min.X, min.Y, min.Z);
+            blockOb.BuiltBy = TestIdentityId();
+            // fresh unique block id: reuse MyEntities' private remap helper (blocks are not
+            // entity bases, so the public RemapObjectBuilder overload does not accept them)
+            var helperField = typeof(Sandbox.Game.Entities.MyEntities).GetField("m_remapHelper",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            var remapper = helperField.GetValue(null) as VRage.ModAPI.IMyRemapHelper;
+            if (remapper == null)
+            {
+                // internal Sandbox.Game.Entities.MyEntityIdRemapHelper, lazily created like MyEntities does
+                var helperType = typeof(Sandbox.Game.Entities.MyEntities)
+                    .Assembly.GetType("Sandbox.Game.Entities.MyEntityIdRemapHelper");
+                remapper = Activator.CreateInstance(helperType, nonPublic: true) as VRage.ModAPI.IMyRemapHelper;
+                helperField.SetValue(null, remapper);
+            }
+            blockOb.Remap(remapper);
+            remapper.Clear();
+
+            var mi = typeof(MyCubeGrid).GetMethod("AddBlock",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (mi == null)
+                throw new InvalidOperationException("MyCubeGrid.AddBlock not found");
+
+            Sandbox.Definitions.MyCubeBlockDefinition dbgDef;
+            bool haveDef = Sandbox.Definitions.MyDefinitionManager.Static
+                .TryGetCubeBlockDefinition(blockOb.GetId(), out dbgDef);
+            bool freeCell = grid.CanAddCubes(min, min);
+            Log.Info("live-add pre: obType={0} id={1} def={2} bigOrSmall={3} gridLarge={4} cellFree={5}",
+                blockOb.GetType().Name, blockOb.GetId().ToString(), dbgDef != null,
+                dbgDef != null ? dbgDef.CubeSize.ToString() : "-", grid.GridSizeEnum, freeCell);
+
+            object slimRaw;
+            try
+            {
+                slimRaw = mi.Invoke(grid, new object[] { blockOb, false });
+            }
+            catch (Exception e)
+            {
+                Log.Error(e.InnerException ?? e, "live-add AddBlock threw for {0}", subtypeId);
+                return null;
+            }
+            var slim = slimRaw as Sandbox.Game.Entities.Cube.MySlimBlock;
+            if (slim == null)
+            {
+                // triage: call AddCubeBlock directly (skips UpgradeCubeBlock) and report the step that fails
+                try
+                {
+                    var acb = typeof(MyCubeGrid).GetMethod("AddCubeBlock",
+                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    var probe = acb.Invoke(grid, new object[] { blockOb, false, dbgDef });
+                    Log.Warn("AddCubeBlock probe returned {0}", probe == null ? "null" : "slim");
+                    slim = probe as Sandbox.Game.Entities.Cube.MySlimBlock;
+                }
+                catch (Exception e2)
+                {
+                    Log.Error(e2.InnerException ?? e2, "live-add AddCubeBlock probe threw for {0}", subtypeId);
+                }
+                try
+                {
+                    var min2 = min;
+                    VRageMath.MyBlockOrientation orient = (VRageMath.MyBlockOrientation)blockOb.BlockOrientation;
+                    var max2 = min;
+                    Sandbox.Game.Entities.Cube.MySlimBlock.ComputeMax(dbgDef, orient, ref min2, out max2);
+                    var scratch = new Sandbox.Game.Entities.Cube.MySlimBlock();
+                    bool initOk = scratch.Init(blockOb, grid, null);
+                    Log.Warn("live-add triage: min={0} max={1} spanFree={2} cellFree={3} slimInit={4} fat={5} defSize={6} gridSize={7}",
+                        min2, max2, grid.CanAddCubes(min2, max2), grid.CanAddCubes(min, min), initOk,
+                        scratch.FatBlock != null, dbgDef.CubeSize, grid.GridSizeEnum);
+                }
+                catch (Exception e3)
+                {
+                    Log.Error(e3.InnerException ?? e3, "live-add triage threw");
+                }
+                if (slim == null)
+                {
+                    Log.Warn("live-add {0} at {1} returned no slim block", subtypeId, min);
+                    return null;
+                }
+            }
+            if (buildAmount > 0f && !slim.IsFullIntegrity)
+                slim.IncreaseMountLevel(buildAmount, TestIdentityId(), null, 1f, false,
+                    VRage.Game.MyOwnershipShareModeEnum.None);
+
+            Log.Info("live-added {0} at {1} on {2}: fat={3} integrity={4}", subtypeId, min,
+                grid.DisplayName, slim.FatBlock != null, slim.Integrity);
+            return slim.FatBlock;
+        }
+
         public static T FindFunctional<T>(MyCubeGrid grid) where T : class
         {
             if (grid?.CubeBlocks == null)
