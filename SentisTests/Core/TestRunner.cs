@@ -3,10 +3,12 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using NLog;
 using Sandbox.ModAPI;
 using VRage.ModAPI;
+using VRageMath;
 
 namespace SentisTests.Core
 {
@@ -64,14 +66,36 @@ namespace SentisTests.Core
             }
         }
 
-        public static void Enqueue(IEnumerable<string> names)
+        /// <summary>
+        /// When set, the next started scenario builds its structures around this point instead of
+        /// the scenario default (used when an admin runs a test from the field: 30 m in front of
+        /// the character's face). Consumed by Start().
+        /// </summary>
+        public static Vector3D? PendingOrigin;
+
+        /// <summary>
+        /// False when the run was requested interactively by a live admin: test entities stay in
+        /// the world until "!test cleanup" removes them.
+        /// </summary>
+        public static bool PendingAutoCleanup = true;
+
+        /// <summary>Origin for the currently active run (null = scenario default). Set by Start().</summary>
+        public static Vector3D? RunOrigin { get; private set; }
+
+        public static bool RunAutoCleanup { get; private set; } = true;
+
+        public static void Enqueue(IEnumerable<string> names, Vector3D? origin = null, bool autoCleanup = true)
         {
+            PendingOrigin = origin;
+            PendingAutoCleanup = autoCleanup;
             foreach (var n in names)
                 _queue.Enqueue(n);
         }
 
-        public static void EnqueueAll()
+        public static void EnqueueAll(Vector3D? origin = null, bool autoCleanup = true)
         {
+            PendingOrigin = origin;
+            PendingAutoCleanup = autoCleanup;
             foreach (var name in ScenarioRegistry.Names)
                 _queue.Enqueue(name);
         }
@@ -89,6 +113,34 @@ namespace SentisTests.Core
 
         private static readonly List<KeyValuePair<IMyEntity, DateTime>> _cleanupQueue =
             new List<KeyValuePair<IMyEntity, DateTime>>();
+
+        // entities of interactively-run scenarios: kept until an admin calls "!test cleanup"
+        private static readonly List<IMyEntity> _held = new List<IMyEntity>();
+
+        /// <summary>Remove every held/queued test entity right now. Returns how many were removed.</summary>
+        public static int CleanupNow()
+        {
+            var count = 0;
+            foreach (var entity in _held.Concat(_cleanupQueue.Select(kvp => kvp.Key)).ToList())
+            {
+                try
+                {
+                    if (entity == null || entity.MarkedForClose)
+                        continue;
+                    MyAPIGateway.Entities.RemoveEntity(entity);
+                    entity.Close();
+                    count++;
+                }
+                catch (Exception e)
+                {
+                    Log.Warn("cleanup: cannot remove {0}: {1}", entity == null ? 0 : entity.EntityId, e.Message);
+                }
+            }
+            _held.Clear();
+            _cleanupQueue.Clear();
+            Log.Info("manual cleanup removed {0} test entities", count);
+            return count;
+        }
 
         /// <summary>Call once per game tick from the plugin Update().</summary>
         public static void Tick()
@@ -223,8 +275,16 @@ namespace SentisTests.Core
                 Message = message,
             };
 
-            // hand the spawned entities to the delayed cleanup queue so admins can inspect them
-            if (SentisTestsPlugin.Config == null || SentisTestsPlugin.Config.CleanupAfterTests)
+            // hand the spawned entities to the delayed cleanup queue so admins can inspect them;
+            // interactive admin runs hold them indefinitely until "!test cleanup"
+            if (!RunAutoCleanup)
+            {
+                foreach (var entity in scenario.TakeTracked())
+                    if (entity != null) _held.Add(entity);
+                Log.Info("{0} left its {1} entities in the world for inspection; run !test cleanup when done",
+                    scenario.Name, _held.Count);
+            }
+            else if (SentisTestsPlugin.Config == null || SentisTestsPlugin.Config.CleanupAfterTests)
             {
                 var delay = SentisTestsPlugin.Config?.CleanupDelaySeconds ?? 0;
                 var due = DateTime.UtcNow.AddSeconds(Math.Max(0, delay));
@@ -264,6 +324,9 @@ namespace SentisTests.Core
                 throw new ScenarioFailedException("scenario already running: " + _active.Name);
 
             var scenario = ScenarioRegistry.Create(name);
+            RunOrigin = PendingOrigin;
+            RunAutoCleanup = PendingAutoCleanup;
+            PendingOrigin = null;
             BaselineMetrics = TickMetrics.Take();
             _active = scenario;
             _stopwatch = Stopwatch.StartNew();

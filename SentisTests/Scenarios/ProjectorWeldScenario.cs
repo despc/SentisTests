@@ -33,7 +33,7 @@ namespace SentisTests.Scenarios
         public const string ScenarioName = "projector_weld";
 
         private const int BlueprintSide = 2; // 2x2x2 = 8 blocks
-        private static readonly Vector3D PlatformPos = new Vector3D(0, 120, 0); // visible from world spawn
+        private static Vector3D PlatformPos = new Vector3D(0, 120, 0); // visible from world spawn
         private static readonly Vector3D ShipSpawnOffset = new Vector3D(80, 25, 0);
 
         public override string Name { get { return ScenarioName; } }
@@ -64,7 +64,8 @@ namespace SentisTests.Scenarios
 
             Note("spawning static platform with projector");
             var platform = WorldApi.SpawnGrid(
-                WorldApi.GridOb("ST-platform", MyCubeSize.Large, true, PlatformPos, platformBlocks));
+                WorldApi.GridOb("ST-platform", MyCubeSize.Large, true,
+                    PlatformPos = TestRunner.RunOrigin ?? PlatformPos, platformBlocks));
             Track(platform);
 
             yield return WaitForTicks(60);

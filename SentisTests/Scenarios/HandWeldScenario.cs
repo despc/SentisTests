@@ -30,7 +30,7 @@ namespace SentisTests.Scenarios
     {
         public const string ScenarioName = "hand_weld";
 
-        private static readonly Vector3D SitePos = new Vector3D(-150, 120, 150);
+        private static Vector3D SitePos = new Vector3D(-150, 120, 150);
 
         public override string Name { get { return ScenarioName; } }
 
@@ -56,6 +56,7 @@ namespace SentisTests.Scenarios
                     blocks.Add(new BlockSpec(armor, new Vector3I(x, y, 0)) { BuildPercent = 0f });
                 }
 
+            SitePos = TestRunner.RunOrigin ?? SitePos;
             Note("spawning construction site (3x3 base + 6-block 0% wall) at " + SitePos.ToString("F0"));
             var site = WorldApi.SpawnGrid(
                 WorldApi.GridOb("ST-hand-site", MyCubeSize.Large, true, SitePos, blocks));

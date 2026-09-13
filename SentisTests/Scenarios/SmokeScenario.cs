@@ -30,7 +30,7 @@ namespace SentisTests.Scenarios
             Note("resolving block subtype");
             var armor = WorldApi.FindSubtype(MyCubeSize.Large, "blockarmorblock");
 
-            var spawn = new Vector3D(300, 200, 300); // close enough for an admin to see from spawn
+            var spawn = TestRunner.RunOrigin ?? new Vector3D(300, 200, 300); // default: visible from world spawn
             var blocks = new System.Collections.Generic.List<BlockSpec>();
             for (var x = 0; x < 2; x++)
                 for (var z = 0; z < 2; z++)
