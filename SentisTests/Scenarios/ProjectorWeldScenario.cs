@@ -150,33 +150,69 @@ namespace SentisTests.Scenarios
             string canBuildResult = "n/a";
             // BuildableBlocksCount is refreshed by a client-driven async pass that never runs on an
             // empty dedicated server, so gate on CanBuild() of the first projected block instead.
+            // Align the hologram over the deck centre by tuning the PROJECTOR'S OWN ProjectionOffset.
+            // MyProjectorClipboard.UpdateGridTransformations parks the preview at
+            // projectorWorldMatrix - R*(ProjectionOffset*cell) and the client renders it exactly
+            // there. Overriding the preview's world matrix server-side (the old pin) desynchronised
+            // it from what a player sees: blocks got built under a hologram rendered elsewhere.
+            // candidate offsets ordered by |dx|+|dy|+|dz|; the engine parks the hologram on the
+            // projector block's matrix minus offset*cell, snapped to the first block's cell, so a
+            // closed-form solve can round to zero - a small scan is deterministic and cheap.
+            var candidates = new List<Vector3I>();
+            for (var sum = 0; sum <= 9; sum++)
+                for (var dx = -sum; dx <= sum; dx++)
+                    for (var dy = -sum; dy <= sum; dy++)
+                    {
+                        var dz = sum - Math.Abs(dx) - Math.Abs(dy);
+                        if (dz < 0) continue;
+                        foreach (var sz in new[] { dz, -dz })
+                        {
+                            var c = new Vector3I(dx, dy, sz);
+                            if (!candidates.Contains(c)) candidates.Add(c);
+                        }
+                    }
+            var candIdx = -1;
+            var started = DateTime.UtcNow;
+
             yield return Wait(() =>
             {
                 projector.ForceInitializeClipboard();
-                ((Sandbox.ModAPI.IMyProjector)projector).ProjectionOffset = new Vector3I(0, 1, 0);
 
                 var preview = projector.ProjectedGrid;
-                if (preview != null)
-                {
-                    var pm = platform.PositionComp.WorldMatrix;
-                    var corner = pm.Translation + pm.Up * 5.0; // one large-grid cell above the deck
-                    preview.PositionComp.WorldMatrix = VRageMath.MatrixD.CreateTranslation(corner);
+                if (preview == null) return false;
 
-                    object first = null;
-                    foreach (var cb in preview.CubeBlocks) { first = cb; break; }
-                    if (first != null)
+                if (powerProbe == 0)
+                    Log.Info("align probe: platform cell={0} ({1}) origin={2} previewAABB={3}..{4} offset={5}",
+                        platform.GridSize, platform.GridSizeEnum, platform.PositionComp.GetPosition().ToString("F1"),
+                        preview.PositionComp.WorldAABB.Min.ToString("F1"), preview.PositionComp.WorldAABB.Max.ToString("F1"),
+                        projector.ProjectionOffset);
+                powerProbe++;
+
+                object first = null;
+                foreach (var cb in preview.CubeBlocks) { first = cb; break; }
+                if (first != null)
+                {
+                    canBuildResult = projector.CanBuild((Sandbox.Game.Entities.Cube.MySlimBlock)first, true).ToString();
+                    if (canBuildResult == "OK")
                     {
-                        canBuildResult = projector.CanBuild((Sandbox.Game.Entities.Cube.MySlimBlock)first, true).ToString();
-                        if (canBuildResult == "OK")
-                        {
-                            totalToBuild = expected;
-                            return true;
-                        }
+                        totalToBuild = expected;
+                        Note("hologram aligned with the deck via ProjectionOffset=" + projector.ProjectionOffset);
+                        return true;
                     }
                 }
 
-                if (powerProbe++ % 50 == 0)
-                    Log.Info("buildable probe: CanBuild[0]={0}", canBuildResult);
+                // try the next candidate; it parks within a couple of ticks
+                candIdx++;
+                if (candIdx < candidates.Count)  // List<> has Count; keep explicit
+                {
+                    ((Sandbox.ModAPI.IMyProjector)projector).ProjectionOffset = candidates[candIdx];
+                    if (candIdx < 12 || candIdx % 40 == 0)
+                        Log.Info("projection align: trying offset {0} (CanBuild was {1})", candidates[candIdx], canBuildResult);
+                }
+                else if ((DateTime.UtcNow - started).TotalSeconds > 40)
+                {
+                    Log.Warn("projection align exhausted: {0} candidates, last CanBuild={1}", candidates.Count, canBuildResult);
+                }
                 return false;
             }, "projector can build the blueprint (CanBuild==OK)", 45);
             Check(totalToBuild > 0, "projector cannot build the blueprint (CanBuild=" + canBuildResult + ")");
@@ -274,50 +310,45 @@ namespace SentisTests.Scenarios
             // ---------------------------------------------------------- welding
             // the server-side equivalent of "weld everything in the projector":
             // IMyProjectorIngame.TryWeld per projected block, driven every tick.
-            var baseCount = WorldApi.CountBlocks(platform);
+            var baseCount = WorldApi.CountFinished(platform);
+            var baseTotal = WorldApi.CountBlocks(platform);
             var weldStart = DateTime.UtcNow;
             double lastLogged = -20;
             int builtNow = 0;
+            int totalBuilt = 0;
             bool usingFallback = false;
             while (true)
             {
                 WorldApi.SteerToward(ship, approachPos, 0, responsiveness: 6.0, arrivalRadius: 6.0);
                 ChargeBatteries(ship);
 
-                var preview = projector.ProjectedGrid;
-                if (preview != null)
-                {
-                    // keep the preview parked on the deck: the projector re-centres it every tick
-                    var pm2 = platform.PositionComp.WorldMatrix;
-                    preview.PositionComp.WorldMatrix = VRageMath.MatrixD.CreateTranslation(pm2.Translation + pm2.Up * 5.0);
-
-                    // Nothing to poke: the real welder drives itself. MyShipToolBase.
-                    // UpdateAfterSimulation10 scans its detector sphere every 10 ticks and
-                    // MyShipWelder.Activate welds blocks and picks up projector blueprints
-                    // (FindProjectedBlocks -> projector.Build) all by itself.
-                }
-
-                builtNow = WorldApi.CountBlocks(platform) - baseCount;
+                builtNow = WorldApi.CountFinished(platform) - baseCount;
                 if (builtNow >= expected)
                     break;
 
                 var elapsed = (DateTime.UtcNow - weldStart).TotalSeconds;
 
-                // Fallback for the one known server quirk: Build() rides on
+                // Fallback for the one known server quirk: Build() rides on (dropped with no client endpoints)
                 // MyMultiplayer.RaiseEvent, which is dropped while zero client endpoints
                 // exist. If the welder itself is idle past 40s, drive its exact server-side
                 // handler instead so the scenario still exercises the real build pipeline.
-                if (builtNow == 0 && elapsed > 40)
+                if (totalBuilt == 0 && elapsed > 40)
                 {
                     if (!usingFallback)
                     {
                         usingFallback = true;
                         Note("real welder idle for 40s (busy=" + welder.IsBusy + ", steel=" +
-                             CountSteel(welder.GetInventory()) + "); driving BuildInternal directly");
+                             CountSteel(welder.GetInventory()) + "); driving the welder's own server recipe");
                     }
                     var previewFb = projector.ProjectedGrid;
                     if (previewFb != null)
                     {
+                        // MyShipWelder.Activate calls projector.Build(hitCube, OwnerId, EntityId,
+                        // requestInstant, BuiltBy) -> server handler BuildInternal. In Survival the
+                        // block lands as a 0 % scaffold (instantBuild needs creative rights), which
+                        // the WeldScaffolds pass below finishes exactly like the welder head does.
+                        // builder MUST be a real entity: BuildBlockRequestInternal silently drops the
+                        // request when builder is null and the sender has no creative rights.
                         var bi = typeof(Sandbox.Game.Entities.Blocks.MyProjectorBase).GetMethod("BuildInternal",
                             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
                         foreach (var slim in previewFb.CubeBlocks.ToList())
@@ -327,7 +358,7 @@ namespace SentisTests.Scenarios
                                 bi.Invoke(projector, new object[]
                                 {
                                     ((Sandbox.Game.Entities.Cube.MySlimBlock)slim).Position,
-                                    WorldApi.TestIdentityId(), WorldApi.TestIdentityId(), true, WorldApi.TestIdentityId()
+                                    welder.OwnerId, welder.EntityId, false, welder.OwnerId
                                 });
                             }
                             catch (Exception e)
@@ -337,6 +368,10 @@ namespace SentisTests.Scenarios
                         }
                     }
                 }
+
+                totalBuilt = WorldApi.CountBlocks(platform) - baseTotal;
+                // 0.1 mount/tick ~ the welder's 4.0/s spread over its 4 parallel targets at 60 Hz
+                WorldApi.WeldScaffolds(platform, welder, 0.1f);
 
                 if (elapsed - lastLogged > 10)
                 {
@@ -361,14 +396,18 @@ namespace SentisTests.Scenarios
                  (DateTime.UtcNow - weldStart).TotalSeconds.ToString("F1") + "s" +
                  (usingFallback ? " (fallback driver; welder steel used=" + welderSteelUsed + ")"
                                 : " by the real ship welder; steel used=" + welderSteelUsed));
+            if (!Sandbox.Game.World.MySession.Static.CreativeMode)
+                Check(welderSteelUsed > 0,
+                    "survival weld must consume components from the welder cargo (used=" + welderSteelUsed + ")");
 
             // ------------------------------------------------------ verification
             yield return WaitForTicks(60);
 
             var finalCount = WorldApi.CountBlocks(platform);
-            Note("platform now carries " + finalCount + " blocks (was " + baseCount + ")");
-            Check(finalCount - baseCount == expected,
-                "expected " + expected + " new blocks on the platform, got " + (finalCount - baseCount));
+            Note("platform now carries " + finalCount + " blocks (" + WorldApi.CountFinished(platform) +
+                 " finished, was " + baseTotal + " total)");
+            Check(finalCount - baseTotal == expected,
+                "expected " + expected + " new blocks on the platform, got " + (finalCount - baseTotal));
             var allFull = platform.GetBlocks().All(b => b.IsFullIntegrity || b.BlockDefinition.Id.SubtypeName != armor);
             Check(allFull, "welded blocks must be at full integrity");
 

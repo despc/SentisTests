@@ -333,6 +333,39 @@ namespace SentisTests.Game
             return grid == null || grid.CubeBlocks == null ? 0 : grid.CubeBlocks.Count;
         }
 
+        /// <summary>Blocks that are fully built (survival builds start as 0 % scaffolds).</summary>
+        public static int CountFinished(MyCubeGrid grid)
+        {
+            if (grid == null || grid.CubeBlocks == null) return 0;
+            var n = 0;
+            foreach (var b in grid.CubeBlocks)
+                if (b.IsFullIntegrity) n++;
+            return n;
+        }
+
+        /// <summary>
+        /// One welder-tick for every unfinished block on the grid: exactly the server branch of
+        /// MyShipWelder.Activate - stockpile from the tool inventory, then IncreaseMountLevel.
+        /// Consumes real components, so in Survival mode the cargo visibly drains.
+        /// </summary>
+        public static int WeldScaffolds(MyCubeGrid grid, Sandbox.Game.Entities.MyCubeBlock tool, float amount)
+        {
+            if (grid == null || grid.CubeBlocks == null || tool == null) return 0;
+            var inv = tool.GetInventory();
+            var inProgress = 0;
+            foreach (var slim in grid.CubeBlocks.ToList())
+            {
+                if (slim.IsFullIntegrity) continue;
+                inProgress++;
+                slim.MoveItemsToConstructionStockpile(inv);
+                slim.MoveUnneededItemsFromConstructionStockpile(inv);
+                var share = tool.IDModule != null ? tool.IDModule.ShareMode : MyOwnershipShareModeEnum.None;
+                slim.IncreaseMountLevel(amount, tool.OwnerId, inv, 0.15f, false, share,
+                    handWelded: false, testingMode: false);
+            }
+            return inProgress;
+        }
+
         // -------------------------------------------------------------- utilities
 
         public static IEnumerable<T> Functionals<T>(MyCubeGrid grid) where T : class
