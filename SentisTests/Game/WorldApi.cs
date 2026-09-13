@@ -158,6 +158,9 @@ namespace SentisTests.Game
                 IsStatic = isStatic,
                 PositionAndOrientation = new MyPositionAndOrientation(
                     position, Vector3.Forward, Vector3.Up),
+                // WITHOUT InScene the entity is added to the server lists only: game-thread logic
+                // runs, but the replication/scene layer never tells clients about it.
+                PersistentFlags = VRage.ObjectBuilders.MyPersistentEntityFlags2.InScene,
                 CubeBlocks = new List<MyObjectBuilder_CubeBlock>(),
             };
 

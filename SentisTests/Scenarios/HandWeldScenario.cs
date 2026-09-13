@@ -195,6 +195,7 @@ namespace SentisTests.Scenarios
             {
                 DisplayName = name,
                 SubtypeName = "Space",
+                PersistentFlags = VRage.ObjectBuilders.MyPersistentEntityFlags2.InScene,
                 PositionAndOrientation = new MyPositionAndOrientation(position, Vector3.Forward, Vector3.Up),
                 Inventory = new MyObjectBuilder_Inventory
                 {
