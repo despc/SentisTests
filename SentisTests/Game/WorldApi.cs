@@ -48,7 +48,7 @@ namespace SentisTests.Game
     {
         /// <summary>
         /// Every entity this plugin creates carries this prefix; the session-start purge and
-        /// KillerTrace key off it. The random digits make a collision with a player-chosen
+        /// The purge keys off it. The random digits make a collision with a player-chosen
         /// name essentially impossible.
         /// </summary>
         public const string EntityPrefix = "ST-47351-";

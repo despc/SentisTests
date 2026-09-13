@@ -74,28 +74,29 @@ namespace SentisTests.Core
         public static Vector3D? PendingOrigin;
 
         /// <summary>
-        /// False when the run was requested interactively by a live admin: test entities stay in
-        /// the world until "!test cleanup" removes them.
+        /// Seconds test entities stay in the world after a run before they are removed.
+        /// Set per enqueue: live players get an inspection window, automated runs use 0
+        /// (cleanup right when the scenario finishes). Negative means "keep until !test cleanup".
         /// </summary>
-        public static bool PendingAutoCleanup = true;
+        public static double PendingCleanupDelaySeconds;
 
         /// <summary>Origin for the currently active run (null = scenario default). Set by Start().</summary>
         public static Vector3D? RunOrigin { get; private set; }
 
-        public static bool RunAutoCleanup { get; private set; } = true;
+        public static double RunCleanupDelaySeconds { get; private set; }
 
-        public static void Enqueue(IEnumerable<string> names, Vector3D? origin = null, bool autoCleanup = true)
+        public static void Enqueue(IEnumerable<string> names, Vector3D? origin = null, double cleanupDelaySeconds = 0)
         {
             PendingOrigin = origin;
-            PendingAutoCleanup = autoCleanup;
+            PendingCleanupDelaySeconds = cleanupDelaySeconds;
             foreach (var n in names)
                 _queue.Enqueue(n);
         }
 
-        public static void EnqueueAll(Vector3D? origin = null, bool autoCleanup = true)
+        public static void EnqueueAll(Vector3D? origin = null, double cleanupDelaySeconds = 0)
         {
             PendingOrigin = origin;
-            PendingAutoCleanup = autoCleanup;
+            PendingCleanupDelaySeconds = cleanupDelaySeconds;
             foreach (var name in ScenarioRegistry.Names)
                 _queue.Enqueue(name);
         }
@@ -315,27 +316,46 @@ namespace SentisTests.Core
                 Message = message,
             };
 
-            // hand the spawned entities to the delayed cleanup queue so admins can inspect them;
-            // interactive admin runs hold them indefinitely until "!test cleanup"
-            if (!RunAutoCleanup)
+            // cleanup policy for this run: live players get an inspection window (the structures
+            // spawned next to them and are removed after the delay); automated runs clean up the
+            // moment the scenario finishes. Config CleanupAfterTests=false always keeps entities.
+            var delay = RunCleanupDelaySeconds;
+            if (SentisTestsPlugin.Config != null && !SentisTestsPlugin.Config.CleanupAfterTests)
+                delay = -1;
+
+            if (delay < 0)
             {
                 foreach (var entity in scenario.TakeTracked())
                     if (entity != null) _held.Add(entity);
                 Log.Info("{0} left its {1} entities in the world for inspection; run !test cleanup when done",
                     scenario.Name, _held.Count);
             }
-            else if (SentisTestsPlugin.Config == null || SentisTestsPlugin.Config.CleanupAfterTests)
+            else if (delay == 0)
             {
-                var delay = SentisTestsPlugin.Config?.CleanupDelaySeconds ?? 0;
-                var due = DateTime.UtcNow.AddSeconds(Math.Max(0, delay));
+                int n = 0;
                 foreach (var entity in scenario.TakeTracked())
-                    _cleanupQueue.Add(new KeyValuePair<IMyEntity, DateTime>(entity, due));
-                Log.Info("cleanup of {0} scheduled in {1}s ({2} entities remain in the world meanwhile)",
-                    scenario.Name, delay, _cleanupQueue.Count);
+                {
+                    if (entity == null) continue;
+                    n++;
+                    try
+                    {
+                        MyAPIGateway.Entities.RemoveEntity(entity);
+                        entity.Close();
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Warn("cleanup: cannot remove {0}: {1}", entity.EntityId, e.Message);
+                    }
+                }
+                Log.Info("cleanup of {0}: {1} entities removed immediately (automated run)", scenario.Name, n);
             }
             else
             {
-                Log.Info("cleanup skipped by config; entities of " + scenario.Name + " remain in the world");
+                var due = DateTime.UtcNow.AddSeconds(delay);
+                foreach (var entity in scenario.TakeTracked())
+                    _cleanupQueue.Add(new KeyValuePair<IMyEntity, DateTime>(entity, due));
+                Log.Info("cleanup of {0} scheduled in {1:F0}s ({2} entities remain in the world meanwhile)",
+                    scenario.Name, delay, _cleanupQueue.Count);
             }
 
             foreach (var progress in scenario.ProgressLog)
@@ -365,7 +385,7 @@ namespace SentisTests.Core
 
             var scenario = ScenarioRegistry.Create(name);
             RunOrigin = PendingOrigin;
-            RunAutoCleanup = PendingAutoCleanup;
+            RunCleanupDelaySeconds = PendingCleanupDelaySeconds;
             PendingOrigin = null;
             BaselineMetrics = TickMetrics.Take();
             _active = scenario;

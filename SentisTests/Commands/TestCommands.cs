@@ -40,17 +40,23 @@ namespace SentisTests.Commands
             }
 
             // a live player runs tests from the field: build the structures 30 m in front of his
-            // face and keep everything afterwards - removal is an explicit !test cleanup
+            // face and leave them visible for an inspection window before cleanup. Automated or
+            // console runs (no player character to look at them) clean up immediately.
             var origin = FieldOfViewOrigin();
             var interactive = origin.HasValue;
+            var inspectDelay = interactive
+                ? Math.Max(0, SentisTestsPlugin.Config?.CleanupDelaySeconds ?? 120)
+                : 0;
 
             try
             {
                 if (names.Length == 1 && string.Equals(names[0], "all", StringComparison.OrdinalIgnoreCase))
                 {
-                    TestRunner.EnqueueAll(origin, autoCleanup: !interactive);
+                    TestRunner.EnqueueAll(origin, inspectDelay);
                     Context.Respond("queued all scenarios: " + string.Join(", ", ScenarioRegistry.Names) +
-                                    (interactive ? " (at your position; cleanup via !test cleanup)" : ""));
+                                    (interactive
+                                        ? string.Format(" (at your position; structures stay ~{0:F0}s for inspection)", inspectDelay)
+                                        : ""));
                     return;
                 }
 
@@ -62,9 +68,11 @@ namespace SentisTests.Commands
                     return;
                 }
 
-                TestRunner.Enqueue(names, origin, autoCleanup: !interactive);
+                TestRunner.Enqueue(names, origin, inspectDelay);
                 Context.Respond("queued: " + string.Join(", ", names) +
-                                (interactive ? " 30m ahead of you; entities stay until !test cleanup" : "") +
+                                (interactive
+                                    ? string.Format(" 30m ahead of you; structures stay ~{0:F0}s for inspection", inspectDelay)
+                                    : "") +
                                 (TestRunner.Active != null ? " (after the current " + TestRunner.Active.Name + ")" : ""));
             }
             catch (Exception e)

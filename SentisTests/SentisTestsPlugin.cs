@@ -28,7 +28,6 @@ namespace SentisTests
 
         public override void Init(ITorchBase torch)
         {
-            Core.KillerTrace.Install();
             try
             {
                 _config = Persistent<MainConfig>.Load(Path.Combine(StoragePath, "SentisTests.cfg"));
