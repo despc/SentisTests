@@ -42,7 +42,19 @@ namespace SentisTests.Scenarios
             var grid = WorldApi.SpawnGrid(smokeOb);
             Track(grid);
 
-            yield return WaitForTicks(60); // let physics/register settle
+            // watch the first second tick-by-tick; something has been eating fresh dynamic
+            // grids silently, so record the exact tick and state of the death
+            for (int t = 0; t < 60; t++)
+            {
+                yield return WaitForTicks(1);
+                if (grid == null || grid.MarkedForClose)
+                {
+                    Note("grid died at tick " + t + " id=" + (grid == null ? "null" : grid.EntityId + "") +
+                         " Closed=" + (grid != null && grid.Closed) +
+                         " inEntityList=" + (grid != null && Sandbox.Game.Entities.MyEntities.GetEntityById(grid.EntityId) != null));
+                    break;
+                }
+            }
             Check(grid != null && !grid.MarkedForClose, "grid alive after 1s");
             Check(WorldApi.CountBlocks(grid) == 4, "expected 4 blocks, got " + WorldApi.CountBlocks(grid));
 

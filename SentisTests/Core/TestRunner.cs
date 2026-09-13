@@ -143,10 +143,42 @@ namespace SentisTests.Core
         }
 
         /// <summary>Call once per game tick from the plugin Update().</summary>
+        private static bool _purgedStale;
+
+        /// <summary>
+        /// Test entities replicate via InScene and therefore land in autosaves; after a restart
+        /// the old platforms/ships sit on the fixed spawn coordinates and the next run trips over
+        /// them ("CanBuild == IntersectedWithSomethingElse"). Remove our leftovers once per session.
+        /// </summary>
+        private static void PurgeStaleTestEntities()
+        {
+            if (_purgedStale) return;
+            _purgedStale = true;
+            try
+            {
+                int closed = 0;
+                foreach (var entity in Sandbox.Game.Entities.MyEntities.GetEntities())
+                {
+                    var ename = entity.Name ?? (entity as Sandbox.Game.Entities.Character.MyCharacter)?.DisplayName;
+                    if (string.IsNullOrEmpty(ename) || !ename.StartsWith("ST-")) continue;
+                    if (entity.MarkedForClose) continue;
+                    entity.Close();
+                    closed++;
+                }
+                if (closed > 0)
+                    Log.Info("purged " + closed + " test entities left over from a previous session");
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "purge of stale test entities failed");
+            }
+        }
+
         public static void Tick()
         {
             try
             {
+                PurgeStaleTestEntities();
                 ProcessCleanupQueue();
                 if (_active == null)
                 {
