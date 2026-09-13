@@ -161,6 +161,8 @@ namespace SentisTests.Game
             var ob = new MyObjectBuilder_CubeGrid
             {
                 Name = name,
+                // the admin GUI searches DisplayName, not the internal Name
+                DisplayName = name,
                 GridSizeEnum = size,
                 IsStatic = isStatic,
                 PositionAndOrientation = new MyPositionAndOrientation(
@@ -173,11 +175,8 @@ namespace SentisTests.Game
 
             foreach (var spec in blocks)
             {
-                var block = new MyObjectBuilder_CubeBlock
-                {
-                    SubtypeName = spec.SubtypeId,
-                    Min = new SerializableVector3I(spec.Position.X, spec.Position.Y, spec.Position.Z),
-                };
+                var block = MakeBlockOb(spec.SubtypeId);
+                block.Min = new SerializableVector3I(spec.Position.X, spec.Position.Y, spec.Position.Z);
                 block.BuiltBy = TestIdentityId();
                 if (spec.Orientation != 0)
                     block.BlockOrientation.Forward = (VRageMath.Base6Directions.Direction)spec.Orientation;
@@ -204,6 +203,98 @@ namespace SentisTests.Game
             }
 
             return ob;
+        }
+
+        /// <summary>
+        /// Creates the block object-builder of the DERIVED type registered for the subtype in the
+        /// definition manager (MyObjectBuilder_ShipWelder for LargeShipWelder, etc). The plain base
+        /// MyObjectBuilder_CubeBlock is silently dropped for functional blocks during grid spawn, so
+        /// prefab ships must use the derived type. Falls back to the base type when the subtype has
+        /// no resolvable definition.
+        /// </summary>
+        public static MyObjectBuilder_CubeBlock MakeBlockOb(string subtypeId)
+        {
+            var defId = Sandbox.Definitions.MyDefinitionManager.Static
+                .GetDefinitionsOfType<Sandbox.Definitions.MyCubeBlockDefinition>()
+                .Where(d => string.Equals(d.Id.SubtypeName, subtypeId, StringComparison.OrdinalIgnoreCase))
+                .Select(d => d.Id)
+                .FirstOrDefault();
+            if (!string.IsNullOrEmpty(defId.SubtypeName))
+            {
+                var derived = VRage.ObjectBuilders.Private.MyObjectBuilderSerializerKeen
+                    .CreateNewObject(defId) as MyObjectBuilder_CubeBlock;
+                if (derived != null)
+                    return derived;
+            }
+            return new MyObjectBuilder_CubeBlock { SubtypeName = subtypeId };
+        }
+
+        /// <summary>
+        /// Aggregates every component the given blueprint blocks consume (definition component
+        /// stacks x instance count x safety multiplier). Maps component subtype -> amount.
+        /// </summary>
+        public static Dictionary<string, int> ComponentsNeeded(
+            IEnumerable<VRage.Game.MyObjectBuilder_CubeBlock> blueprintBlocks, int multiplier = 2)
+        {
+            var needs = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var grp in blueprintBlocks.GroupBy(b => b.SubtypeName))
+            {
+                var def = Sandbox.Definitions.MyDefinitionManager.Static
+                    .GetDefinitionsOfType<Sandbox.Definitions.MyCubeBlockDefinition>()
+                    .FirstOrDefault(d => string.Equals(d.Id.SubtypeName, grp.Key, StringComparison.OrdinalIgnoreCase));
+                if (def == null || def.Components == null)
+                {
+                    Log.Warn("no definition/components for blueprint block {0}", grp.Key);
+                    continue;
+                }
+                foreach (var c in def.Components)
+                {
+                    var name = c.Definition != null ? c.Definition.Id.SubtypeName : null;
+                    if (string.IsNullOrEmpty(name)) continue;
+                    int add = c.Count * grp.Count() * Math.Max(1, multiplier);
+                    int prev;
+                    needs.TryGetValue(name, out prev);
+                    needs[name] = prev + add;
+                }
+            }
+            return needs;
+        }
+
+        /// <summary>
+        /// Puts every component of the map into the block's inventory (welder/drill style storage).
+        /// Returns a human summary; individual failures are logged, not thrown.
+        /// </summary>
+        public static string StockComponents(VRage.Game.Entity.MyInventoryBase inventory,
+            Dictionary<string, int> components)
+        {
+            var done = new List<string>();
+            foreach (var kvp in components)
+            {
+                try
+                {
+                    var content = new VRage.Game.MyObjectBuilder_Component { SubtypeName = kvp.Key };
+                    inventory.AddItems(kvp.Value, content);
+                    done.Add(kvp.Key + "=" + CountComponent(inventory, kvp.Key) + "/" + kvp.Value);
+                }
+                catch (Exception e)
+                {
+                    Log.Warn("cannot stock {0} x{1}: {2}", kvp.Key, kvp.Value, e.Message);
+                }
+            }
+            return string.Join(", ", done);
+        }
+
+        public static int CountComponent(VRage.Game.Entity.MyInventoryBase inventory, string subtype)
+        {
+            int total = 0;
+            if (inventory == null) return 0;
+            foreach (dynamic item in inventory.GetItems())
+            {
+                string name = ((string)item.Content.SubtypeName);
+                if (string.Equals(name, subtype, StringComparison.OrdinalIgnoreCase))
+                    total += (int)(float)item.Amount;
+            }
+            return total;
         }
 
         public static MyObjectBuilder_Inventory SteelInventory(int amount)

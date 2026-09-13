@@ -207,6 +207,9 @@ namespace SentisTests.Scenarios
             shipBlocks.Add(new BlockSpec(batteryType, new Vector3I(2, 1, 2)));
             shipBlocks.Add(new BlockSpec(cockpitType, new Vector3I(2, 1, 1)));
             shipBlocks.Add(new BlockSpec(batteryType, new Vector3I(0, 0, 0)));
+            // the welder is part of the prefab: GridOb builds the DERIVED object-builder type
+            // (MyObjectBuilder_ShipWelder), which survives spawn; only the plain base type is dropped
+            shipBlocks.Add(new BlockSpec(welderType, new Vector3I(1, 0, 1)));
 
             var shipPos = PlatformPos + ShipSpawnOffset;
             Note("spawning welder ship at " + shipPos.ToString("F0"));
@@ -220,20 +223,26 @@ namespace SentisTests.Scenarios
 
             Log.Info("ship blocks: " + string.Join(", ", ship.GetBlocks().Select(b => b.BlockDefinition.Id.SubtypeName + "@" + b.Position + (b.FatBlock != null ? "" : "(thin)"))));
 
-            // The OB spawn path strips MyShipWelder fat blocks on this build (18 -> 17), so the
-            // welder goes in through the engine's live-add path used by real construction.
-            var welderSubtype = WorldApi.FindSubtype(MyCubeSize.Large, "shipwelder");
-            var welderFat = WorldApi.AddRealBlock(ship, welderSubtype, new Vector3I(1, 0, 1));
-            Check(welderFat != null, "cannot install the real welder block at runtime");
-            var welder = welderFat as SpaceEngineers.Game.Entities.Blocks.MyShipWelder;
-            Check(welder != null, "installed block is " + welderFat.GetType().Name + ", not MyShipWelder");
-            Note("real welder installed: " + welder.BlockDefinition.Id.SubtypeName + " at " + welder.Position);
+            var welder = WorldApi.FindFunctional<SpaceWelder>(ship);
+            if (welder == null)
+            {
+                // prefab path failed on this engine build: fall back to the live-add construction path
+                Log.Warn("prefab welder missing after spawn, using live-add fallback");
+                var welderFat = WorldApi.AddRealBlock(ship, welderType, new Vector3I(1, 0, 1));
+                Check(welderFat != null, "cannot install the real welder block at runtime");
+                welder = welderFat as SpaceWelder;
+                Check(welder != null, "installed block is " + welderFat.GetType().Name + ", not MyShipWelder");
+            }
+            Note("real welder on the ship: " + welder.BlockDefinition.Id.SubtypeName + " at " + welder.Position);
 
             EnsureDistributor(ship); // re-wire power so the new block's sink is registered
 
-            welder.GetInventory().AddItems(240, new MyObjectBuilder_Component { SubtypeName = "SteelPlate" });
+            // every component the blueprint can consume, with a 2x safety margin, lies in the
+            // welder before the first spark - exactly what a prepared construction ship carries
+            var needs = WorldApi.ComponentsNeeded(blueprint.CubeBlocks, 2);
+            Note("welder cargo plan: " + string.Join(", ", needs.Select(kvp => kvp.Key + " x" + kvp.Value)));
+            Note("welder stocked: " + WorldApi.StockComponents(welder.GetInventory(), needs));
             var welderSteel0 = CountSteel(welder.GetInventory());
-            Note("welder stock: " + welderSteel0 + " steel plates");
 
             yield return Wait(() => { ChargeBatteries(ship); return welder.IsFunctional; },
                 "welder functional (" + WorldApi.DescribePower(ship) + ")", 90);
