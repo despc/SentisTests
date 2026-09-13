@@ -156,8 +156,11 @@ namespace SentisTests.Game
         }
 
         public static MyObjectBuilder_CubeGrid GridOb(string name, MyCubeSize size, bool isStatic,
-            Vector3D position, IEnumerable<BlockSpec> blocks)
+            Vector3D position, IEnumerable<BlockSpec> blocks,
+            Vector3? forward = null, Vector3? up = null)
         {
+            var f = forward ?? Vector3.Forward;
+            var u = up ?? Vector3.Up;
             var ob = new MyObjectBuilder_CubeGrid
             {
                 Name = name,
@@ -165,8 +168,7 @@ namespace SentisTests.Game
                 DisplayName = name,
                 GridSizeEnum = size,
                 IsStatic = isStatic,
-                PositionAndOrientation = new MyPositionAndOrientation(
-                    position, Vector3.Forward, Vector3.Up),
+                PositionAndOrientation = new MyPositionAndOrientation(position, f, u),
                 // WITHOUT InScene the entity is added to the server lists only: game-thread logic
                 // runs, but the replication/scene layer never tells clients about it.
                 PersistentFlags = VRage.ObjectBuilders.MyPersistentEntityFlags2.InScene,
@@ -343,29 +345,65 @@ namespace SentisTests.Game
             return n;
         }
 
-        /// <summary>
-        /// One welder-tick for every unfinished block on the grid: exactly the server branch of
-        /// MyShipWelder.Activate - stockpile from the tool inventory, then IncreaseMountLevel.
-        /// Consumes real components, so in Survival mode the cargo visibly drains.
-        /// </summary>
-        public static int WeldScaffolds(MyCubeGrid grid, Sandbox.Game.Entities.MyCubeBlock tool, float amount)
+        // ------------------------------------------------------- ship-tool sensors
+        // MyShipToolBase keeps the detector sphere and the activation flag private; the test
+        // needs them to respect the welder's real reach instead of teleport-welding.
+        private static System.Reflection.FieldInfo FindField(object obj, string name)
         {
-            if (grid == null || grid.CubeBlocks == null || tool == null) return 0;
-            var inv = tool.GetInventory();
-            var inProgress = 0;
-            foreach (var slim in grid.CubeBlocks.ToList())
+            for (var t = obj.GetType(); t != null; t = t.BaseType)
             {
-                if (slim.IsFullIntegrity) continue;
-                inProgress++;
-                slim.MoveItemsToConstructionStockpile(inv);
-                slim.MoveUnneededItemsFromConstructionStockpile(inv);
-                var share = tool.IDModule != null ? tool.IDModule.ShareMode : MyOwnershipShareModeEnum.None;
-                slim.IncreaseMountLevel(amount, tool.OwnerId, inv, 0.15f, false, share,
-                    handWelded: false, testingMode: false);
+                var f = t.GetField(name, System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+                if (f != null) return f;
             }
-            return inProgress;
+            return null;
         }
 
+        /// <summary>World-space detector sphere of a ship tool (m_detectorSphere transformed by the grid matrix).</summary>
+        public static BoundingSphereD SensorSphere(Sandbox.Game.Entities.MyCubeBlock tool)
+        {
+            var f = FindField(tool, "m_detectorSphere");
+            if (f == null) return new BoundingSphereD(PositionOf(tool), 15);
+            var local = (BoundingSphere)f.GetValue(tool);
+            var center = Vector3D.Transform((Vector3D)local.Center, tool.CubeGrid.WorldMatrix);
+            return new BoundingSphereD(center, local.Radius);
+        }
+
+        public static bool ToolIsActivated(Sandbox.Game.Entities.MyCubeBlock tool)
+        {
+            var f = FindField(tool, "m_isActivated");
+            return f != null && (bool)f.GetValue(tool);
+        }
+
+        /// <summary>Vanilla StartShooting(): sets m_isActivated so UpdateAfterSimulation10 drives ActivateCommon.</summary>
+        public static void ToolStartShooting(Sandbox.Game.Entities.MyCubeBlock tool)
+        {
+            for (var t = tool.GetType(); t != null; t = t.BaseType)
+            {
+                var m = t.GetMethod("StartShooting", System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+                if (m != null) { m.Invoke(tool, new object[0]); break; }
+            }
+            tool.NeedsUpdate |= VRage.ModAPI.MyEntityUpdateEnum.EACH_10TH_FRAME;
+        }
+
+        /// <summary>MyShipWelder.FindProjectedBlocks(): how many hologram blocks the welder itself sees right now.</summary>
+        public static int ProbeProjectedBlocks(Sandbox.Game.Entities.MyCubeBlock tool)
+        {
+            for (var t = tool.GetType(); t != null; t = t.BaseType)
+            {
+                var m = t.GetMethod("FindProjectedBlocks", System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Instance);
+                if (m != null)
+                {
+                    var arr = m.Invoke(tool, new object[0]);
+                    return arr == null ? 0 : ((Array)arr).Length;
+                }
+            }
+            return -1;
+        }
+
+        /// <summary>
         // -------------------------------------------------------------- utilities
 
         public static IEnumerable<T> Functionals<T>(MyCubeGrid grid) where T : class
