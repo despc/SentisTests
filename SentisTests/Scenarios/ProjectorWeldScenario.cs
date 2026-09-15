@@ -116,8 +116,8 @@ namespace SentisTests.Scenarios
 
             yield return WaitForTicks(60);
 
-            var platformDist = EnsureDistributor(platform);
-            var charged = ChargeBatteries(platform);
+            var platformDist = WorldApi.EnsureDistributor(platform);
+            var charged = WorldApi.ChargeBatteries(platform);
             Check(charged > 0, "no chargeable batteries on the platform");
             Note("platform batteries charged to " + charged.ToString("F0") + " MW");
 
@@ -126,7 +126,7 @@ namespace SentisTests.Scenarios
 
             yield return Wait(() =>
             {
-                ChargeBatteries(platform);
+                WorldApi.ChargeBatteries(platform);
                 platformDist.MarkForUpdate();
                 platformDist.UpdateBeforeSimulation();
                 return projector.IsWorking && projector.ProjectedGrid != null;
@@ -188,8 +188,8 @@ namespace SentisTests.Scenarios
 
             yield return WaitForTicks(120); // fat-block promotion must finish before the distributor pass
 
-            EnsureDistributor(ship);
-            Note("ship batteries charged to " + ChargeBatteries(ship).ToString("F0") + " MW");
+            WorldApi.EnsureDistributor(ship);
+            Note("ship batteries charged to " + WorldApi.ChargeBatteries(ship).ToString("F0") + " MW");
 
             var welder = WorldApi.FindFunctional<SpaceWelder>(ship);
             Check(welder != null, "welder block missing from the prefab");
@@ -201,14 +201,14 @@ namespace SentisTests.Scenarios
                  ", sensor r=" + sensor.Radius.ToString("F1") + " m, offset from center=" +
                  sensorOffset.ToString("F1"));
 
-            EnsureDistributor(ship); // re-wire power so the new block's sink is registered
+            WorldApi.EnsureDistributor(ship); // re-wire power so the new block's sink is registered
 
             var needs = WorldApi.ComponentsNeeded(blueprint.CubeBlocks, 2);
             Note("welder cargo plan: " + string.Join(", ", needs.Select(kvp => kvp.Key + " x" + kvp.Value)));
             Note("welder stocked: " + WorldApi.StockComponents(welder.GetInventory(), needs));
-            var welderSteel0 = CountSteel(welder.GetInventory());
+            var welderSteel0 = WorldApi.CountSteel(welder.GetInventory());
 
-            yield return Wait(() => { ChargeBatteries(ship); return welder.IsFunctional; },
+            yield return Wait(() => { WorldApi.ChargeBatteries(ship); return welder.IsFunctional; },
                 "welder functional (" + WorldApi.DescribePower(ship) + ")", 90);
 
             welder.Enabled = true;
@@ -244,7 +244,11 @@ namespace SentisTests.Scenarios
             var lastLogAt = DateTime.UtcNow;
             var lastProgressAt = DateTime.UtcNow;
             var lastProgressCount = 0;
-            var sensorGap = 1.2;   // sensor center this far above the slab top face
+            // Sensor centre this far above the slab top face. Half a metre more than the old 1.2:
+            // parked lower, the welder hull flies into the very projected block it is building and
+            // the game's build check then rejects that block - which shows up as the ship parking
+            // over the last remaining block forever, build check cancelled, nothing happening.
+            var sensorGap = 1.7;
             var slabArea = new BoundingBoxD(slabBb.Min - new Vector3D(1.5, 1.5, 1.5), slabBb.Max + new Vector3D(1.5, 1.5, 1.5));
             var holdCenter = new Vector3D(slabCenter.X, slabTopY + sensorGap, slabCenter.Z);
 
@@ -271,8 +275,8 @@ namespace SentisTests.Scenarios
 
                 // keep both grids powered: the projector dies in seconds without a top-up,
                 // and a dead projector makes every CanBuild fail
-                ChargeBatteries(ship);
-                ChargeBatteries(platform);
+                WorldApi.ChargeBatteries(ship);
+                WorldApi.ChargeBatteries(platform);
                 platformDist.MarkForUpdate();
                 platformDist.UpdateBeforeSimulation();
 
@@ -331,7 +335,7 @@ namespace SentisTests.Scenarios
                 {
                     lastLogAt = DateTime.UtcNow;
                     Note("welding: built=" + built + "/" + expected + " (finished=" + finished + ")" +
-                         ", steel=" + CountSteel(welder.GetInventory()) +
+                         ", steel=" + WorldApi.CountSteel(welder.GetInventory()) +
                          ", probe sees " + WorldApi.ProbeProjectedBlocks(welder) + " projected" +
                          (found ? "" : ", NO TARGET"));
                 }
@@ -340,7 +344,7 @@ namespace SentisTests.Scenarios
                 {
                     throw new Core.ScenarioFailedException(
                         "vanilla welder stalled: no finished blocks for 90s (built=" + built + "/" + expected +
-                        ", finished=" + finished + ", steel=" + CountSteel(welder.GetInventory()) +
+                        ", finished=" + finished + ", steel=" + WorldApi.CountSteel(welder.GetInventory()) +
                         ", probe=" + WorldApi.ProbeProjectedBlocks(welder) +
                         ", projector=" + (projector.IsWorking ? "working" : "NOT working") + ")");
                 }
@@ -352,7 +356,7 @@ namespace SentisTests.Scenarios
             yield return Wait(() => WorldApi.CountFinished(platform) - baseFinished >= expected,
                 "all " + expected + " slab blocks finished", 120);
 
-            var welderSteelUsed = welderSteel0 - CountSteel(welder.GetInventory());
+            var welderSteelUsed = welderSteel0 - WorldApi.CountSteel(welder.GetInventory());
             var realBuilt = WorldApi.CountBlocks(platform) - baseTotal;
             Note("slab welded in " + (DateTime.UtcNow - weldingStart).TotalSeconds.ToString("F1") +
                  "s | vanilla welder built " + realBuilt + " blocks | steel used=" + welderSteelUsed);
@@ -375,77 +379,5 @@ namespace SentisTests.Scenarios
                  "(" + realBuilt + " blocks, steel used=" + welderSteelUsed + ")");
         }
 
-        private static Sandbox.Game.EntityComponents.MyResourceDistributorComponent EnsureDistributor(MyCubeGrid grid)
-        {
-            var distributor = grid.Components.Get<Sandbox.Game.EntityComponents.MyResourceDistributorComponent>();
-            if (distributor == null)
-            {
-                distributor = new Sandbox.Game.EntityComponents.MyResourceDistributorComponent("SentisTests");
-                grid.Components.Add(distributor);
-                Log.Info("installed resource distributor on " + grid.DisplayName);
-            }
-
-            int sources = 0, sinks = 0;
-            foreach (var cube in grid.GetBlocks())
-            {
-                var fat = cube.FatBlock;
-                if (fat == null || fat.MarkedForClose)
-                    continue;
-
-                var battery = fat as Sandbox.Game.Entities.MyBatteryBlock;
-                if (battery != null && battery.SourceComp != null)
-                {
-                    distributor.AddSource(battery.SourceComp);
-                    sources++;
-                }
-
-                var sink = fat.Components != null
-                    ? fat.Components.Get<Sandbox.Game.EntityComponents.MyResourceSinkComponent>()
-                    : null;
-                if (sink != null)
-                {
-                    distributor.AddSink(sink);
-                    sinks++;
-                }
-            }
-            Log.Info("distributor wiring on {0}: {1} sources, {2} sinks", grid.DisplayName, sources, sinks);
-
-            distributor.MarkForUpdate();
-            distributor.UpdateBeforeSimulation();
-            return distributor;
-        }
-
-        private static float ChargeBatteries(MyCubeGrid grid)
-        {
-            float total = 0;
-            foreach (var battery in WorldApi.Functionals<Sandbox.Game.Entities.MyBatteryBlock>(grid))
-            {
-                try
-                {
-                    battery.ChargeMode = Sandbox.ModAPI.Ingame.ChargeMode.Auto;
-                    if (battery.CurrentStoredPower < battery.MaxStoredPower)
-                        battery.CurrentStoredPower = battery.MaxStoredPower;
-                    total += battery.CurrentStoredPower;
-                }
-                catch (Exception e)
-                {
-                    Log.Warn("battery charge failed: {0}", e.Message);
-                }
-            }
-            return total;
-        }
-
-        private static long CountSteel(VRage.Game.Entity.MyInventoryBase inv)
-        {
-            long n = 0;
-            if (inv == null) return 0;
-            foreach (dynamic item in inv.GetItems())
-            {
-                string subtype = ((string)item.Content.SubtypeName).ToLowerInvariant();
-                if (subtype.Contains("steel"))
-                    n += (long)(float)item.Amount;
-            }
-            return n;
-        }
     }
 }

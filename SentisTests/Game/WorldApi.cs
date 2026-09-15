@@ -155,6 +155,54 @@ namespace SentisTests.Game
             return _identityId.Value;
         }
 
+        private static long? _ownerIdentityId;
+
+        /// <summary>
+        /// The operator's own identity - the player who welds projections by hand in the client.
+        /// MyShipWelder hands its OWN OwnerId to MyProjectorBase.Build as the owner of the block it
+        /// is starting, and a grid spawned without an owner leaves OwnerId = 0 on every block on it:
+        /// such a welder silently never starts a construction in survival. Ships that must weld are
+        /// therefore handed to this identity instead of the synthetic SentisTests one.
+        /// </summary>
+        public static long PlayerIdentityId()
+        {
+            if (_ownerIdentityId.HasValue)
+                return _ownerIdentityId.Value;
+
+            var players = Sandbox.Game.World.MySession.Static.Players;
+            var wanted = SentisTestsPlugin.Config != null ? SentisTestsPlugin.Config.OwnerPlayerName : null;
+            Sandbox.Game.World.MyIdentity preferred = null;
+            Sandbox.Game.World.MyIdentity anyPlayer = null;
+            var seen = new List<string>();
+            foreach (var identity in players.GetAllIdentities())
+            {
+                if (identity == null || identity.IdentityId == 0) continue;
+                // A saved player has a MyPlayer record, an NPC or a created test identity does not.
+                var isPlayer = players.TryGetPlayer(identity.IdentityId) != null;
+                seen.Add(identity.DisplayName + "=" + identity.IdentityId + (isPlayer ? "" : "(no player)"));
+                if (!isPlayer) continue;
+                if (!string.IsNullOrEmpty(wanted) &&
+                    string.Equals(identity.DisplayName, wanted, System.StringComparison.OrdinalIgnoreCase))
+                {
+                    preferred = identity;
+                    break;
+                }
+                if (anyPlayer == null) anyPlayer = identity;
+            }
+
+            var chosen = preferred ?? anyPlayer;
+            if (chosen == null)
+            {
+                Log.Warn("no saved player identity to own the test ships (identities: {0}), using the test identity",
+                    string.Join(", ", seen));
+                return TestIdentityId();
+            }
+
+            _ownerIdentityId = chosen.IdentityId;
+            Log.Info("test ships will be owned and built by player '{0}' ({1})", chosen.DisplayName, _ownerIdentityId);
+            return _ownerIdentityId.Value;
+        }
+
         public static MyObjectBuilder_CubeGrid GridOb(string name, MyCubeSize size, bool isStatic,
             Vector3D position, IEnumerable<BlockSpec> blocks,
             Vector3? forward = null, Vector3? up = null)
@@ -330,6 +378,138 @@ namespace SentisTests.Game
             return grid;
         }
 
+        /// <summary>
+        /// Loads a cube-grid template shipped as an embedded resource and readies it for spawn:
+        /// fresh player owner/builder and caller-chosen placement, everything else (block
+        /// orientations, the conveyor-line topology, stocked inventories) kept exactly as authored.
+        /// Used instead of re-guessing a working build in code.
+        /// </summary>
+        public static MyObjectBuilder_CubeGrid LoadGridTemplate(string resourceName, string name,
+            Vector3D position, Vector3 forward, Vector3 up)
+        {
+            var ob = LoadTemplateXml(resourceName);
+            ob.Name = name;
+            ob.DisplayName = name;
+            ob.IsStatic = false;
+            ob.PositionAndOrientation = new MyPositionAndOrientation(position, forward, up);
+            ob.PersistentFlags = VRage.ObjectBuilders.MyPersistentEntityFlags2.InScene;
+            // The extractor strips <Owner>/<BuiltBy> from the saved grid. Ownership lives on the
+            // BLOCK object-builders (there is no grid-level owner), so spawning it as-is leaves
+            // every block - and with it every ship welder - owned by nobody, and an ownerless
+            // welder never starts a construction in survival, because Build() carries the welder's
+            // own OwnerId as the new block's owner. Hand every block to the player instead.
+            var owner = PlayerIdentityId();
+            foreach (var block in ob.CubeBlocks)
+            {
+                block.Owner = owner;
+                block.BuiltBy = owner;
+                block.ShareMode = VRage.Game.MyOwnershipShareModeEnum.Faction;
+            }
+
+            Log.Info("loaded grid template '{0}': {1} blocks, {2} conveyor lines",
+                resourceName, ob.CubeBlocks.Count, ob.ConveyorLines == null ? 0 : ob.ConveyorLines.Count);
+            return ob;
+        }
+
+        /// <summary>
+        /// A hand-built grid spawned exactly where the operator left it in the world. Same trimming
+        /// and ownership rules as <see cref="LoadGridTemplate"/>, but the saved transform survives
+        /// instead of being replaced: for a bench that was lined up by eye - a platform, a projector,
+        /// a welding boat parked on the side of the plate its tools are meant to come from - the
+        /// relative placement is the fixture, and re-deriving it in code is how the boat ends up
+        /// pushing the projection across the sector.
+        /// </summary>
+        public static MyObjectBuilder_CubeGrid LoadAuthoredGrid(string resourceName, string name)
+        {
+            var ob = LoadTemplateXml(resourceName);
+            if (!ob.PositionAndOrientation.HasValue)
+                throw new Core.ScenarioFailedException(resourceName +
+                    " carries no saved placement - extract it with tools/extract_authored.py");
+            ob.Name = name;
+            ob.DisplayName = name;
+            ob.PersistentFlags = VRage.ObjectBuilders.MyPersistentEntityFlags2.InScene;
+            var owner = PlayerIdentityId();
+            foreach (var block in ob.CubeBlocks)
+            {
+                block.Owner = owner;
+                block.BuiltBy = owner;
+                block.ShareMode = VRage.Game.MyOwnershipShareModeEnum.Faction;
+            }
+            var place = ob.PositionAndOrientation.Value;
+            Log.Info("loaded authored grid '{0}': {1} blocks at {2} fwd {3} up {4}{5}",
+                resourceName, ob.CubeBlocks.Count, place.Position, place.Forward, place.Up,
+                ob.IsStatic ? " (static)" : "");
+            return ob;
+        }
+
+        /// <summary>
+        /// A hand-built grid from the save, ready to be a projector's projected grid. Same rule as
+        /// <see cref="LoadGridTemplate"/> - the save is the authority for the layout - plus two
+        /// things a projection needs: the volume is shifted so its minimum corner sits at the
+        /// origin, which is where the projector's own placement then anchors it, and ownership is
+        /// left out, because vanilla takes the new block's owner from the PROJECTOR, not from the
+        /// blueprint cell. Nothing is spawned: the welders turn it into construction requests.
+        /// </summary>
+        public static MyObjectBuilder_CubeGrid LoadProjectionTemplate(string resourceName)
+        {
+            var ob = LoadTemplateXml(resourceName);
+            var min = new SerializableVector3I(int.MaxValue, int.MaxValue, int.MaxValue);
+            foreach (var block in ob.CubeBlocks)
+            {
+                if (block.Min.X < min.X) min.X = block.Min.X;
+                if (block.Min.Y < min.Y) min.Y = block.Min.Y;
+                if (block.Min.Z < min.Z) min.Z = block.Min.Z;
+            }
+            if (min.X != 0 || min.Y != 0 || min.Z != 0)
+            {
+                foreach (var block in ob.CubeBlocks)
+                    block.Min = new SerializableVector3I(block.Min.X - min.X, block.Min.Y - min.Y,
+                        block.Min.Z - min.Z);
+                // the saved conveyor lines are addressed by cell, so they move with the blocks
+                if (ob.ConveyorLines != null)
+                    foreach (var line in ob.ConveyorLines)
+                    {
+                        line.StartPosition = new Vector3I(line.StartPosition.X - min.X, line.StartPosition.Y - min.Y,
+                            line.StartPosition.Z - min.Z);
+                        line.EndPosition = new Vector3I(line.EndPosition.X - min.X, line.EndPosition.Y - min.Y,
+                            line.EndPosition.Z - min.Z);
+                    }
+            }
+            ob.PositionAndOrientation = null;      // the projector places the volume, not the save
+            Log.Info("loaded projection template '{0}': {1} blocks shifted by {2}, {3} conveyor lines",
+                resourceName, ob.CubeBlocks.Count, min.ToString(), ob.ConveyorLines == null ? 0 : ob.ConveyorLines.Count);
+            return ob;
+        }
+
+        private static MyObjectBuilder_CubeGrid LoadTemplateXml(string resourceName)
+        {
+            string xml;
+            using (var stream = typeof(WorldApi).Assembly.GetManifestResourceStream(resourceName))
+            {
+                if (stream == null)
+                    throw new Core.ScenarioFailedException("embedded grid template not found: " + resourceName +
+                        " (available: " + string.Join(", ", typeof(WorldApi).Assembly.GetManifestResourceNames()) + ")");
+                using (var reader = new System.IO.StreamReader(stream))
+                    xml = reader.ReadToEnd();
+            }
+
+            MyObjectBuilder_CubeGrid ob;
+            try
+            {
+                ob = MyAPIGateway.Utilities.SerializeFromXML<MyObjectBuilder_CubeGrid>(xml);
+            }
+            catch (Exception ex)
+            {
+                throw new Core.ScenarioFailedException("grid template failed to deserialize: " +
+                                                       ex.GetBaseException().Message);
+            }
+            if (ob == null)
+                throw new Core.ScenarioFailedException("grid template deserialized to null");
+            if (ob.CubeBlocks == null || ob.CubeBlocks.Count == 0)
+                throw new Core.ScenarioFailedException("grid template has no blocks");
+            return ob;
+        }
+
         public static int CountBlocks(MyCubeGrid grid)
         {
             return grid == null || grid.CubeBlocks == null ? 0 : grid.CubeBlocks.Count;
@@ -365,6 +545,7 @@ namespace SentisTests.Game
             var f = FindField(tool, "m_detectorSphere");
             if (f == null) return new BoundingSphereD(PositionOf(tool), 15);
             var local = (BoundingSphere)f.GetValue(tool);
+            if (tool.CubeGrid == null) return new BoundingSphereD(PositionOf(tool), 15);
             var center = Vector3D.Transform((Vector3D)local.Center, tool.CubeGrid.WorldMatrix);
             return new BoundingSphereD(center, local.Radius);
         }
@@ -396,15 +577,97 @@ namespace SentisTests.Game
                     System.Reflection.BindingFlags.Instance);
                 if (m != null)
                 {
-                    var arr = m.Invoke(tool, new object[0]);
-                    return arr == null ? 0 : ((Array)arr).Length;
+                    try
+                    {
+                        var arr = m.Invoke(tool, new object[0]);
+                        return arr == null ? 0 : ((Array)arr).Length;
+                    }
+                    catch { return 0; }
                 }
             }
             return -1;
         }
 
-        /// <summary>
         // -------------------------------------------------------------- utilities
+
+        /// <summary>
+        /// Install (or re-wire) the grid's resource distributor: every battery source and
+        /// every block sink gets registered, so headless power actually flows.
+        /// </summary>
+        public static Sandbox.Game.EntityComponents.MyResourceDistributorComponent EnsureDistributor(MyCubeGrid grid)
+        {
+            var distributor = grid.Components.Get<Sandbox.Game.EntityComponents.MyResourceDistributorComponent>();
+            if (distributor == null)
+            {
+                distributor = new Sandbox.Game.EntityComponents.MyResourceDistributorComponent("SentisTests");
+                grid.Components.Add(distributor);
+                Log.Info("installed resource distributor on " + grid.DisplayName);
+            }
+
+            int sources = 0, sinks = 0;
+            foreach (var cube in grid.GetBlocks())
+            {
+                var fat = cube.FatBlock;
+                if (fat == null || fat.MarkedForClose)
+                    continue;
+
+                var battery = fat as MyBatteryBlock;
+                if (battery != null && battery.SourceComp != null)
+                {
+                    distributor.AddSource(battery.SourceComp);
+                    sources++;
+                }
+
+                var sink = fat.Components != null
+                    ? fat.Components.Get<Sandbox.Game.EntityComponents.MyResourceSinkComponent>()
+                    : null;
+                if (sink != null)
+                {
+                    distributor.AddSink(sink);
+                    sinks++;
+                }
+            }
+            Log.Info("distributor wiring on {0}: {1} sources, {2} sinks", grid.DisplayName, sources, sinks);
+
+            distributor.MarkForUpdate();
+            distributor.UpdateBeforeSimulation();
+            return distributor;
+        }
+
+        /// <summary>Top up every battery on the grid; returns the resulting stored power.</summary>
+        public static float ChargeBatteries(MyCubeGrid grid)
+        {
+            float total = 0;
+            foreach (var battery in Functionals<MyBatteryBlock>(grid))
+            {
+                try
+                {
+                    battery.ChargeMode = Sandbox.ModAPI.Ingame.ChargeMode.Auto;
+                    if (battery.CurrentStoredPower < battery.MaxStoredPower)
+                        battery.CurrentStoredPower = battery.MaxStoredPower;
+                    total += battery.CurrentStoredPower;
+                }
+                catch (Exception e)
+                {
+                    Log.Warn("battery charge failed: {0}", e.Message);
+                }
+            }
+            return total;
+        }
+
+        /// <summary>Total steel (any "steel" subtype) in the inventory.</summary>
+        public static long CountSteel(VRage.Game.Entity.MyInventoryBase inv)
+        {
+            long n = 0;
+            if (inv == null) return 0;
+            foreach (dynamic item in inv.GetItems())
+            {
+                string subtype = ((string)item.Content.SubtypeName).ToLowerInvariant();
+                if (subtype.Contains("steel"))
+                    n += (long)(float)item.Amount;
+            }
+            return n;
+        }
 
         public static IEnumerable<T> Functionals<T>(MyCubeGrid grid) where T : class
         {

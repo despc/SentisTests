@@ -35,6 +35,9 @@ namespace SentisTests.Core
 
         public IReadOnlyList<string> ProgressLog { get { return _progressLog; } }
 
+        /// <summary>The entities this run tracked (cleanup skips them, it owns them).</summary>
+        internal IReadOnlyList<IMyEntity> Tracked { get { return _tracked; } }
+
         public abstract IEnumerator Run();
 
         /// <summary>Moves the tracked list out without deleting anything (deferred cleanup).</summary>
@@ -65,6 +68,15 @@ namespace SentisTests.Core
 
             _tracked.Clear();
         }
+
+        /// <summary>
+        /// Removes what <see cref="Cleanup"/> does not cover: debris the test knocked loose
+        /// (blocks that flew off and became their own tiny grids) and stale test grids from a
+        /// previous crashed/interrupted run. Called by the runner once Run() has finished, on
+        /// every verdict (pass, fail, timeout, error). Skipped when the run is kept for
+        /// inspection.
+        /// </summary>
+        public virtual void CleanupLeftovers() { }
 
         // ---------------------------------------------------------------- helpers
 

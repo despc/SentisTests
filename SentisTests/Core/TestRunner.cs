@@ -323,6 +323,15 @@ namespace SentisTests.Core
             if (SentisTestsPlugin.Config != null && !SentisTestsPlugin.Config.CleanupAfterTests)
                 delay = -1;
 
+            // whatever the verdict, the scenario gets a chance to sweep up what Tracking never
+            // saw: debris grids, stale rigs from a crashed run. Inspection runs (delay < 0)
+            // keep everything on purpose, so the leftovers sweep is skipped there too.
+            if (delay >= 0)
+            {
+                try { scenario.CleanupLeftovers(); }
+                catch (Exception e) { Log.Warn("leftover cleanup failed for {0}: {1}", scenario.Name, e.Message); }
+            }
+
             if (delay < 0)
             {
                 foreach (var entity in scenario.TakeTracked())

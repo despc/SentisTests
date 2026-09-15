@@ -30,5 +30,22 @@ namespace SentisTests
 
         /// <summary>Directory for markdown/json reports. Relative paths are resolved against the instance.</summary>
         public string ReportDirectory { get; set; } = @"SentisTests";
+
+        /// <summary>
+        /// Enables the loopback-only administrative DebugBridge. Disabled by default because its
+        /// endpoints can move/delete grids and read logs.
+        /// </summary>
+        public bool EnableDebugBridge { get; set; } = false;
+
+        /// <summary>Bearer token required by every DebugBridge REST/MCP request (minimum 32 characters).</summary>
+        public string DebugBridgeToken { get; set; } = "";
+
+        /// <summary>
+        /// Display name of the player that owns and built the spawned test ships.
+        /// welder passes its OWN OwnerId to the projector as the owner of the block it starts, so
+        /// the tools have to belong to a real player - the same one who hand-welds the projection
+        /// in the client. Empty, or a name that is not in the save, falls back to any saved player.
+        /// </summary>
+        public string OwnerPlayerName { get; set; } = "";
     }
 }

@@ -35,12 +35,16 @@ namespace SentisTests
 
                 ScenarioRegistry.Register(SmokeScenario.ScenarioName, () => new SmokeScenario());
                 ScenarioRegistry.Register(ProjectorWeldScenario.ScenarioName, () => new ProjectorWeldScenario());
+                ScenarioRegistry.Register(MixedWeldScenario.ScenarioName, () => new MixedWeldScenario());
                 ScenarioRegistry.Register(HandWeldScenario.ScenarioName, () => new HandWeldScenario());
+                ScenarioRegistry.Register(ProductionScenario.ScenarioName, () => new ProductionScenario());
 
                 _sessionManager = torch.Managers.GetManager<TorchSessionManager>();
                 if (_sessionManager != null)
                     _sessionManager.SessionStateChanged += OnSessionStateChanged;
 
+                if (Config != null && Config.EnableDebugBridge)
+                    Debug.DebugBridge.Start(Config.DebugBridgeToken);
                 Log.Info("SentisTests ready; scenarios: {0}", string.Join(", ", ScenarioRegistry.Names));
             }
             catch (Exception e)
@@ -89,6 +93,7 @@ namespace SentisTests
             TickMetrics.FrameBegin();
             try
             {
+                Debug.DebugBridge.Tick();
                 MaybeStartAutoRun();
                 TestRunner.Tick();
             }
@@ -122,6 +127,7 @@ namespace SentisTests
             try
             {
                 TestRunner.StopActive("plugin unloading");
+                Debug.DebugBridge.Stop();
                 if (_sessionManager != null)
                     _sessionManager.SessionStateChanged -= OnSessionStateChanged;
                 _config?.Save(Path.Combine(StoragePath, "SentisTests.cfg"));
