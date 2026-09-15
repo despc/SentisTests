@@ -38,6 +38,8 @@ namespace SentisTests
                 ScenarioRegistry.Register(MixedWeldScenario.ScenarioName, () => new MixedWeldScenario());
                 ScenarioRegistry.Register(HandWeldScenario.ScenarioName, () => new HandWeldScenario());
                 ScenarioRegistry.Register(ProductionScenario.ScenarioName, () => new ProductionScenario());
+                ScenarioRegistry.Register(ProductionFreezerStressScenario.ScenarioName,
+                    () => new ProductionFreezerStressScenario());
 
                 _sessionManager = torch.Managers.GetManager<TorchSessionManager>();
                 if (_sessionManager != null)

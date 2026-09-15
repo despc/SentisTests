@@ -71,6 +71,7 @@
     <EmbeddedResource Include="Resources\MixedShip.xml" />
     <EmbeddedResource Include="Resources\PlatformWithProjection.xml" />
     <EmbeddedResource Include="Resources\ProductionGrid.xml" />
+    <EmbeddedResource Include="Resources\ProductionStressGrid.xml" />
   </ItemGroup>
 
 </Project>

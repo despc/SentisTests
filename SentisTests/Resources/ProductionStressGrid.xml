@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<MyObjectBuilder_CubeGrid xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <SubtypeName />
+  <GridSizeEnum>Large</GridSizeEnum>
+  <CubeBlocks>
+    <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_Refinery">
+      <SubtypeName>LargeRefinery</SubtypeName>
+      <Min x="0" y="0" z="0" />
+      <BlockOrientation Forward="Forward" Up="Up" />
+      <CustomName>ST Production Refinery</CustomName>
+      <ShowOnHUD>false</ShowOnHUD>
+      <ShowInTerminal>true</ShowInTerminal>
+      <ShowInToolbarConfig>true</ShowInToolbarConfig>
+      <ShowInInventory>true</ShowInInventory>
+      <Enabled>true</Enabled>
+      <InputInventory><Items /><nextItemId>0</nextItemId></InputInventory>
+      <OutputInventory><Items /><nextItemId>0</nextItemId></OutputInventory>
+    </MyObjectBuilder_CubeBlock>
+
+    <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_Assembler">
+      <SubtypeName>LargeAssembler</SubtypeName>
+      <Min x="-3" y="1" z="1" />
+      <BlockOrientation Forward="Forward" Up="Up" />
+      <CustomName>ST Production Assembler</CustomName>
+      <ShowOnHUD>false</ShowOnHUD>
+      <ShowInTerminal>true</ShowInTerminal>
+      <ShowInToolbarConfig>true</ShowInToolbarConfig>
+      <ShowInInventory>true</ShowInInventory>
+      <Enabled>true</Enabled>
+      <InputInventory><Items /><nextItemId>0</nextItemId></InputInventory>
+      <OutputInventory><Items /><nextItemId>0</nextItemId></OutputInventory>
+      <Queue>
+        <Item>
+          <Id><TypeId>MyObjectBuilder_BlueprintDefinition</TypeId><SubtypeId>SteelPlate</SubtypeId></Id>
+          <Amount>25</Amount><ItemId>0</ItemId>
+        </Item>
+        <Item>
+          <Id><TypeId>MyObjectBuilder_BlueprintDefinition</TypeId><SubtypeId>MotorComponent</SubtypeId></Id>
+          <Amount>25</Amount><ItemId>1</ItemId>
+        </Item>
+        <Item>
+          <Id><TypeId>MyObjectBuilder_BlueprintDefinition</TypeId><SubtypeId>ComputerComponent</SubtypeId></Id>
+          <Amount>25</Amount><ItemId>2</ItemId>
+        </Item>
+      </Queue>
+      <NextItemId>3</NextItemId>
+      <CurrentProgress>0</CurrentProgress>
+      <DisassembleEnabled>false</DisassembleEnabled>
+      <RepeatAssembleEnabled>false</RepeatAssembleEnabled>
+      <RepeatDisassembleEnabled>false</RepeatDisassembleEnabled>
+      <SlaveEnabled>false</SlaveEnabled>
+    </MyObjectBuilder_CubeBlock>
+
+    <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CargoContainer">
+      <SubtypeName>LargeBlockLargeContainer</SubtypeName>
+      <Min x="-7" y="-1" z="0" />
+      <BlockOrientation Forward="Forward" Up="Up" />
+      <CustomName>ST Production Ore Cargo</CustomName>
+      <ComponentContainer>
+        <Components>
+          <ComponentData>
+            <TypeId>MyInventoryBase</TypeId>
+            <Component xsi:type="MyObjectBuilder_Inventory">
+              <CanPutItems>true</CanPutItems>
+              <Items>
+                <MyObjectBuilder_InventoryItem>
+                  <Amount>5000</Amount>
+                  <PhysicalContent xsi:type="MyObjectBuilder_Ore"><SubtypeName>Iron</SubtypeName></PhysicalContent>
+                  <ItemId>0</ItemId>
+                </MyObjectBuilder_InventoryItem>
+                <MyObjectBuilder_InventoryItem>
+                  <Amount>1250</Amount>
+                  <PhysicalContent xsi:type="MyObjectBuilder_Ore"><SubtypeName>Nickel</SubtypeName></PhysicalContent>
+                  <ItemId>1</ItemId>
+                </MyObjectBuilder_InventoryItem>
+                <MyObjectBuilder_InventoryItem>
+                  <Amount>500</Amount>
+                  <PhysicalContent xsi:type="MyObjectBuilder_Ore"><SubtypeName>Silicon</SubtypeName></PhysicalContent>
+                  <ItemId>2</ItemId>
+                </MyObjectBuilder_InventoryItem>
+              </Items>
+              <nextItemId>3</nextItemId>
+              <Volume>15.625</Volume>
+              <Mass>9223372036854.775807</Mass>
+              <MaxItemCount>2147483647</MaxItemCount>
+              <Size xsi:nil="true" />
+              <InventoryFlags>CanReceive CanSend</InventoryFlags>
+              <RemoveEntityOnEmpty>false</RemoveEntityOnEmpty>
+            </Component>
+          </ComponentData>
+        </Components>
+      </ComponentContainer>
+      <ShowOnHUD>false</ShowOnHUD>
+      <ShowInTerminal>true</ShowInTerminal>
+      <ShowInToolbarConfig>true</ShowInToolbarConfig>
+      <ShowInInventory>true</ShowInInventory>
+    </MyObjectBuilder_CubeBlock>
+
+    <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_Reactor">
+      <SubtypeName>LargeBlockSmallGenerator</SubtypeName>
+      <Min x="-2" y="-1" z="1" />
+      <BlockOrientation Forward="Forward" Up="Up" />
+      <CustomName>ST Production Reactor</CustomName>
+      <ComponentContainer>
+        <Components>
+          <ComponentData>
+            <TypeId>MyInventoryBase</TypeId>
+            <Component xsi:type="MyObjectBuilder_Inventory">
+              <CanPutItems>true</CanPutItems>
+              <Items>
+                <MyObjectBuilder_InventoryItem>
+                  <Amount>10</Amount>
+                  <PhysicalContent xsi:type="MyObjectBuilder_Ingot"><SubtypeName>Uranium</SubtypeName></PhysicalContent>
+                  <ItemId>0</ItemId>
+                </MyObjectBuilder_InventoryItem>
+              </Items>
+              <nextItemId>1</nextItemId>
+              <Volume>1</Volume>
+              <Mass>9223372036854.775807</Mass>
+              <MaxItemCount>2147483647</MaxItemCount>
+              <Size xsi:nil="true" />
+              <InventoryFlags>CanReceive</InventoryFlags>
+              <RemoveEntityOnEmpty>false</RemoveEntityOnEmpty>
+            </Component>
+          </ComponentData>
+          <ComponentData>
+            <TypeId>MyTimerComponent</TypeId>
+            <Component xsi:type="MyObjectBuilder_TimerComponent">
+              <Repeat>true</Repeat><TimeToEvent>0</TimeToEvent><SetTimeMinutes>0</SetTimeMinutes>
+              <TimerEnabled>false</TimerEnabled><RemoveEntityOnTimer>false</RemoveEntityOnTimer>
+              <TimerType>Frame100</TimerType><FramesFromLastTrigger>0</FramesFromLastTrigger>
+              <TimerTickInFrames>900</TimerTickInFrames><IsSessionUpdateEnabled>false</IsSessionUpdateEnabled>
+            </Component>
+          </ComponentData>
+        </Components>
+      </ComponentContainer>
+      <ShowOnHUD>false</ShowOnHUD>
+      <ShowInTerminal>true</ShowInTerminal>
+      <ShowInToolbarConfig>true</ShowInToolbarConfig>
+      <ShowInInventory>true</ShowInInventory>
+      <Enabled>true</Enabled>
+      <Capacity>2</Capacity>
+    </MyObjectBuilder_CubeBlock>
+
+    <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_Conveyor">
+      <SubtypeName>LargeBlockConveyor</SubtypeName><Min x="-1" y="0" z="1" />
+      <BlockOrientation Forward="Forward" Up="Up" />
+    </MyObjectBuilder_CubeBlock>
+    <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_Conveyor">
+      <SubtypeName>LargeBlockConveyor</SubtypeName><Min x="-2" y="0" z="1" />
+      <BlockOrientation Forward="Forward" Up="Up" />
+    </MyObjectBuilder_CubeBlock>
+    <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_Conveyor">
+      <SubtypeName>LargeBlockConveyor</SubtypeName><Min x="-3" y="0" z="1" />
+      <BlockOrientation Forward="Forward" Up="Up" />
+    </MyObjectBuilder_CubeBlock>
+    <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_Conveyor">
+      <SubtypeName>LargeBlockConveyor</SubtypeName><Min x="-4" y="0" z="1" />
+      <BlockOrientation Forward="Forward" Up="Up" />
+    </MyObjectBuilder_CubeBlock>
+  </CubeBlocks>
+  <DisplayName>ST-PRODUCTION-FREEZER-STRESS-TEMPLATE</DisplayName>
+  <DestructibleBlocks>true</DestructibleBlocks>
+  <IsRespawnGrid>false</IsRespawnGrid>
+  <LocalCoordSys>0</LocalCoordSys>
+  <TargetingTargets />
+  <NPCGridClaimElapsed xsi:nil="true" />
+</MyObjectBuilder_CubeGrid>
