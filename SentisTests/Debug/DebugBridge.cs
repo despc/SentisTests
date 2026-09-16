@@ -7,14 +7,19 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Reflection;
 using NLog;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Sandbox.Definitions;
+using Sandbox.Common.ObjectBuilders;
 using Sandbox.Game;
 using Sandbox.ModAPI;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.EntityComponents;
+using Sandbox.Game.Weapons;
+using SpaceEngineers.Game.Entities.Blocks;
 using VRage.Game.ModAPI;
 using VRage.Game.ModAPI.Ingame;
 using VRage;
@@ -276,6 +281,12 @@ namespace SentisTests.Debug
                 case "/conveyor":
                     SendJson(ctx, 200, RunGameThread(() => ConveyorStates(long.Parse(qkey("id")))));
                     break;
+                case "/tool-radii":
+                    SendJson(ctx, 200, RunGameThread(ToolRadii));
+                    break;
+                case "/freezer":
+                    SendJson(ctx, 200, RunGameThread(FreezerState));
+                    break;
                 case "/status":
                     SendJson(ctx, 200, RunGameThread(() =>
                     {
@@ -334,6 +345,15 @@ namespace SentisTests.Debug
                         break;
                     case "/spawn-mixed":
                         SendJson(ctx, 200, RunGameThread(SpawnMixed));
+                        break;
+                    case "/tool-radii":
+                        SendJson(ctx, 200, RunGameThread(() => SetToolRadii(body)));
+                        break;
+                    case "/freezer":
+                        SendJson(ctx, 200, RunGameThread(() => SetFreezer(body.Value<bool>("enabled"))));
+                        break;
+                    case "/spawn-tool-radii":
+                        SendJson(ctx, 200, RunGameThread(() => SpawnToolRadiusRig(body.Value<string>("tool"))));
                         break;
                     case "/test":
                         Core.TestRunner.Enqueue(new[] { body.Value<string>("name") });
@@ -792,6 +812,133 @@ namespace SentisTests.Debug
                 ship = new { id = ship.EntityId, name = ship.Name, pos = V(ship.PositionComp.GetPosition()) },
                 note = "poll /probe until projected=80, then /park the ship over the plate",
             });
+        }
+
+        // ------------------------------------------------------------------ ship-tool radius verification
+
+        private static Assembly GameplayAssembly()
+        {
+            return AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a =>
+                string.Equals(a.GetName().Name, "SentisGameplayImprovements", StringComparison.Ordinal));
+        }
+
+        private static object GameplayConfig(out Type pluginType)
+        {
+            var assembly = GameplayAssembly();
+            if (assembly == null) throw new InvalidOperationException("SentisGameplayImprovements assembly is not loaded");
+            pluginType = assembly.GetType("SentisGameplayImprovements.SentisGameplayImprovementsPlugin", true);
+            return pluginType.GetProperty("Config", BindingFlags.Public | BindingFlags.Static).GetValue(null);
+        }
+
+        private static JObject ToolRadii()
+        {
+            Type pluginType;
+            var config = GameplayConfig(out pluginType);
+            var samples = new JArray();
+            foreach (var grid in AllGrids(1e6))
+            foreach (var slim in grid.CubeBlocks)
+            {
+                var block = slim.FatBlock;
+                if (block is MyShipWelder welder)
+                {
+                    var definition = (MyShipWelderDefinition)welder.BlockDefinition;
+                    samples.Add(Obj("grid", grid.EntityId, "block", welder.EntityId, "tool", "welder",
+                        "frozen", IsFrozenGrid(grid.EntityId),
+                        "definition", definition.SensorRadius, "runtime", welder.DetectorSphere.Radius,
+                        "optimizedProjectionRuntime", OptimizedWelderRadius(welder)));
+                }
+                else if (block is MyShipGrinder grinder)
+                {
+                    var definition = (MyShipGrinderDefinition)grinder.BlockDefinition;
+                    samples.Add(Obj("grid", grid.EntityId, "block", grinder.EntityId, "tool", "grinder",
+                        "frozen", IsFrozenGrid(grid.EntityId),
+                        "definition", definition.SensorRadius, "runtime", grinder.DetectorSphere.Radius));
+                }
+                else if (block is MyShipDrill drill)
+                {
+                    var definition = (MyShipDrillDefinition)drill.BlockDefinition;
+                    var sensor = drill.DrillBase?.Sensor;
+                    var sensorRadius = sensor == null ? null : sensor.GetType().GetField("m_radius",
+                        BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(sensor);
+                    samples.Add(Obj("grid", grid.EntityId, "block", drill.EntityId, "tool", "drill",
+                        "frozen", IsFrozenGrid(grid.EntityId),
+                        "definitionSensor", definition.SensorRadius, "runtimeSensor", sensorRadius,
+                        "definitionCutout", definition.CutOutRadius, "runtimeCutout", drill.GetDrillingSphere().Radius));
+                }
+            }
+
+            float Value(string property) => (float)config.GetType().GetProperty(property).GetValue(config);
+            return Obj("welder", Value("WelderRadiusMultiplier"),
+                "grinder", Value("GrinderRadiusMultiplier"),
+                "drill", Value("DrillRadiusMultiplier"), "samples", samples);
+        }
+
+        private static bool IsFrozenGrid(long gridId)
+        {
+            return Game.RuntimePluginControls.IsGridFrozen(gridId);
+        }
+
+        private static JObject FreezerState()
+        {
+            return Obj("enabled", Game.RuntimePluginControls.FreezerEnabled,
+                "frozenGridCount", Game.RuntimePluginControls.FrozenGridCount);
+        }
+
+        private static JObject SetFreezer(bool enabled)
+        {
+            Game.RuntimePluginControls.SetFreezerEnabled(enabled);
+            return FreezerState();
+        }
+
+        private static float OptimizedWelderRadius(MyShipWelder welder)
+        {
+            var assembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a =>
+                string.Equals(a.GetName().Name, "SentisOptimisations", StringComparison.Ordinal));
+            var type = assembly?.GetType("SentisOptimisationsPlugin.ShipTool.ShipToolPatch");
+            var method = type?.GetMethod("GetWelderRadius", BindingFlags.Public | BindingFlags.Static);
+            if (method == null) throw new InvalidOperationException("SentisOptimisations GetWelderRadius is unavailable");
+            return (float)method.Invoke(null, new object[] { welder });
+        }
+
+        private static JObject SetToolRadii(JObject body)
+        {
+            Type pluginType;
+            var config = GameplayConfig(out pluginType);
+            foreach (var pair in new[]
+            {
+                (Json: "welder", Property: "WelderRadiusMultiplier"),
+                (Json: "grinder", Property: "GrinderRadiusMultiplier"),
+                (Json: "drill", Property: "DrillRadiusMultiplier"),
+            })
+            {
+                if (body[pair.Json] != null)
+                    config.GetType().GetProperty(pair.Property).SetValue(config, body.Value<float>(pair.Json));
+            }
+            pluginType.GetMethod("SaveConfig", BindingFlags.Public | BindingFlags.Static).Invoke(null, null);
+            return ToolRadii();
+        }
+
+        private static JObject SpawnToolRadiusRig(string tool)
+        {
+            var specs = new Dictionary<string, (string Subtype, Vector3D Position)>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["welder"] = ("LargeShipWelder", new Vector3D(100, 100, 100)),
+                ["grinder"] = ("LargeShipGrinder", new Vector3D(120, 100, 100)),
+                ["drill"] = ("LargeBlockDrill", new Vector3D(140, 100, 100)),
+            };
+            if (string.IsNullOrEmpty(tool) || !specs.TryGetValue(tool, out var spec))
+                return Err("tool must be welder, grinder or drill");
+
+            var name = "STDBG-tool-radius-" + tool.ToLowerInvariant() + "-" + Guid.NewGuid().ToString("N");
+            var ob = Game.WorldApi.GridOb(name, VRage.Game.MyCubeSize.Large, true,
+                spec.Position, new[] { new Game.BlockSpec(spec.Subtype, Vector3I.Zero) });
+            if (ob.CubeBlocks[0] is MyObjectBuilder_Drill drill)
+            {
+                drill.Inventory = new VRage.Game.MyObjectBuilder_Inventory();
+                drill.Enabled = false;
+            }
+            var grid = Game.WorldApi.SpawnGrid(ob);
+            return Obj("id", grid.EntityId, "name", grid.Name, "blocks", grid.CubeBlocks.Count);
         }
 
         // ------------------------------------------------------------------ misc

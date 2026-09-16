@@ -211,6 +211,10 @@ namespace SentisTests.Scenarios
             yield return Wait(() => { WorldApi.ChargeBatteries(ship); return welder.IsFunctional; },
                 "welder functional (" + WorldApi.DescribePower(ship) + ")", 90);
 
+            var preparation = BeforeWelding(ship, welder);
+            while (preparation.MoveNext())
+                yield return preparation.Current;
+
             welder.Enabled = true;
             yield return Wait(() => welder.IsWorking, "welder working (" + WorldApi.DescribePower(ship) + ")", 60);
 
@@ -377,6 +381,11 @@ namespace SentisTests.Scenarios
 
             Note("PASS: the vanilla welder ship built the full slab " +
                  "(" + realBuilt + " blocks, steel used=" + welderSteelUsed + ")");
+        }
+
+        protected virtual IEnumerator BeforeWelding(MyCubeGrid ship, SpaceWelder welder)
+        {
+            yield break;
         }
 
     }
