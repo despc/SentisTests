@@ -72,6 +72,7 @@ namespace SentisTests.Scenarios
             var testGrids = Tracked.OfType<MyCubeGrid>().ToList();
             Note("allocation profile of one grid snapshot: " + AllocationProfile(testGrids[0]));
             Note("component containers vs vanilla reference: " + CompareComponentContainers(testGrids));
+            Note("allocation detail: " + AllocationDetail(testGrids[0]));
             for (var round = 1; round <= ConsistencyRounds; round++)
             {
                 var sequentialA = testGrids.Select(g => Xml(g.GetObjectBuilder())).ToArray();
@@ -157,6 +158,45 @@ namespace SentisTests.Scenarios
                                                         x.Components / x.Count + "B, inventories " + x.Inventories / x.Count + "B"));
         }
 
+        private static long Bytes(Action action, int repeat = 50)
+        {
+            action();
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < repeat; i++) action();
+            return (GC.GetAllocatedBytesForCurrentThread() - before) / repeat;
+        }
+
+        /// <summary>Bytes per call of the pieces of one conveyor block, one refinery and one conveyor line snapshot.</summary>
+        private static string AllocationDetail(MyCubeGrid grid)
+        {
+            var parts = new System.Collections.Generic.List<string>();
+            foreach (var sample in new[] { "LargeBlockConveyor", "LargeRefinery" })
+            {
+                var slim = grid.GetBlocks().First(b => b.BlockDefinition.Id.SubtypeName == sample);
+                var fat = slim.FatBlock;
+                var container = (VRage.Game.Components.MyComponentContainer)(object)fat.Components;
+                var components = (System.Collections.Generic.Dictionary<Type, System.Collections.Generic.List<VRage.Game.Components.MyComponentBase>>)
+                    ComponentsField.GetValue(container);
+                var perComponent = components.SelectMany(kv => kv.Value.Select(c => new { kv.Key, c }))
+                    .Select(x => x.Key.Name + "(" + x.c.GetType().Name + (x.c.IsSerialized() ? ", serialized" : "") + ")=" +
+                                 Bytes(() => { if (x.c.IsSerialized()) x.c.Serialize(); }) + "B" +
+                                 (x.c.IsSerialized() && x.c.Serialize() == null ? " returns null" : ""));
+                parts.Add(sample + ": slim.GetObjectBuilder=" + Bytes(() => slim.GetObjectBuilder()) +
+                          "B, GetObjectBuilderCubeBlock=" + Bytes(() => fat.GetObjectBuilderCubeBlock()) +
+                          "B, CreateNewObject=" + Bytes(() => VRage.ObjectBuilders.Private.MyObjectBuilderSerializerKeen.CreateNewObject(slim.BlockDefinition.Id)) +
+                          "B, Components.Serialize=" + Bytes(() => fat.Components.Serialize()) +
+                          "B, components: " + string.Join(", ", perComponent));
+            }
+            var linesField = typeof(Sandbox.Game.GameSystems.MyGridConveyorSystem).GetField("m_lines",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var lines = ((System.Collections.IEnumerable)linesField.GetValue(grid.GridSystems.ConveyorSystem)).Cast<object>().ToList();
+            var getLineBuilder = lines[0].GetType().GetMethod("GetObjectBuilder");
+            parts.Add("conveyor lines x" + lines.Count + ": GetObjectBuilder=" + Bytes(() => getLineBuilder.Invoke(lines[0], null)) +
+                      "B (includes reflection call), new MyObjectBuilder_ConveyorLine=" + Bytes(() => new VRage.Game.MyObjectBuilder_ConveyorLine()) +
+                      "B, SerializeLines(all)=" + Bytes(() => grid.GridSystems.ConveyorSystem.SerializeLines(new System.Collections.Generic.List<VRage.Game.MyObjectBuilder_ConveyorLine>()), 5) / lines.Count + "B/line");
+            return string.Join(" || ", parts);
+        }
+
         private static readonly System.Reflection.FieldInfo ComponentsField = typeof(VRage.Game.Components.MyComponentContainer)
             .GetField("m_components", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
 
@@ -175,6 +215,8 @@ namespace SentisTests.Scenarios
                 blocks++;
                 var actual = fat.Components.Serialize();
                 var expected = VanillaSerialize((VRage.Game.Components.MyComponentContainer)(object)fat.Components);
+                // An empty container is never written (ShouldSerializeComponentContainer), so it equals null.
+                if (expected != null && expected.Components.Count == 0) expected = null;
                 if (expected != null) withContainer++;
                 var actualXml = actual == null ? "null" : Xml(actual);
                 var expectedXml = expected == null ? "null" : Xml(expected);
