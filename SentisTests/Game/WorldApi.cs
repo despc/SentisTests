@@ -164,6 +164,8 @@ namespace SentisTests.Game
         /// such a welder silently never starts a construction in survival. Ships that must weld are
         /// therefore handed to this identity instead of the synthetic SentisTests one.
         /// </summary>
+        private static bool _warnedNoPlayerIdentity;
+
         public static long PlayerIdentityId()
         {
             if (_ownerIdentityId.HasValue)
@@ -193,8 +195,12 @@ namespace SentisTests.Game
             var chosen = preferred ?? anyPlayer;
             if (chosen == null)
             {
-                Log.Warn("no saved player identity to own the test ships ({0} NPC identities), using the test identity",
-                    seen.Count);
+                if (!_warnedNoPlayerIdentity)
+                {
+                    _warnedNoPlayerIdentity = true;
+                    Log.Warn("no saved player identity to own the test ships ({0} NPC identities), using the test identity",
+                        seen.Count);
+                }
                 return TestIdentityId();
             }
 
