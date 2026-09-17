@@ -20,6 +20,7 @@ using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.EntityComponents;
 using Sandbox.Game.Weapons;
 using SpaceEngineers.Game.Entities.Blocks;
+using VRage.Game;
 using VRage.Game.ModAPI;
 using VRage.Game.ModAPI.Ingame;
 using VRage;
@@ -75,6 +76,7 @@ namespace SentisTests.Debug
 
         // grids held at a point by the game-thread servo
         private static readonly ConcurrentDictionary<long, Vector3D> _parked = new ConcurrentDictionary<long, Vector3D>();
+        private static JObject _lastSpawnPerfBody;
 
         // single SSE client (one agent at a time is plenty for debugging)
         private static object _sseLock = new object();
@@ -269,6 +271,10 @@ namespace SentisTests.Debug
                 case "/projection":
                     SendJson(ctx, 200, RunGameThread(() => Projection(long.Parse(qkey("id")))));
                     break;
+
+                case "/projector":
+                    SendJson(ctx, 200, RunGameThread(() => Projector(long.Parse(qkey("id")))));
+                    break;
                 case "/sensors":
                     SendJson(ctx, 200, RunGameThread(() => Sensors(long.Parse(qkey("id")), long.Parse(qkey("proj")))));
                     break;
@@ -346,6 +352,23 @@ namespace SentisTests.Debug
                     case "/spawn-mixed":
                         SendJson(ctx, 200, RunGameThread(SpawnMixed));
                         break;
+                    case "/spawn-perf":
+                        _lastSpawnPerfBody = body;
+                        SendJson(ctx, 200, RunGameThread(SpawnPerfProjection));
+                        break;
+                    case "/projector-enabled":
+                        SendJson(ctx, 200, RunGameThread(() =>
+                        {
+                            if (!MyEntities.TryGetEntityById(id, out var entity)) return Err("grid not found " + id);
+                            var projector = Game.WorldApi.FindFunctional<MyProjectorBase>((MyCubeGrid)entity);
+                            if (projector == null) return Err("grid has no projector");
+                            projector.Enabled = body.Value<bool>("enabled");
+                            return JObject.FromObject(new { projector = projector.EntityId, enabled = projector.Enabled });
+                        }));
+                        break;
+                    case "/set-projection":
+                        SendJson(ctx, 200, RunGameThread(() => SetProjectionCube(id, body)));
+                        break;
                     case "/tool-radii":
                         SendJson(ctx, 200, RunGameThread(() => SetToolRadii(body)));
                         break;
@@ -383,15 +406,17 @@ namespace SentisTests.Debug
         {
             var arr = new JArray();
             foreach (var g in AllGrids(1e6)
-                .Where(g => string.IsNullOrEmpty(filter) || (g.Name ?? g.EntityId.ToString()).IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
+                .Where(g => string.IsNullOrEmpty(filter)
+                    || (g.Name ?? g.EntityId.ToString()).IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0
+                    || (g.DisplayName ?? "").IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
                 .OrderBy(g => g.EntityId))
             {
                 try
                 {
                     if (g.PositionComp == null || g.Physics == null) continue;
                     var bb = g.PositionComp.WorldAABB;
-                    arr.Add(Obj("id", g.EntityId, "name", g.Name,
-                        "pos", V(g.PositionComp.GetPosition()), "fwd", V(g.WorldMatrix.Forward), "up", V(g.WorldMatrix.Up),
+                    arr.Add(Obj("id", g.EntityId, "name", g.Name, "displayName", g.DisplayName,
+                            "pos", V(g.PositionComp.GetPosition()), "fwd", V(g.WorldMatrix.Forward), "up", V(g.WorldMatrix.Up),
                         "aabb", bb.Min.ToString("F0") + ".." + bb.Max.ToString("F0"),
                         "blocks", g.CubeBlocks == null ? 0 : g.CubeBlocks.Count,
                         "isStatic", g.Physics.IsStatic,
@@ -415,8 +440,9 @@ namespace SentisTests.Debug
             return JObject.FromObject(new
             {
                 id,
-                name = g.Name,
-                pos = V(g.PositionComp.GetPosition()),
+                    name = g.Name,
+                    displayName = g.DisplayName,
+                    pos = V(g.PositionComp.GetPosition()),
                 fwd = V(g.WorldMatrix.Forward),
                 up = V(g.WorldMatrix.Up),
                 isStatic = g.Physics.IsStatic,
@@ -526,6 +552,58 @@ namespace SentisTests.Debug
             return Obj("cells", pg.CubeBlocks.Count,
                 "min", min.ToString("F1"), "max", max.ToString("F1"),
                 "layers", ys.Count, "ys", string.Join(",", ys), "samples", samples.ToString(Newtonsoft.Json.Formatting.None));
+        }
+
+        private static JObject Projector(long gridId)
+        {
+            var g = MyEntities.GetEntityById(gridId) as MyCubeGrid;
+            if (g == null) return Err("grid " + gridId + " not found");
+            var proj = Game.WorldApi.FindFunctional<MyProjectorBase>(g);
+            if (proj == null) return Err("no projector on grid");
+            var obj = new JObject
+            {
+                ["id"] = g.EntityId,
+                ["projector"] = proj.EntityId,
+                ["enabled"] = (bool)proj.Enabled,
+                ["isWorking"] = (bool)proj.IsWorking,
+                ["isFunctional"] = (bool)proj.IsFunctional,
+                ["isActivating"] = (bool)proj.IsActivating,
+                ["scale"] = proj.Scale,
+                ["projectionOffset"] = proj.ProjectionOffset.ToString(),
+            };
+            var pg = proj.ProjectedGrid;
+            obj["projectedGrid"] = pg == null || pg.CubeBlocks == null ? 0 : pg.CubeBlocks.Count;
+            if (pg != null && pg.CubeBlocks != null)
+            {
+                var census = new Dictionary<string, int>();
+                var buildableComponents = new Dictionary<string, int>();
+                foreach (var slim in pg.CubeBlocks)
+                {
+                    string verdict;
+                    try
+                    {
+                        var check = proj.CanBuild(slim, true);
+                        verdict = check.ToString();
+                        if (check == Sandbox.ModAPI.BuildCheckResult.OK)
+                        {
+                            var components = slim.BlockDefinition?.Components;
+                            var subtype = components != null && components.Length > 0
+                                ? components[0].Definition.Id.SubtypeName
+                                : "<none>";
+                            int componentCount;
+                            buildableComponents.TryGetValue(subtype, out componentCount);
+                            buildableComponents[subtype] = componentCount + 1;
+                        }
+                    }
+                    catch (Exception e) { verdict = "EX:" + e.GetBaseException().GetType().Name; }
+                    int count;
+                    census.TryGetValue(verdict, out count);
+                    census[verdict] = count + 1;
+                }
+                obj["buildCheckCensus"] = JObject.FromObject(census);
+                obj["buildableComponents"] = JObject.FromObject(buildableComponents);
+            }
+            return obj;
         }
 
         private static JObject Sensors(long shipId, long platformId)
@@ -813,6 +891,121 @@ namespace SentisTests.Debug
                 note = "poll /probe until projected=80, then /park the ship over the plate",
             });
         }
+
+        /// <summary>
+        /// Drops the welder_perf fixture platform (Projector-Test-REACTORS copy shipped as
+        /// PerfProjection.xml) directly in front of the first live player character, so the
+        /// operator can eyeball how the fixture actually materializes. With
+        /// <c>withProjection=false</c> the embedded hologram is stripped from the projector
+        /// object-builder before spawn - the grid carries no blueprint at all, which also
+        /// isolates the heavy-blueprint replication from the plain grid replication.
+        /// </summary>
+        private static JObject SpawnPerfProjection()
+        {
+            var withProjection = true;
+            try { withProjection = _lastSpawnPerfBody == null || _lastSpawnPerfBody.Value<bool?>("withProjection") != false; }
+            catch { }
+            var ob = Game.WorldApi.LoadAuthoredGrid("SentisTests.Resources.PerfProjection.xml",
+                "STDBG-perf-projection");
+            var projectors = ob.CubeBlocks.OfType<VRage.Game.MyObjectBuilder_ProjectorBase>().ToList();
+            if (!withProjection)
+                foreach (var p in projectors) p.ProjectedGrids = null;
+            Vector3D anchor;
+            var character = MyEntities.GetEntities().OfType<Sandbox.Game.Entities.Character.MyCharacter>()
+                .FirstOrDefault(c => c != null && !c.MarkedForClose &&
+                    MyAPIGateway.Players.GetPlayerControllingEntity(c) != null);
+            if (character != null)
+            {
+                var eye = character.PositionComp.GetPosition();
+                var dir = character.PositionComp.WorldMatrixRef.Forward;
+                if (dir.LengthSquared() < 0.001) dir = character.PositionComp.WorldMatrixRef.Up;
+                anchor = eye + Vector3D.Normalize(dir) * 120.0;
+            }
+            else
+            {
+                anchor = ob.PositionAndOrientation.Value.Position;
+            }
+            var pose = ob.PositionAndOrientation.Value;
+            ob.PositionAndOrientation = new MyPositionAndOrientation(anchor, pose.Forward, pose.Up);
+            ob.IsStatic = true;
+            var grid = Game.WorldApi.SpawnGrid(ob);
+            Game.WorldApi.EnsureDistributor(grid);
+            Game.WorldApi.ChargeBatteries(grid);
+            var projector = Game.WorldApi.FindFunctional<MyProjectorBase>(grid);
+            if (projector != null) projector.Enabled = withProjection;
+            return JObject.FromObject(new
+            {
+                id = grid.EntityId,
+                name = grid.Name,
+                pos = V(grid.PositionComp.GetPosition()),
+                blocks = grid.BlocksCount,
+                projector = projector == null ? (object)"none"
+                    : new { id = projector.EntityId, enabled = projector.Enabled,
+                            projected = projector.ProjectedGrid?.CubeBlocks.Count ?? 0 },
+            });
+        }
+
+        /// <summary>
+        /// Loads a fresh cube-shaped blueprint (N x N x N solid heavy-armor large blocks) into
+        /// the grid's live projector via the vanilla IMyProjector.SetProjectedGrid path, then
+        /// re-enables the projector so the clipboard rebuilds the preview. Used to eyeball how
+        /// the client syncs a freshly authored projection.
+        /// </summary>
+        private static JObject SetProjectionCube(long gridId, JObject body)
+        {
+            if (!MyEntities.TryGetEntityById(gridId, out var entity)) return Err("grid not found " + gridId);
+            var projector = Game.WorldApi.FindFunctional<MyProjectorBase>((MyCubeGrid)entity);
+            if (projector == null) return Err("grid has no projector");
+            int size = body.Value<int?>("size") ?? 10;
+            size = Math.Max(1, Math.Min(size, 40));
+            int sx = 0, sy = 0, sz = 0;
+            try
+            {
+                var shift = body["shift"] as JArray;
+                if (shift != null && shift.Count == 3)
+                {
+                    sx = shift.Value<int>(0);
+                    sy = shift.Value<int>(1);
+                    sz = shift.Value<int>(2);
+                }
+            }
+            catch { }
+            var grid = new MyObjectBuilder_CubeGrid
+            {
+                Name = "STDBG-armor-cube",
+                GridSizeEnum = MyCubeSize.Large,
+                IsStatic = false,
+                PositionAndOrientation = new MyPositionAndOrientation(Vector3D.Zero, new Vector3D(0, 0, 1), new Vector3D(0, 1, 0)),
+                CubeBlocks = new System.Collections.Generic.List<MyObjectBuilder_CubeBlock>(),
+            };
+            for (int x = 0; x < size; x++)
+                for (int y = 0; y < size; y++)
+                    for (int z = 0; z < size; z++)
+                    {
+                        grid.CubeBlocks.Add(new MyObjectBuilder_CubeBlock
+                        {
+                            SubtypeName = "LargeHeavyBlockArmorBlock",
+                            Min = new SerializableVector3I(x + sx, y + sy, z + sz),
+                        });
+                    }
+            // SetNewBlueprint only (re)initializes the clipboard when the projector is enabled
+            // and working, so arm it first and swap the blueprint while it is live.
+            projector.Enabled = true;
+            ((Sandbox.ModAPI.IMyProjector)projector).SetProjectedGrid(grid);
+            return JObject.FromObject(new
+            {
+                projector = projector.EntityId,
+                blocks = grid.CubeBlocks.Count,
+                size,
+                shift = new { sx, sy, sz },
+                enabled = projector.Enabled,
+                projected = projector.ProjectedGrid?.CubeBlocks.Count ?? 0,
+                previewAabb = projector.ProjectedGrid?.PositionComp.WorldAABB.ToString(),
+                platformAabb = ((MyCubeGrid)entity).PositionComp.WorldAABB.ToString(),
+                note = "projection is applied relative to the projector's current offset",
+            });
+        }
+
 
         // ------------------------------------------------------------------ ship-tool radius verification
 

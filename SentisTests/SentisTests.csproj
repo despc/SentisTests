@@ -72,6 +72,8 @@
     <EmbeddedResource Include="Resources\PlatformWithProjection.xml" />
     <EmbeddedResource Include="Resources\ProductionGrid.xml" />
     <EmbeddedResource Include="Resources\ProductionStressGrid.xml" />
+    <EmbeddedResource Include="Resources\PerfProjection.xml" />
+    <EmbeddedResource Include="Resources\PerfWelderShip.xml" />
   </ItemGroup>
 
 </Project>

@@ -193,8 +193,8 @@ namespace SentisTests.Game
             var chosen = preferred ?? anyPlayer;
             if (chosen == null)
             {
-                Log.Warn("no saved player identity to own the test ships (identities: {0}), using the test identity",
-                    string.Join(", ", seen));
+                Log.Warn("no saved player identity to own the test ships ({0} NPC identities), using the test identity",
+                    seen.Count);
                 return TestIdentityId();
             }
 
@@ -611,10 +611,16 @@ namespace SentisTests.Game
                 if (fat == null || fat.MarkedForClose)
                     continue;
 
-                var battery = fat as MyBatteryBlock;
-                if (battery != null && battery.SourceComp != null)
+                // Every source component (batteries AND reactors) must be wired into the
+                // grid distributor; the spawn path does not auto-connect them. Reactors left
+                // unconnected generate power that the grid's sinks (projector, welders, and
+                // the built projection blocks) cannot see.
+                var source = fat.Components != null
+                    ? fat.Components.Get<Sandbox.Game.EntityComponents.MyResourceSourceComponent>()
+                    : null;
+                if (source != null)
                 {
-                    distributor.AddSource(battery.SourceComp);
+                    distributor.AddSource(source);
                     sources++;
                 }
 
@@ -908,7 +914,12 @@ namespace SentisTests.Game
             {
                 var producers = FindFunctionals<MyReactor>(grid);
                 var working = producers.Count(p => p.IsWorking);
-                return "reactors=" + producers.Count + " working=" + working;
+                var totalOutput = producers.Sum(p =>
+                {
+                    try { return (float)p.CurrentOutput; } catch { return 0f; }
+                });
+                return "reactors=" + producers.Count + " working=" + working +
+                       " output=" + totalOutput.ToString("F0") + "MW";
             }
             catch (Exception e)
             {

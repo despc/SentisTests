@@ -7,6 +7,7 @@ using Torch;
 using Torch.API;
 using Torch.API.Managers;
 using Torch.API.Session;
+using Torch.Managers.PatchManager;
 using Torch.Session;
 
 namespace SentisTests
@@ -36,11 +37,21 @@ namespace SentisTests
                 ScenarioRegistry.Register(SmokeScenario.ScenarioName, () => new SmokeScenario());
                 ScenarioRegistry.Register(ProjectorWeldScenario.ScenarioName, () => new ProjectorWeldScenario());
                 ScenarioRegistry.Register(FrozenRadiusWeldScenario.ScenarioName, () => new FrozenRadiusWeldScenario());
+                ScenarioRegistry.Register(WelderPerfScenario.ScenarioName, () => new WelderPerfScenario());
                 ScenarioRegistry.Register(MixedWeldScenario.ScenarioName, () => new MixedWeldScenario());
                 ScenarioRegistry.Register(HandWeldScenario.ScenarioName, () => new HandWeldScenario());
                 ScenarioRegistry.Register(ProductionScenario.ScenarioName, () => new ProductionScenario());
                 ScenarioRegistry.Register(ProductionFreezerStressScenario.ScenarioName,
                     () => new ProductionFreezerStressScenario());
+
+                try
+                {
+                    FrameProbe.Install(torch.Managers.GetManager<PatchManager>());
+                }
+                catch (Exception e)
+                {
+                    Log.Error(e, "FrameProbe install failed; sim-work metrics disabled");
+                }
 
                 _sessionManager = torch.Managers.GetManager<TorchSessionManager>();
                 if (_sessionManager != null)
@@ -94,9 +105,12 @@ namespace SentisTests
         public override void Update()
         {
             TickMetrics.FrameBegin();
+            FrameProbe.HarnessBegin();
             try
             {
-                Debug.DebugBridge.Tick();
+                FrameProbe.BridgeBegin();
+                try { Debug.DebugBridge.Tick(); }
+                finally { FrameProbe.BridgeEnd(); }
                 MaybeStartAutoRun();
                 TestRunner.Tick();
             }
@@ -106,6 +120,7 @@ namespace SentisTests
             }
             finally
             {
+                FrameProbe.HarnessEnd();
                 TickMetrics.FrameEnd();
             }
         }
