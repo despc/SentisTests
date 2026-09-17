@@ -41,6 +41,44 @@ namespace SentisTests.Game
             save.Invoke(null, null);
         }
 
+        public static string AntifreezeBlocksSubtypes
+        {
+            get
+            {
+                var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.SentisOptimisationsPlugin");
+                return (string)Config(type).GetType().GetProperty("AntifreezeBlocksSubtypes").GetValue(Config(type));
+            }
+        }
+
+        public static void SetAntifreezeBlocksSubtypes(string subtypes)
+        {
+            var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.SentisOptimisationsPlugin");
+            var config = Config(type);
+            config.GetType().GetProperty("AntifreezeBlocksSubtypes").SetValue(config, subtypes);
+            type.GetMethod("SaveConfig", BindingFlags.Public | BindingFlags.Static)?.Invoke(null, null);
+        }
+
+        /// <summary>Public static field or property of the SentisOptimisations FrozenGridSaveCache.</summary>
+        public static object FrozenGridSaveCacheStat(string name)
+        {
+            var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.Freezer.FrozenGridSaveCache");
+            return type.GetField(name, BindingFlags.Public | BindingFlags.Static)?.GetValue(null)
+                   ?? throw new InvalidOperationException("FrozenGridSaveCache." + name + " is unavailable");
+        }
+
+        public static object FrozenGridSaveCacheStatOrNull(string name)
+        {
+            var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.Freezer.FrozenGridSaveCache");
+            return type.GetField(name, BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
+        }
+
+        public static void SetFrozenGridSaveCacheVerify(bool verify)
+        {
+            var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.Freezer.FrozenGridSaveCache");
+            (type.GetField("VerifyPreparedBuilders", BindingFlags.Public | BindingFlags.Static)
+             ?? throw new InvalidOperationException("FrozenGridSaveCache.VerifyPreparedBuilders is unavailable")).SetValue(null, verify);
+        }
+
         public static bool IsGridFrozen(long gridId)
         {
             var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.Freezer.FreezeLogic");
