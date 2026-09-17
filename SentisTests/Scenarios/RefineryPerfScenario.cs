@@ -27,7 +27,7 @@ namespace SentisTests.Scenarios
     public sealed class RefineryPerfScenario : TestScenario
     {
         public const string ScenarioName = "refinery_perf";
-        private const string ResourceName = "SentisTests.Resources.RefineryTest.xml";
+        internal const string ResourceName = "SentisTests.Resources.RefineryTest.xml";
         private const string GridPrefix = "refinery-perf-";
         private const int GridCount = 64;
         private const int GridsPerRow = 8;

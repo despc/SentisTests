@@ -23,12 +23,14 @@ namespace SentisTests
 
         private static Persistent<MainConfig> _config;
         public static MainConfig Config => _config?.Data;
+        public static ITorchBase TorchInstance { get; private set; }
 
         private TorchSessionManager _sessionManager;
         private DateTime _autoRunEarliest = DateTime.MaxValue;
 
         public override void Init(ITorchBase torch)
         {
+            TorchInstance = torch;
             try
             {
                 _config = Persistent<MainConfig>.Load(Path.Combine(StoragePath, "SentisTests.cfg"));
@@ -39,6 +41,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(FrozenRadiusWeldScenario.ScenarioName, () => new FrozenRadiusWeldScenario());
                 ScenarioRegistry.Register(WelderPerfScenario.ScenarioName, () => new WelderPerfScenario());
                 ScenarioRegistry.Register(RefineryPerfScenario.ScenarioName, () => new RefineryPerfScenario());
+                ScenarioRegistry.Register(SavePerfScenario.ScenarioName, () => new SavePerfScenario());
                 ScenarioRegistry.Register(MixedWeldScenario.ScenarioName, () => new MixedWeldScenario());
                 ScenarioRegistry.Register(HandWeldScenario.ScenarioName, () => new HandWeldScenario());
                 ScenarioRegistry.Register(ProductionScenario.ScenarioName, () => new ProductionScenario());
