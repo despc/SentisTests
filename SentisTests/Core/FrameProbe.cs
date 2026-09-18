@@ -29,12 +29,12 @@ namespace SentisTests.Core
         // turns into a missed frame.
         private const double ReportAboveMs = BudgetMs / 2;
 
-        private enum Section { Tools, ProjectorBuild, Physics, Refinery, ConveyorPull, ConveyorPush, RefineryUpdateProduction, RefineryRebuildQueue, RefineryRebuildQueue2, InventoryTransfer, QueueInsert, QueueClear, RefineryProcess, InvTransferOrRemove, InvAddItems, ObCreate, InvFitsBlueprint, QueueRemoveRequest, SinkSetRequired, EntitiesBefore, EntitiesAfter, SessionComponents, Harness, Bridge, Count }
+        private enum Section { Tools, ProjectorBuild, Physics, Refinery, ConveyorPull, ConveyorPush, RefineryUpdateProduction, RefineryRebuildQueue, RefineryRebuildQueue2, InventoryTransfer, QueueInsert, QueueClear, RefineryProcess, InvTransferOrRemove, InvAddItems, ObCreate, InvFitsBlueprint, QueueRemoveRequest, SinkSetRequired, EntitiesBefore, EntitiesAfter, SessionComponents, Harness, Bridge, ReplicationBefore, ReplicationSend, NetProcess, FakeClients, ReplFilterStateSync, ReplAddForClient, ReplRefreshReplicable, ReplGridSerialize, ReplClientAcks, ReplApplyDirty, SgInventory, SgProperty, SgPhysics, SgCreateClientData, ReplStreamingEntry, ReplRemoveForClient, GridGetObjectBuilder, InvRefreshClientData, Count }
 
-        private static readonly string[] SectionNames = { "tools10", "projector.Build", "physics", "refinery.tick", "conveyor.pull", "conveyor.push", "refinery.updateProduction", "refinery.rebuildQueue", "sgi.rebuildQueue", "inventory.transfer", "queue.insert", "queue.clear", "refinery.process", "inv.transferOrRemove", "inv.addItems", "ob.createNewObject", "inv.fitsBlueprint", "queue.removeRequest", "sink.setRequired", "entities.before", "entities.after", "session.components", "harness", "bridge" };
+        private static readonly string[] SectionNames = { "tools10", "projector.Build", "physics", "refinery.tick", "conveyor.pull", "conveyor.push", "refinery.updateProduction", "refinery.rebuildQueue", "sgi.rebuildQueue", "inventory.transfer", "queue.insert", "queue.clear", "refinery.process", "inv.transferOrRemove", "inv.addItems", "ob.createNewObject", "inv.fitsBlueprint", "queue.removeRequest", "sink.setRequired", "entities.before", "entities.after", "session.components", "harness", "bridge", "replication.updateBefore", "replication.sendUpdate", "net.receiveProcess", "fakeClients.tick", "repl.filterStateSync", "repl.addForClient", "repl.refreshReplicable", "repl.gridSerialize", "repl.clientAcks", "repl.applyDirtyGroups", "sg.inventory.serialize", "sg.property.serialize", "sg.physics.serialize", "sg.createClientData", "repl.sendStreamingEntry", "repl.removeForClient", "grid.getObjectBuilder", "inv.refreshClientData" };
 
         // Sections timed inside another section; excluded from the top-level sum behind "other".
-        private static readonly bool[] Nested = { false, true, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, false, true };
+        private static readonly bool[] Nested = { false, true, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, false, true, false, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true };
         private static readonly long[] _sectionTicks = new long[(int)Section.Count];
         private static readonly long[] _sectionStart = new long[(int)Section.Count];
         private static readonly int[] _sectionDepth = new int[(int)Section.Count];
@@ -122,6 +122,40 @@ namespace SentisTests.Core
                 nameof(ProcessPrefix), nameof(ProcessSuffix));
             Hook(ctx, typeof(MyProductionBlock).GetMethod("RemoveQueueItemRequest", any),
                 nameof(QueueRemovePrefix), nameof(QueueRemoveSuffix));
+            Hook(ctx, typeof(VRage.Network.MyReplicationServer).GetMethod("UpdateBefore", BindingFlags.Instance | BindingFlags.Public),
+                nameof(ReplicationBeforePrefix), nameof(ReplicationBeforeSuffix));
+            Hook(ctx, typeof(VRage.Network.MyReplicationServer).GetMethod("SendUpdate", BindingFlags.Instance | BindingFlags.Public),
+                nameof(ReplicationSendPrefix), nameof(ReplicationSendSuffix));
+            Hook(ctx, typeof(Sandbox.Engine.Networking.MyNetworkWriter).Assembly
+                    .GetType("Sandbox.Engine.Networking.MyNetworkReader")?.GetMethod("Process", BindingFlags.Static | BindingFlags.Public),
+                nameof(NetProcessPrefix), nameof(NetProcessSuffix));
+            var replicationServer = typeof(VRage.Network.MyReplicationServer);
+            var groupsAssembly = typeof(Sandbox.Game.Entities.MyCubeGrid).Assembly;
+            Hook(ctx, replicationServer.GetMethod("FilterStateSync", any), nameof(ReplFilterPrefix), nameof(ReplFilterSuffix));
+            Hook(ctx, replicationServer.GetMethod("AddForClient", any), nameof(ReplAddPrefix), nameof(ReplAddSuffix));
+            Hook(ctx, replicationServer.GetMethod("RefreshReplicable", any), nameof(ReplRefreshPrefix), nameof(ReplRefreshSuffix));
+            Hook(ctx, typeof(Sandbox.Game.Entities.MyCubeGrid).GetMethod("GetObjectBuilder", any, null, new[] { typeof(bool) }, null),
+                nameof(GridBuilderPrefix), nameof(GridBuilderSuffix));
+            Hook(ctx, groupsAssembly.GetType("Sandbox.Game.Replication.StateGroups.MyEntityInventoryStateGroup")?
+                    .GetMethod("RefreshClientData", BindingFlags.Instance | BindingFlags.Public),
+                nameof(InvRefreshPrefix), nameof(InvRefreshSuffix));
+            Hook(ctx, replicationServer.GetMethod("SendStreamingEntry", any), nameof(ReplStreamPrefix), nameof(ReplStreamSuffix));
+            Hook(ctx, replicationServer.GetMethod("RemoveForClient", any), nameof(ReplRemovePrefix), nameof(ReplRemoveSuffix));
+            Hook(ctx, replicationServer.GetMethod("OnClientAcks", any), nameof(ReplAcksPrefix), nameof(ReplAcksSuffix));
+            Hook(ctx, replicationServer.GetMethod("ApplyDirtyGroups", any), nameof(ReplDirtyPrefix), nameof(ReplDirtySuffix));
+            Hook(ctx, typeof(Sandbox.Game.Entities.MyCubeGrid).Assembly.GetType("Sandbox.Game.Replication.MyCubeGridReplicable")?
+                    .GetMethod("Serialize", BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly),
+                nameof(ReplGridSerializePrefix), nameof(ReplGridSerializeSuffix));
+            Hook(ctx, groupsAssembly.GetType("Sandbox.Game.Replication.StateGroups.MyEntityInventoryStateGroup")?.GetMethod("Serialize", BindingFlags.Instance | BindingFlags.Public),
+                nameof(SgInventoryPrefix), nameof(SgInventorySuffix));
+            Hook(ctx, groupsAssembly.GetType("Sandbox.Game.Replication.StateGroups.MyPropertySyncStateGroup")?.GetMethod("Serialize", BindingFlags.Instance | BindingFlags.Public),
+                nameof(SgPropertyPrefix), nameof(SgPropertySuffix));
+            Hook(ctx, groupsAssembly.GetType("Sandbox.Game.Replication.StateGroups.MyEntityPhysicsStateGroup")?.GetMethod("Serialize", BindingFlags.Instance | BindingFlags.Public),
+                nameof(SgPhysicsPrefix), nameof(SgPhysicsSuffix));
+            Hook(ctx, groupsAssembly.GetType("Sandbox.Game.Replication.StateGroups.MyEntityInventoryStateGroup")?.GetMethod("CreateClientData", BindingFlags.Instance | BindingFlags.NonPublic, null, new[] { typeof(VRage.Network.Endpoint) }, null),
+                nameof(SgCreatePrefix), nameof(SgCreateSuffix));
+            Hook(ctx, groupsAssembly.GetType("Sandbox.Game.Replication.StateGroups.MyPropertySyncStateGroup")?.GetMethod("CreateClientData", BindingFlags.Instance | BindingFlags.Public),
+                nameof(SgCreatePrefix), nameof(SgCreateSuffix));
             patchManager.Commit();
             _installed = true;
         }
@@ -285,6 +319,42 @@ namespace SentisTests.Core
         private static void PhysicsSuffix() => End(Section.Physics);
         public static void HarnessBegin() => Begin(Section.Harness);
         public static void HarnessEnd() => End(Section.Harness);
+        public static void FakeClientsBegin() => Begin(Section.FakeClients);
+        public static void FakeClientsEnd() => End(Section.FakeClients);
+        private static void ReplicationBeforePrefix() => Begin(Section.ReplicationBefore);
+        private static void ReplicationBeforeSuffix() => End(Section.ReplicationBefore);
+        private static void ReplicationSendPrefix() => Begin(Section.ReplicationSend);
+        private static void ReplicationSendSuffix() => End(Section.ReplicationSend);
+        private static void NetProcessPrefix() => Begin(Section.NetProcess);
+        private static void NetProcessSuffix() => End(Section.NetProcess);
+        private static void ReplFilterPrefix() => Begin(Section.ReplFilterStateSync);
+        private static void ReplFilterSuffix() => End(Section.ReplFilterStateSync);
+        private static void ReplAddPrefix() => Begin(Section.ReplAddForClient);
+        private static void ReplAddSuffix() => End(Section.ReplAddForClient);
+        private static void ReplRefreshPrefix() => Begin(Section.ReplRefreshReplicable);
+        private static void ReplRefreshSuffix() => End(Section.ReplRefreshReplicable);
+        private static void ReplAcksPrefix() => Begin(Section.ReplClientAcks);
+        private static void ReplAcksSuffix() => End(Section.ReplClientAcks);
+        private static void ReplDirtyPrefix() => Begin(Section.ReplApplyDirty);
+        private static void ReplDirtySuffix() => End(Section.ReplApplyDirty);
+        private static void GridBuilderPrefix() => Begin(Section.GridGetObjectBuilder);
+        private static void GridBuilderSuffix() => End(Section.GridGetObjectBuilder);
+        private static void InvRefreshPrefix() => Begin(Section.InvRefreshClientData);
+        private static void InvRefreshSuffix() => End(Section.InvRefreshClientData);
+        private static void ReplStreamPrefix() => Begin(Section.ReplStreamingEntry);
+        private static void ReplStreamSuffix() => End(Section.ReplStreamingEntry);
+        private static void ReplRemovePrefix() => Begin(Section.ReplRemoveForClient);
+        private static void ReplRemoveSuffix() => End(Section.ReplRemoveForClient);
+        private static void SgInventoryPrefix() => Begin(Section.SgInventory);
+        private static void SgInventorySuffix() => End(Section.SgInventory);
+        private static void SgPropertyPrefix() => Begin(Section.SgProperty);
+        private static void SgPropertySuffix() => End(Section.SgProperty);
+        private static void SgPhysicsPrefix() => Begin(Section.SgPhysics);
+        private static void SgPhysicsSuffix() => End(Section.SgPhysics);
+        private static void SgCreatePrefix() => Begin(Section.SgCreateClientData);
+        private static void SgCreateSuffix() => End(Section.SgCreateClientData);
+        private static void ReplGridSerializePrefix() => Begin(Section.ReplGridSerialize);
+        private static void ReplGridSerializeSuffix() => End(Section.ReplGridSerialize);
         public static void BridgeBegin() => Begin(Section.Bridge);
         public static void BridgeEnd() => End(Section.Bridge);
 
