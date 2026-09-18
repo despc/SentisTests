@@ -43,6 +43,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(RefineryPerfScenario.ScenarioName, () => new RefineryPerfScenario());
                 ScenarioRegistry.Register(SavePerfScenario.ScenarioName, () => new SavePerfScenario());
                 ScenarioRegistry.Register(FrozenSavePerfScenario.ScenarioName, () => new FrozenSavePerfScenario());
+                ScenarioRegistry.Register(ReplicationPerfScenario.ScenarioName, () => new ReplicationPerfScenario());
                 ScenarioRegistry.Register(MixedWeldScenario.ScenarioName, () => new MixedWeldScenario());
                 ScenarioRegistry.Register(HandWeldScenario.ScenarioName, () => new HandWeldScenario());
                 ScenarioRegistry.Register(ProductionScenario.ScenarioName, () => new ProductionScenario());
@@ -56,6 +57,15 @@ namespace SentisTests
                 catch (Exception e)
                 {
                     Log.Error(e, "FrameProbe install failed; sim-work metrics disabled");
+                }
+
+                try
+                {
+                    Game.FakeClients.Install(torch.Managers.GetManager<PatchManager>());
+                }
+                catch (Exception e)
+                {
+                    Log.Error(e, "FakeClients install failed; replication scenarios disabled");
                 }
 
                 _sessionManager = torch.Managers.GetManager<TorchSessionManager>();
@@ -89,6 +99,8 @@ namespace SentisTests
                 if (state == TorchSessionState.Unloading)
                 {
                     TestRunner.StopActive("world unloading");
+                    Game.FakeClients.RemoveAll();
+                    Game.GridFlight.Clear();
                     _autoRunEarliest = DateTime.MaxValue;
                 }
                 else if (state == TorchSessionState.Loaded && Config != null && Config.AutoRun)
@@ -118,6 +130,13 @@ namespace SentisTests
                 finally { FrameProbe.BridgeEnd(); }
                 MaybeStartAutoRun();
                 TestRunner.Tick();
+                FrameProbe.FakeClientsBegin();
+                try
+                {
+                    Game.GridFlight.Tick();
+                    Game.FakeClients.Tick();
+                }
+                finally { FrameProbe.FakeClientsEnd(); }
             }
             catch (Exception e)
             {
