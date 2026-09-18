@@ -134,6 +134,14 @@ namespace SentisTests.Game
             return (counts[0], counts[1]);
         }
 
+        /// <summary>Reads and resets IdleInventorySync's wake counter; 0 when the plugin is absent.</summary>
+        public static long TakeIdleInventoryWake()
+        {
+            var type = PluginType("SentisOptimisations", "Optimizer.Optimizations.IdleInventorySync");
+            var method = type?.GetMethod("TakeWokenUp", BindingFlags.Public | BindingFlags.Static);
+            return method == null ? 0L : (long)method.Invoke(null, null);
+        }
+
         /// <summary>Compares the state group client index with the vanilla scan (slow; test only).</summary>
         public static void SetStateGroupIndexVerify(bool verify)
         {

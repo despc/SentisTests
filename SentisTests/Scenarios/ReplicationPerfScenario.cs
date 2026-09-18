@@ -60,25 +60,33 @@ namespace SentisTests.Scenarios
 
         /// <summary>
         /// A client that opens something must be served its inventories at once, not after the idle
-        /// wait (see IdleInventorySync). Looks at what the server has queued for one client before and
-        /// after putting a grid in front of it.
+        /// wait (see IdleInventorySync). Two signals: the wake counter (IdleInventorySync pulled
+        /// this client's queued inventories to the front) and the due fraction of its queue right
+        /// after opening. The wake counter is race-free; the queue snapshot is not - a fast server
+        /// may already have sent the whole queue through by the next frames, so a drained queue with
+        /// a matching wake is a pass, not a failure.
         /// </summary>
         private IEnumerator CheckTerminalOpening()
         {
             const int Soon = 5;
             var state = FakeClients.StateOf(0);
+            RuntimePluginControls.TakeIdleInventoryWake();
             var idle = RuntimePluginControls.InventoryQueueState(state, Soon);
             FakeClients.LookAt(0, _firstGrid);
-            for (var i = 0; i < 3; i++) yield return null;
+            yield return null;
+            var woken = RuntimePluginControls.TakeIdleInventoryWake();
             var opened = RuntimePluginControls.InventoryQueueState(state, Soon);
             FakeClients.LookAt(0, null);
             Note("TERMINAL OPENING | of " + idle.Queued + " queued inventories " + idle.Due + " were due within " + Soon +
-                 " frames while idle, " + opened.Due + " of " + opened.Queued + " after opening");
+                 " frames while idle, " + opened.Due + " of " + opened.Queued + " after opening, " + woken + " woken up");
             Check(idle.Queued > 100, "only " + idle.Queued + " inventories were queued for the client, this proves nothing");
             Check(idle.Due * 4 < idle.Queued, idle.Due + " of " + idle.Queued +
                   " inventories were already due for an idle client, they are not being held back");
-            Check(opened.Due * 10 >= opened.Queued * 9, "after opening, only " + opened.Due + " of " + opened.Queued +
-                  " inventories were pulled forward");
+            // Either the queue is still there and due now, or the wake fired and the server already
+            // served the bulk of it: both mean opening pulled the inventories forward.
+            Check(opened.Due * 10 >= opened.Queued * 9 || woken >= idle.Queued / 2,
+                  "after opening, only " + opened.Due + " of " + opened.Queued + " inventories were pulled forward" +
+                  " and " + woken + " were woken up");
         }
 
         public override IEnumerator Run()
