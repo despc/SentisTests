@@ -51,6 +51,12 @@ namespace SentisTests.Core
         private static readonly double[] _gcFrameMs = new double[4];
 
         private static readonly List<double> _busyMs = new List<double>();
+        // Per-frame section ticks kept for every frame, so the report can compare what frames over
+        // the budget do differently from ordinary ones, not only the handful of worst ones.
+        private static readonly List<double> _frameMsList = new List<double>();
+        private static readonly List<int> _frameGcBucket = new List<int>();
+        private static readonly List<long[]> _frameSections = new List<long[]>();
+        private static readonly List<long> _frameAlloc = new List<long>();
         private static readonly List<string> _worst = new List<string>();
         private static readonly List<double> _worstMs = new List<double>();
         private static readonly List<double> _buildMs = new List<double>();
@@ -187,7 +193,8 @@ namespace SentisTests.Core
             if (_frameStart == 0) return;
             var ms = (Stopwatch.GetTimestamp() - _frameStart) * 1000.0 / Stopwatch.Frequency;
             _frameStart = 0;
-            _windowFrameAllocBytes += GC.GetAllocatedBytesForCurrentThread() - _frameAllocStart;
+            var frameAlloc = GC.GetAllocatedBytesForCurrentThread() - _frameAllocStart;
+            _windowFrameAllocBytes += frameAlloc;
             _frameIndex++;
             _busyMs.Add(ms);
             _refineryTicksPerFrame.Add(_refineryTicksThisFrame);
@@ -196,6 +203,10 @@ namespace SentisTests.Core
                 if (GC.CollectionCount(g) != _gcAtFrameStart[g]) { gcBucket = g + 1; break; }
             _gcFrames[gcBucket]++;
             _gcFrameMs[gcBucket] += ms;
+            _frameMsList.Add(ms);
+            _frameGcBucket.Add(gcBucket);
+            _frameSections.Add((long[])_sectionTicks.Clone());
+            _frameAlloc.Add(frameAlloc);
             if (ms <= ReportAboveMs) return;
             if (_worstMs.Count >= WorstKept && ms <= _worstMs.Min()) return;
 
@@ -380,12 +391,86 @@ namespace SentisTests.Core
                 _gcSchedulerType.GetField(name)?.SetValue(null, 0.0);
         }
 
+        /// <summary>
+        /// Compares frames over the budget with ordinary ones section by section: what the heavy
+        /// frames spend their extra time on, separately for frames with and without a GC collection.
+        /// </summary>
+        private static void AppendOverBudgetBreakdown(StringBuilder sb, double[] frameMs, int[] frameGc,
+            long[][] frameSections, long[] frameAlloc)
+        {
+            var n = frameMs.Length;
+            if (n == 0 || frameSections.Length != n) return;
+            var heavyNoGc = new List<int>();
+            var heavyGc = new List<int>();
+            var normal = new List<int>();
+            for (var f = 0; f < n; f++)
+            {
+                if (frameMs[f] <= BudgetMs) { normal.Add(f); continue; }
+                if (frameGc[f] == 0) heavyNoGc.Add(f); else heavyGc.Add(f);
+            }
+            if (heavyNoGc.Count + heavyGc.Count == 0) return;
+            // Sections are timed inside each other in places; report every section that differs,
+            // but compute "other" from the non-nested ones only, like the worst-frame lines.
+            Func<List<int>, double[]> avgPerFrame = idx =>
+            {
+                var acc = new double[(int)Section.Count];
+                foreach (var f in idx)
+                    for (var i = 0; i < (int)Section.Count; i++)
+                        acc[i] += frameSections[f][i];
+                for (var i = 0; i < (int)Section.Count; i++)
+                    acc[i] = acc[i] * 1000.0 / Stopwatch.Frequency / Math.Max(1, idx.Count);
+                return acc;
+            };
+            var normalAvg = avgPerFrame(normal);
+            sb.Append(" | over-budget breakdown:");
+            void Bucket(string label, List<int> idx)
+            {
+                if (idx.Count == 0) return;
+                var heavyAvg = avgPerFrame(idx);
+                double heavyMs = 0, normalMs = 0, alloc = 0;
+                foreach (var f in idx) { heavyMs += frameMs[f]; alloc += frameAlloc[f]; }
+                foreach (var f in normal) normalMs += frameMs[f];
+                heavyMs /= idx.Count; normalMs /= Math.Max(1, normal.Count);
+                sb.Append(' ').Append(label).Append("(n=").Append(idx.Count)
+                    .Append(", avg ").Append(heavyMs.ToString("F1")).Append("ms vs ").Append(normalMs.ToString("F1"))
+                    .Append("ms, alloc ").Append(alloc / 1024.0 / idx.Count).Append("KB/frame):");
+                var deltas = new List<(int idx, double delta)>();
+                for (var i = 0; i < (int)Section.Count; i++)
+                {
+                    var delta = heavyAvg[i] - normalAvg[i];
+                    if (Math.Abs(delta) < 0.05) continue;
+                    if (heavyAvg[i] < 0.02 && normalAvg[i] < 0.02) continue;
+                    deltas.Add((i, delta));
+                }
+                foreach (var d in deltas.OrderByDescending(x => Math.Abs(x.delta)).Take(8))
+                    sb.Append(' ').Append(SectionNames[d.idx]).Append(d.delta >= 0 ? '+' : '−')
+                        .Append(Math.Abs(d.delta).ToString("F2"));
+                double Other(double[] a)
+                {
+                    var attributed = 0.0;
+                    for (var i = 0; i < (int)Section.Count; i++) if (!Nested[i]) attributed += a[i];
+                    return attributed;
+                }
+                sb.Append(" other+").Append((Other(heavyAvg) - Other(normalAvg)).ToString("F2"));
+            }
+            Bucket("noGc", heavyNoGc);
+            Bucket("withGc", heavyGc);
+        }
+
         /// <summary>Formats statistics for frames since the last call and clears the window.</summary>
         public static string Take()
         {
             var frames = _busyMs.ToArray();
             var worst = _worst.Zip(_worstMs, (text, ms) => new { text, ms })
                 .OrderByDescending(x => x.ms).Select(x => x.text).ToList();
+            var frameMs = _frameMsList.ToArray();
+            var frameGc = _frameGcBucket.ToArray();
+            var frameSections = _frameSections.ToArray();
+            var frameAlloc = _frameAlloc.ToArray();
+            _frameMsList.Clear();
+            _frameGcBucket.Clear();
+            _frameSections.Clear();
+            _frameAlloc.Clear();
             var refineryTicks = _refineryTicksPerFrame.ToArray();
             _refineryTicksPerFrame.Clear();
             var builds = _buildMs.ToArray();
@@ -446,6 +531,7 @@ namespace SentisTests.Core
             Array.Clear(_windowAllocBytes, 0, _windowAllocBytes.Length);
             _windowFrameAllocBytes = 0;
             _emptyPulls = 0;
+            AppendOverBudgetBreakdown(sb, frameMs, frameGc, frameSections, frameAlloc);
             if (worst.Count > 0)
                 sb.Append(" | worst: ").Append(string.Join("; ", worst));
             return sb.ToString();
