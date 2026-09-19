@@ -516,6 +516,44 @@ namespace SentisTests.Game
             return ob;
         }
 
+        /// <summary>
+        /// A hand-built group of grids joined by mechanical connections (a wheeled vehicle: the
+        /// chassis and one grid per wheel), extracted with tools/extract_group.py as a ship
+        /// blueprint. Returned with fresh entity ids (links between the grids remapped too), every
+        /// block handed to the player, saved transforms kept; the chassis comes first.
+        /// </summary>
+        public static List<MyObjectBuilder_CubeGrid> LoadAuthoredGroup(string resourceName, string name)
+        {
+            string xml;
+            using (var stream = typeof(WorldApi).Assembly.GetManifestResourceStream(resourceName))
+            {
+                if (stream == null)
+                    throw new Core.ScenarioFailedException("embedded grid group not found: " + resourceName);
+                using (var reader = new System.IO.StreamReader(stream))
+                    xml = reader.ReadToEnd();
+            }
+            var definitions = MyAPIGateway.Utilities.SerializeFromXML<MyObjectBuilder_Definitions>(xml);
+            var grids = definitions?.ShipBlueprints?.FirstOrDefault()?.CubeGrids?.ToList();
+            if (grids == null || grids.Count == 0)
+                throw new Core.ScenarioFailedException(resourceName + " holds no grids");
+            MyEntities.RemapObjectBuilderCollection(grids);
+            var owner = PlayerIdentityId();
+            for (var i = 0; i < grids.Count; i++)
+            {
+                var ob = grids[i];
+                ob.Name = i == 0 ? name : name + "-part" + i;
+                if (i == 0) ob.DisplayName = name;
+                ob.PersistentFlags = VRage.ObjectBuilders.MyPersistentEntityFlags2.InScene;
+                foreach (var block in ob.CubeBlocks)
+                {
+                    block.Owner = owner;
+                    block.BuiltBy = owner;
+                    block.ShareMode = VRage.Game.MyOwnershipShareModeEnum.Faction;
+                }
+            }
+            return grids;
+        }
+
         public static int CountBlocks(MyCubeGrid grid)
         {
             return grid == null || grid.CubeBlocks == null ? 0 : grid.CubeBlocks.Count;

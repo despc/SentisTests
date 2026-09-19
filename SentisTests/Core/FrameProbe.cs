@@ -29,12 +29,12 @@ namespace SentisTests.Core
         // turns into a missed frame.
         private const double ReportAboveMs = BudgetMs / 2;
 
-        private enum Section { Tools, ProjectorBuild, Physics, Refinery, ConveyorPull, ConveyorPush, RefineryUpdateProduction, RefineryRebuildQueue, RefineryRebuildQueue2, InventoryTransfer, QueueInsert, QueueClear, RefineryProcess, InvTransferOrRemove, InvAddItems, ObCreate, InvFitsBlueprint, QueueRemoveRequest, SinkSetRequired, EntitiesBefore, EntitiesAfter, SessionComponents, Harness, Bridge, ReplicationBefore, ReplicationSend, NetProcess, FakeClients, ReplFilterStateSync, ReplAddForClient, ReplRefreshReplicable, ReplGridSerialize, ReplClientAcks, ReplApplyDirty, SgInventory, SgProperty, SgPhysics, SgCreateClientData, ReplStreamingEntry, ReplRemoveForClient, GridGetObjectBuilder, InvRefreshClientData, ReplDirtyIndex, DrillUpdate10, DrillAfterSim, DrillUpdate100, MiningSchedule, DrillCutFinish, DrillResults, VoxelNotify, Count }
+        private enum Section { Tools, ProjectorBuild, Physics, Refinery, ConveyorPull, ConveyorPush, RefineryUpdateProduction, RefineryRebuildQueue, RefineryRebuildQueue2, InventoryTransfer, QueueInsert, QueueClear, RefineryProcess, InvTransferOrRemove, InvAddItems, ObCreate, InvFitsBlueprint, QueueRemoveRequest, SinkSetRequired, EntitiesBefore, EntitiesAfter, SessionComponents, Harness, Bridge, ReplicationBefore, ReplicationSend, NetProcess, FakeClients, ReplFilterStateSync, ReplAddForClient, ReplRefreshReplicable, ReplGridSerialize, ReplClientAcks, ReplApplyDirty, SgInventory, SgProperty, SgPhysics, SgCreateClientData, ReplStreamingEntry, ReplRemoveForClient, GridGetObjectBuilder, InvRefreshClientData, ReplDirtyIndex, DrillUpdate10, DrillAfterSim, DrillUpdate100, MiningSchedule, DrillCutFinish, DrillResults, VoxelNotify, WheelSystem, SuspensionUpdate, MechUpdateBefore, WheelUpdateBefore, WheelUpdateAfter, WheelContact, Count }
 
-        private static readonly string[] SectionNames = { "tools10", "projector.Build", "physics", "refinery.tick", "conveyor.pull", "conveyor.push", "refinery.updateProduction", "refinery.rebuildQueue", "sgi.rebuildQueue", "inventory.transfer", "queue.insert", "queue.clear", "refinery.process", "inv.transferOrRemove", "inv.addItems", "ob.createNewObject", "inv.fitsBlueprint", "queue.removeRequest", "sink.setRequired", "entities.before", "entities.after", "session.components", "harness", "bridge", "replication.updateBefore", "replication.sendUpdate", "net.receiveProcess", "fakeClients.tick", "repl.filterStateSync", "repl.addForClient", "repl.refreshReplicable", "repl.gridSerialize", "repl.clientAcks", "repl.applyDirtyGroups", "sg.inventory.serialize", "sg.property.serialize", "sg.physics.serialize", "sg.createClientData", "repl.sendStreamingEntry", "repl.removeForClient", "grid.getObjectBuilder", "inv.refreshClientData", "repl.dirtyIndex", "drill.update10", "drill.afterSim", "drill.update100", "mining.schedule", "drill.cutFinish", "drill.results", "voxel.notifyChanged" };
+        private static readonly string[] SectionNames = { "tools10", "projector.Build", "physics", "refinery.tick", "conveyor.pull", "conveyor.push", "refinery.updateProduction", "refinery.rebuildQueue", "sgi.rebuildQueue", "inventory.transfer", "queue.insert", "queue.clear", "refinery.process", "inv.transferOrRemove", "inv.addItems", "ob.createNewObject", "inv.fitsBlueprint", "queue.removeRequest", "sink.setRequired", "entities.before", "entities.after", "session.components", "harness", "bridge", "replication.updateBefore", "replication.sendUpdate", "net.receiveProcess", "fakeClients.tick", "repl.filterStateSync", "repl.addForClient", "repl.refreshReplicable", "repl.gridSerialize", "repl.clientAcks", "repl.applyDirtyGroups", "sg.inventory.serialize", "sg.property.serialize", "sg.physics.serialize", "sg.createClientData", "repl.sendStreamingEntry", "repl.removeForClient", "grid.getObjectBuilder", "inv.refreshClientData", "repl.dirtyIndex", "drill.update10", "drill.afterSim", "drill.update100", "mining.schedule", "drill.cutFinish", "drill.results", "voxel.notifyChanged", "wheels.system", "suspension.update", "mech.updateBefore", "wheel.updateBefore", "wheel.updateAfter", "wheel.contact" };
 
         // Sections timed inside another section; excluded from the top-level sum behind "other".
-        private static readonly bool[] Nested = { false, true, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, false, true, false, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, false, true, true };
+        private static readonly bool[] Nested = { false, true, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, false, true, false, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, false, true, true, true, true, true, true, true, true };
         private static readonly long[] _sectionTicks = new long[(int)Section.Count];
         private static readonly long[] _sectionStart = new long[(int)Section.Count];
         private static readonly int[] _sectionDepth = new int[(int)Section.Count];
@@ -166,6 +166,17 @@ namespace SentisTests.Core
             Hook(ctx, typeof(MyDrillBase).GetMethod("OnDrillResults", any), nameof(DrillResultsPrefix), nameof(DrillResultsSuffix));
             Hook(ctx, typeof(MyShipDrill).Assembly.GetType("Sandbox.Engine.Voxels.MyVoxelGenerator")?.GetMethod("NotifyVoxelChanged", any),
                 nameof(VoxelNotifyPrefix), nameof(VoxelNotifySuffix));
+            var sandbox = typeof(MyShipDrill).Assembly;
+            Hook(ctx, sandbox.GetType("Sandbox.Game.GameSystems.MyGridWheelSystem")?.GetMethod("Update", any, null, Type.EmptyTypes, null),
+                nameof(WheelSystemPrefix), nameof(WheelSystemSuffix));
+            Hook(ctx, sandbox.GetType("Sandbox.Game.Entities.Cube.MyMotorSuspension")?.GetMethod("Update", any, null, Type.EmptyTypes, null),
+                nameof(SuspensionUpdatePrefix), nameof(SuspensionUpdateSuffix));
+            Hook(ctx, sandbox.GetType("Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase")?.GetMethod("UpdateBeforeSimulation", any, null, Type.EmptyTypes, null),
+                nameof(MechUpdateBeforePrefix), nameof(MechUpdateBeforeSuffix));
+            var wheel = sandbox.GetType("Sandbox.Game.Entities.Blocks.MyWheel");
+            Hook(ctx, wheel?.GetMethod("UpdateBeforeSimulation", any, null, Type.EmptyTypes, null), nameof(WheelUpdateBeforePrefix), nameof(WheelUpdateBeforeSuffix));
+            Hook(ctx, wheel?.GetMethod("UpdateAfterSimulation", any, null, Type.EmptyTypes, null), nameof(WheelUpdateAfterPrefix), nameof(WheelUpdateAfterSuffix));
+            Hook(ctx, wheel?.GetMethod("ContactPointCallback", any), nameof(WheelContactPrefix), nameof(WheelContactSuffix));
             Hook(ctx, typeof(Sandbox.Game.Entities.MyCubeGrid).Assembly.GetType("Sandbox.Game.Replication.MyCubeGridReplicable")?
                     .GetMethod("Serialize", BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly),
                 nameof(ReplGridSerializePrefix), nameof(ReplGridSerializeSuffix));
@@ -441,6 +452,18 @@ namespace SentisTests.Core
         private static void DrillResultsSuffix() => End(Section.DrillResults);
         private static void VoxelNotifyPrefix() => Begin(Section.VoxelNotify);
         private static void VoxelNotifySuffix() => End(Section.VoxelNotify);
+        private static void WheelSystemPrefix() => Begin(Section.WheelSystem);
+        private static void WheelSystemSuffix() => End(Section.WheelSystem);
+        private static void SuspensionUpdatePrefix() => Begin(Section.SuspensionUpdate);
+        private static void SuspensionUpdateSuffix() => End(Section.SuspensionUpdate);
+        private static void MechUpdateBeforePrefix() => Begin(Section.MechUpdateBefore);
+        private static void MechUpdateBeforeSuffix() => End(Section.MechUpdateBefore);
+        private static void WheelUpdateBeforePrefix() => Begin(Section.WheelUpdateBefore);
+        private static void WheelUpdateBeforeSuffix() => End(Section.WheelUpdateBefore);
+        private static void WheelUpdateAfterPrefix() => Begin(Section.WheelUpdateAfter);
+        private static void WheelUpdateAfterSuffix() => End(Section.WheelUpdateAfter);
+        private static void WheelContactPrefix() => Begin(Section.WheelContact);
+        private static void WheelContactSuffix() => End(Section.WheelContact);
         public static void BridgeBegin() => Begin(Section.Bridge);
         public static void BridgeEnd() => End(Section.Bridge);
 

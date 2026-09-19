@@ -1,0 +1,1135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <ShipBlueprints>
+    <ShipBlueprint xsi:type="MyObjectBuilder_ShipBlueprintDefinition">
+      <Id Type="MyObjectBuilder_ShipBlueprintDefinition" Subtype="WHEEL_TEST" />
+      <CubeGrids>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>89719599050507278</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-45626.674279041174" y="-106930.53513594337" z="-185446.83483872749" />
+        <Forward x="-0.0138717" y="-0.999903262" z="0.0008250475" />
+        <Up x="0.254962951" y="-0.00273895077" z="0.9669468" />
+        <Orientation>
+          <X>0.09580318</X>
+          <Y>0.700881064</Y>
+          <Z>0.701563537</Z>
+          <W>-0.08600056</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_Cockpit">
+          <SubtypeName>LargeBlockCockpitSeat</SubtypeName>
+          <EntityId>114148595529392611</EntityId>
+<Min x="-3" y="5" z="0" />
+          <BlockOrientation Forward="Right" Up="Up" />
+<ShareMode>Faction</ShareMode>
+          <ComponentContainer>
+            <Components>
+              <ComponentData>
+                <TypeId>MyInventoryBase</TypeId>
+                <Component xsi:type="MyObjectBuilder_Inventory">
+                  <CanPutItems>true</CanPutItems>
+                  <Items />
+                  <nextItemId>0</nextItemId>
+                  <Volume>1</Volume>
+                  <Mass>9223372036854.775807</Mass>
+                  <MaxItemCount>2147483647</MaxItemCount>
+                  <Size xsi:nil="true" />
+                  <InventoryFlags>CanReceive CanSend</InventoryFlags>
+                  <RemoveEntityOnEmpty>false</RemoveEntityOnEmpty>
+                </Component>
+              </ComponentData>
+              <ComponentData>
+                <TypeId>MyMultiTextPanelComponent</TypeId>
+                <Component xsi:type="MyObjectBuilder_MultiTextPanelComponent">
+                  <TextPanelsContents>
+                    <MySerializedTextPanelData>
+                      <ChangeInterval>0</ChangeInterval>
+                      <Font Type="MyObjectBuilder_FontDefinition" Subtype="Debug" />
+                      <FontSize>1</FontSize>
+                      <ShowText>NONE</ShowText>
+                      <FontColor>
+                        <PackedValue>4294967295</PackedValue>
+                        <X>255</X>
+                        <Y>255</Y>
+                        <Z>255</Z>
+                        <R>255</R>
+                        <G>255</G>
+                        <B>255</B>
+                        <A>255</A>
+                      </FontColor>
+                      <BackgroundColor>
+                        <PackedValue>4278190080</PackedValue>
+                        <X>0</X>
+                        <Y>0</Y>
+                        <Z>0</Z>
+                        <R>0</R>
+                        <G>0</G>
+                        <B>0</B>
+                        <A>255</A>
+                      </BackgroundColor>
+                      <CurrentShownTexture>0</CurrentShownTexture>
+                      <ContentType>SCRIPT</ContentType>
+                      <SelectedScript>TSS_ArtificialHorizon</SelectedScript>
+                      <TextPadding>2</TextPadding>
+                      <CustomizeScripts>true</CustomizeScripts>
+                      <ScriptBackgroundColor>
+                        <PackedValue>4288108544</PackedValue>
+                        <X>0</X>
+                        <Y>88</Y>
+                        <Z>151</Z>
+                        <R>0</R>
+                        <G>88</G>
+                        <B>151</B>
+                        <A>255</A>
+                      </ScriptBackgroundColor>
+                      <ScriptForegroundColor>
+                        <PackedValue>4294962611</PackedValue>
+                        <X>179</X>
+                        <Y>237</Y>
+                        <Z>255</Z>
+                        <R>179</R>
+                        <G>237</G>
+                        <B>255</B>
+                        <A>255</A>
+                      </ScriptForegroundColor>
+                      <Sprites>
+                        <Length>0</Length>
+                      </Sprites>
+                      <UpdateStartOfFirstTexture>330538304</UpdateStartOfFirstTexture>
+                    </MySerializedTextPanelData>
+                    <MySerializedTextPanelData>
+                      <ChangeInterval>0</ChangeInterval>
+                      <Font Type="MyObjectBuilder_FontDefinition" Subtype="Debug" />
+                      <FontSize>1</FontSize>
+                      <ShowText>NONE</ShowText>
+                      <FontColor>
+                        <PackedValue>4294967295</PackedValue>
+                        <X>255</X>
+                        <Y>255</Y>
+                        <Z>255</Z>
+                        <R>255</R>
+                        <G>255</G>
+                        <B>255</B>
+                        <A>255</A>
+                      </FontColor>
+                      <BackgroundColor>
+                        <PackedValue>4278190080</PackedValue>
+                        <X>0</X>
+                        <Y>0</Y>
+                        <Z>0</Z>
+                        <R>0</R>
+                        <G>0</G>
+                        <B>0</B>
+                        <A>255</A>
+                      </BackgroundColor>
+                      <CurrentShownTexture>0</CurrentShownTexture>
+                      <ContentType>SCRIPT</ContentType>
+                      <SelectedScript>TSS_EnergyHydrogen</SelectedScript>
+                      <TextPadding>2</TextPadding>
+                      <CustomizeScripts>true</CustomizeScripts>
+                      <ScriptBackgroundColor>
+                        <PackedValue>4288108544</PackedValue>
+                        <X>0</X>
+                        <Y>88</Y>
+                        <Z>151</Z>
+                        <R>0</R>
+                        <G>88</G>
+                        <B>151</B>
+                        <A>255</A>
+                      </ScriptBackgroundColor>
+                      <ScriptForegroundColor>
+                        <PackedValue>4294962611</PackedValue>
+                        <X>179</X>
+                        <Y>237</Y>
+                        <Z>255</Z>
+                        <R>179</R>
+                        <G>237</G>
+                        <B>255</B>
+                        <A>255</A>
+                      </ScriptForegroundColor>
+                      <Sprites>
+                        <Length>0</Length>
+                      </Sprites>
+                      <UpdateStartOfFirstTexture>330538304</UpdateStartOfFirstTexture>
+                    </MySerializedTextPanelData>
+                    <MySerializedTextPanelData>
+                      <ChangeInterval>0</ChangeInterval>
+                      <Font Type="MyObjectBuilder_FontDefinition" Subtype="Debug" />
+                      <FontSize>1</FontSize>
+                      <ShowText>NONE</ShowText>
+                      <FontColor>
+                        <PackedValue>4294967295</PackedValue>
+                        <X>255</X>
+                        <Y>255</Y>
+                        <Z>255</Z>
+                        <R>255</R>
+                        <G>255</G>
+                        <B>255</B>
+                        <A>255</A>
+                      </FontColor>
+                      <BackgroundColor>
+                        <PackedValue>4278190080</PackedValue>
+                        <X>0</X>
+                        <Y>0</Y>
+                        <Z>0</Z>
+                        <R>0</R>
+                        <G>0</G>
+                        <B>0</B>
+                        <A>255</A>
+                      </BackgroundColor>
+                      <CurrentShownTexture>0</CurrentShownTexture>
+                      <ContentType>SCRIPT</ContentType>
+                      <SelectedScript>TSS_Gravity</SelectedScript>
+                      <TextPadding>2</TextPadding>
+                      <CustomizeScripts>true</CustomizeScripts>
+                      <ScriptBackgroundColor>
+                        <PackedValue>4288108544</PackedValue>
+                        <X>0</X>
+                        <Y>88</Y>
+                        <Z>151</Z>
+                        <R>0</R>
+                        <G>88</G>
+                        <B>151</B>
+                        <A>255</A>
+                      </ScriptBackgroundColor>
+                      <ScriptForegroundColor>
+                        <PackedValue>4294962611</PackedValue>
+                        <X>179</X>
+                        <Y>237</Y>
+                        <Z>255</Z>
+                        <R>179</R>
+                        <G>237</G>
+                        <B>255</B>
+                        <A>255</A>
+                      </ScriptForegroundColor>
+                      <Sprites>
+                        <Length>0</Length>
+                      </Sprites>
+                      <UpdateStartOfFirstTexture>330538304</UpdateStartOfFirstTexture>
+                    </MySerializedTextPanelData>
+                    <MySerializedTextPanelData>
+                      <ChangeInterval>0</ChangeInterval>
+                      <Font Type="MyObjectBuilder_FontDefinition" Subtype="Debug" />
+                      <FontSize>1</FontSize>
+                      <ShowText>NONE</ShowText>
+                      <FontColor>
+                        <PackedValue>4294967295</PackedValue>
+                        <X>255</X>
+                        <Y>255</Y>
+                        <Z>255</Z>
+                        <R>255</R>
+                        <G>255</G>
+                        <B>255</B>
+                        <A>255</A>
+                      </FontColor>
+                      <BackgroundColor>
+                        <PackedValue>4278190080</PackedValue>
+                        <X>0</X>
+                        <Y>0</Y>
+                        <Z>0</Z>
+                        <R>0</R>
+                        <G>0</G>
+                        <B>0</B>
+                        <A>255</A>
+                      </BackgroundColor>
+                      <CurrentShownTexture>0</CurrentShownTexture>
+                      <SelectedScript />
+                      <TextPadding>2</TextPadding>
+                      <ScriptBackgroundColor>
+                        <PackedValue>4288108544</PackedValue>
+                        <X>0</X>
+                        <Y>88</Y>
+                        <Z>151</Z>
+                        <R>0</R>
+                        <G>88</G>
+                        <B>151</B>
+                        <A>255</A>
+                      </ScriptBackgroundColor>
+                      <ScriptForegroundColor>
+                        <PackedValue>4294962611</PackedValue>
+                        <X>179</X>
+                        <Y>237</Y>
+                        <Z>255</Z>
+                        <R>179</R>
+                        <G>237</G>
+                        <B>255</B>
+                        <A>255</A>
+                      </ScriptForegroundColor>
+                      <Sprites>
+                        <Length>0</Length>
+                      </Sprites>
+                      <UpdateStartOfFirstTexture>330538304</UpdateStartOfFirstTexture>
+                    </MySerializedTextPanelData>
+                    <MySerializedTextPanelData>
+                      <ChangeInterval>0</ChangeInterval>
+                      <Font Type="MyObjectBuilder_FontDefinition" Subtype="Debug" />
+                      <FontSize>1</FontSize>
+                      <ShowText>NONE</ShowText>
+                      <FontColor>
+                        <PackedValue>4294967295</PackedValue>
+                        <X>255</X>
+                        <Y>255</Y>
+                        <Z>255</Z>
+                        <R>255</R>
+                        <G>255</G>
+                        <B>255</B>
+                        <A>255</A>
+                      </FontColor>
+                      <BackgroundColor>
+                        <PackedValue>4278190080</PackedValue>
+                        <X>0</X>
+                        <Y>0</Y>
+                        <Z>0</Z>
+                        <R>0</R>
+                        <G>0</G>
+                        <B>0</B>
+                        <A>255</A>
+                      </BackgroundColor>
+                      <CurrentShownTexture>0</CurrentShownTexture>
+                      <ContentType>SCRIPT</ContentType>
+                      <SelectedScript>TSS_ClockAnalog</SelectedScript>
+                      <TextPadding>2</TextPadding>
+                      <CustomizeScripts>true</CustomizeScripts>
+                      <ScriptBackgroundColor>
+                        <PackedValue>4288108544</PackedValue>
+                        <X>0</X>
+                        <Y>88</Y>
+                        <Z>151</Z>
+                        <R>0</R>
+                        <G>88</G>
+                        <B>151</B>
+                        <A>255</A>
+                      </ScriptBackgroundColor>
+                      <ScriptForegroundColor>
+                        <PackedValue>4294962611</PackedValue>
+                        <X>179</X>
+                        <Y>237</Y>
+                        <Z>255</Z>
+                        <R>179</R>
+                        <G>237</G>
+                        <B>255</B>
+                        <A>255</A>
+                      </ScriptForegroundColor>
+                      <Sprites>
+                        <Length>0</Length>
+                      </Sprites>
+                      <UpdateStartOfFirstTexture>330538304</UpdateStartOfFirstTexture>
+                    </MySerializedTextPanelData>
+                    <MySerializedTextPanelData>
+                      <ChangeInterval>0</ChangeInterval>
+                      <Font Type="MyObjectBuilder_FontDefinition" Subtype="Debug" />
+                      <FontSize>1</FontSize>
+                      <ShowText>NONE</ShowText>
+                      <FontColor>
+                        <PackedValue>4294967295</PackedValue>
+                        <X>255</X>
+                        <Y>255</Y>
+                        <Z>255</Z>
+                        <R>255</R>
+                        <G>255</G>
+                        <B>255</B>
+                        <A>255</A>
+                      </FontColor>
+                      <BackgroundColor>
+                        <PackedValue>4278190080</PackedValue>
+                        <X>0</X>
+                        <Y>0</Y>
+                        <Z>0</Z>
+                        <R>0</R>
+                        <G>0</G>
+                        <B>0</B>
+                        <A>255</A>
+                      </BackgroundColor>
+                      <CurrentShownTexture>0</CurrentShownTexture>
+                      <SelectedScript />
+                      <TextPadding>2</TextPadding>
+                      <ScriptBackgroundColor>
+                        <PackedValue>4288108544</PackedValue>
+                        <X>0</X>
+                        <Y>88</Y>
+                        <Z>151</Z>
+                        <R>0</R>
+                        <G>88</G>
+                        <B>151</B>
+                        <A>255</A>
+                      </ScriptBackgroundColor>
+                      <ScriptForegroundColor>
+                        <PackedValue>4294962611</PackedValue>
+                        <X>179</X>
+                        <Y>237</Y>
+                        <Z>255</Z>
+                        <R>179</R>
+                        <G>237</G>
+                        <B>255</B>
+                        <A>255</A>
+                      </ScriptForegroundColor>
+                      <Sprites>
+                        <Length>0</Length>
+                      </Sprites>
+                      <UpdateStartOfFirstTexture>330538304</UpdateStartOfFirstTexture>
+                    </MySerializedTextPanelData>
+                  </TextPanelsContents>
+                </Component>
+              </ComponentData>
+            </Components>
+          </ComponentContainer>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>1</NumberInGrid>
+          <UseSingleWeaponMode>false</UseSingleWeaponMode>
+          <Toolbar>
+            <ToolbarType>Character</ToolbarType>
+            <SelectedSlot xsi:nil="true" />
+            <Slots />
+            <SlotsGamepad />
+          </Toolbar>
+          <SelectedGunId xsi:nil="true" />
+          <BuildToolbar>
+            <ToolbarType>Character</ToolbarType>
+            <SelectedSlot xsi:nil="true" />
+            <Slots />
+            <SlotsGamepad />
+          </BuildToolbar>
+          <OnLockedToolbar>
+            <ToolbarType>Character</ToolbarType>
+            <SelectedSlot xsi:nil="true" />
+            <Slots />
+            <SlotsGamepad />
+          </OnLockedToolbar>
+          <PilotRelativeWorld>
+            <Position x="-1.7436158657073975" y="-0.22717389464378357" z="-2.3917150497436523" />
+            <Forward x="0.5672771" y="-0.4923573" z="0.6601376" />
+            <Up x="0.0294963121" y="0.813231051" z="0.5811935" />
+            <Orientation>
+              <X>-0.07731086</X>
+              <Y>0.907794952</Y>
+              <Z>0.29564783</Z>
+              <W>-0.287269354</W>
+            </Orientation>
+          </PilotRelativeWorld>
+          <PilotGunDefinition xsi:nil="true" />
+          <IsInFirstPersonView>true</IsInFirstPersonView>
+          <OxygenLevel>0.890285</OxygenLevel>
+          <PilotJetpackEnabled xsi:nil="true" />
+          <TargetData>
+            <TargetId>0</TargetId>
+            <IsTargetLocked>false</IsTargetLocked>
+            <LockingProgress>0</LockingProgress>
+          </TargetData>
+          <SitAnimation>724483</SitAnimation>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-3" y="4" z="0" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-4" y="4" z="0" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-5" y="4" z="0" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-6" y="4" z="0" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-7" y="4" z="0" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-8" y="4" z="0" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-9" y="4" z="0" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-10" y="4" z="0" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-11" y="4" z="0" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-12" y="4" z="0" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-13" y="4" z="0" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-14" y="4" z="0" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-15" y="4" z="0" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-16" y="4" z="0" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-17" y="4" z="0" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-18" y="4" z="0" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-19" y="4" z="0" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-20" y="4" z="0" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-21" y="4" z="0" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_Gyro">
+          <SubtypeName>LargeBlockGyro</SubtypeName>
+          <EntityId>101677789378739432</EntityId>
+<Min x="-18" y="5" z="0" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>1</NumberInGrid>
+          <Enabled>true</Enabled>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_BatteryBlock">
+          <SubtypeName>LargeBlockBatteryBlock</SubtypeName>
+          <EntityId>128106355908473151</EntityId>
+<Min x="-12" y="4" z="1" />
+          <BlockOrientation Forward="Forward" Up="Left" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>1</NumberInGrid>
+          <Enabled>true</Enabled>
+          <CurrentStoredPower>0.8994957</CurrentStoredPower>
+          <ProducerEnabled>true</ProducerEnabled>
+          <MaxStoredPower>0</MaxStoredPower>
+          <SemiautoEnabled>false</SemiautoEnabled>
+          <OnlyDischargeEnabled>false</OnlyDischargeEnabled>
+          <ChargeMode>0</ChargeMode>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-5" y="4" z="-1" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-5" y="4" z="-2" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-5" y="4" z="-3" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-11" y="4" z="-1" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-11" y="4" z="-2" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-19" y="4" z="-1" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-19" y="4" z="-2" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_MotorSuspension">
+          <SubtypeName>OffroadSuspension5x5mirrored</SubtypeName>
+          <EntityId>93805720052971967</EntityId>
+<Min x="-5" y="4" z="-6" />
+          <BlockOrientation Forward="Down" Up="Forward" />
+<ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>1</NumberInGrid>
+          <Enabled>true</Enabled>
+          <TopBlockId>101726291227487523</TopBlockId>
+          <ShareInertiaTensor>false</ShareInertiaTensor>
+          <SafetyDetach>5</SafetyDetach>
+          <RotorEntityId xsi:nil="true" />
+          <WeldedEntityId xsi:nil="true" />
+          <SteerAngle>0</SteerAngle>
+          <Damping>0.9</Damping>
+          <Strength>3.40282347E+38</Strength>
+          <Propulsion>true</Propulsion>
+          <Friction>2.8</Friction>
+          <Power>0</Power>
+          <Height>-0.458</Height>
+          <MaxSteerAngle>0.349066</MaxSteerAngle>
+          <InvertSteer>false</InvertSteer>
+          <InvertPropulsion>false</InvertPropulsion>
+          <SpeedLimit>180</SpeedLimit>
+          <PowerNew>0.6</PowerNew>
+          <StrengthNew>0.06</StrengthNew>
+          <FrictionNew>0.5</FrictionNew>
+          <AirShockEnabled>true</AirShockEnabled>
+          <BrakingEnabled>true</BrakingEnabled>
+          <SteeringOverride>0</SteeringOverride>
+          <PropulsionOverride>0</PropulsionOverride>
+          <IsParkingEnabled>true</IsParkingEnabled>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_MotorSuspension">
+          <SubtypeName>OffroadSuspension5x5mirrored</SubtypeName>
+          <EntityId>96545275350133822</EntityId>
+<Min x="-11" y="4" z="-5" />
+          <BlockOrientation Forward="Down" Up="Forward" />
+<ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>2</NumberInGrid>
+          <Enabled>true</Enabled>
+          <TopBlockId>119288377459612554</TopBlockId>
+          <ShareInertiaTensor>false</ShareInertiaTensor>
+          <SafetyDetach>5</SafetyDetach>
+          <RotorEntityId xsi:nil="true" />
+          <WeldedEntityId xsi:nil="true" />
+          <SteerAngle>0</SteerAngle>
+          <Damping>0.9</Damping>
+          <Strength>3.40282347E+38</Strength>
+          <Propulsion>true</Propulsion>
+          <Friction>2.8</Friction>
+          <Power>0</Power>
+          <Height>-0.458</Height>
+          <MaxSteerAngle>0.349066</MaxSteerAngle>
+          <InvertSteer>false</InvertSteer>
+          <InvertPropulsion>false</InvertPropulsion>
+          <SpeedLimit>180</SpeedLimit>
+          <PowerNew>0.6</PowerNew>
+          <StrengthNew>0.06</StrengthNew>
+          <FrictionNew>0.5</FrictionNew>
+          <AirShockEnabled>true</AirShockEnabled>
+          <BrakingEnabled>true</BrakingEnabled>
+          <SteeringOverride>0</SteeringOverride>
+          <PropulsionOverride>0</PropulsionOverride>
+          <IsParkingEnabled>true</IsParkingEnabled>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_MotorSuspension">
+          <SubtypeName>OffroadSuspension5x5mirrored</SubtypeName>
+          <EntityId>142748423947794650</EntityId>
+<Min x="-19" y="4" z="-5" />
+          <BlockOrientation Forward="Down" Up="Forward" />
+<ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>3</NumberInGrid>
+          <Enabled>true</Enabled>
+          <TopBlockId>130116014993014966</TopBlockId>
+          <ShareInertiaTensor>false</ShareInertiaTensor>
+          <SafetyDetach>5</SafetyDetach>
+          <RotorEntityId xsi:nil="true" />
+          <WeldedEntityId xsi:nil="true" />
+          <SteerAngle>0</SteerAngle>
+          <Damping>0.9</Damping>
+          <Strength>3.40282347E+38</Strength>
+          <Propulsion>true</Propulsion>
+          <Friction>2.8</Friction>
+          <Power>0</Power>
+          <Height>-0.458</Height>
+          <MaxSteerAngle>0.349066</MaxSteerAngle>
+          <InvertSteer>false</InvertSteer>
+          <InvertPropulsion>false</InvertPropulsion>
+          <SpeedLimit>180</SpeedLimit>
+          <PowerNew>0.6</PowerNew>
+          <StrengthNew>0.06</StrengthNew>
+          <FrictionNew>0.5</FrictionNew>
+          <AirShockEnabled>true</AirShockEnabled>
+          <BrakingEnabled>true</BrakingEnabled>
+          <SteeringOverride>0</SteeringOverride>
+          <PropulsionOverride>0</PropulsionOverride>
+          <IsParkingEnabled>true</IsParkingEnabled>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-19" y="4" z="1" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-19" y="4" z="2" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-11" y="4" z="1" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-11" y="4" z="2" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-5" y="4" z="1" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_CubeBlock">
+          <SubtypeName>LargeBlockArmorBlock</SubtypeName>
+          <Min x="-5" y="4" z="2" />
+</MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_MotorSuspension">
+          <SubtypeName>OffroadSuspension5x5</SubtypeName>
+          <EntityId>125435971581015949</EntityId>
+<Min x="-6" y="4" z="3" />
+          <BlockOrientation Forward="Down" Up="Backward" />
+<ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>1</NumberInGrid>
+          <Enabled>true</Enabled>
+          <TopBlockId>104901070149882684</TopBlockId>
+          <ShareInertiaTensor>false</ShareInertiaTensor>
+          <SafetyDetach>5</SafetyDetach>
+          <RotorEntityId xsi:nil="true" />
+          <WeldedEntityId xsi:nil="true" />
+          <SteerAngle>0</SteerAngle>
+          <Damping>0.9</Damping>
+          <Strength>3.40282347E+38</Strength>
+          <Propulsion>true</Propulsion>
+          <Friction>2.8</Friction>
+          <Power>0</Power>
+          <Height>-0.458</Height>
+          <MaxSteerAngle>0.349066</MaxSteerAngle>
+          <InvertSteer>false</InvertSteer>
+          <InvertPropulsion>false</InvertPropulsion>
+          <SpeedLimit>180</SpeedLimit>
+          <PowerNew>0.6</PowerNew>
+          <StrengthNew>0.06</StrengthNew>
+          <FrictionNew>0.5</FrictionNew>
+          <AirShockEnabled>true</AirShockEnabled>
+          <BrakingEnabled>true</BrakingEnabled>
+          <SteeringOverride>0</SteeringOverride>
+          <PropulsionOverride>0</PropulsionOverride>
+          <IsParkingEnabled>true</IsParkingEnabled>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_MotorSuspension">
+          <SubtypeName>OffroadSuspension5x5</SubtypeName>
+          <EntityId>129546136790969716</EntityId>
+<Min x="-12" y="4" z="3" />
+          <BlockOrientation Forward="Down" Up="Backward" />
+<ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>2</NumberInGrid>
+          <Enabled>true</Enabled>
+          <TopBlockId>122826163841457407</TopBlockId>
+          <ShareInertiaTensor>false</ShareInertiaTensor>
+          <SafetyDetach>5</SafetyDetach>
+          <RotorEntityId xsi:nil="true" />
+          <WeldedEntityId xsi:nil="true" />
+          <SteerAngle>0</SteerAngle>
+          <Damping>0.9</Damping>
+          <Strength>3.40282347E+38</Strength>
+          <Propulsion>true</Propulsion>
+          <Friction>2.8</Friction>
+          <Power>0</Power>
+          <Height>-0.458</Height>
+          <MaxSteerAngle>0.349066</MaxSteerAngle>
+          <InvertSteer>false</InvertSteer>
+          <InvertPropulsion>false</InvertPropulsion>
+          <SpeedLimit>180</SpeedLimit>
+          <PowerNew>0.6</PowerNew>
+          <StrengthNew>0.06</StrengthNew>
+          <FrictionNew>0.5</FrictionNew>
+          <AirShockEnabled>true</AirShockEnabled>
+          <BrakingEnabled>true</BrakingEnabled>
+          <SteeringOverride>0</SteeringOverride>
+          <PropulsionOverride>0</PropulsionOverride>
+          <IsParkingEnabled>true</IsParkingEnabled>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_MotorSuspension">
+          <SubtypeName>OffroadSuspension5x5</SubtypeName>
+          <EntityId>130746644050805866</EntityId>
+<Min x="-20" y="4" z="3" />
+          <BlockOrientation Forward="Down" Up="Backward" />
+<ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>3</NumberInGrid>
+          <Enabled>true</Enabled>
+          <TopBlockId>93222031925957117</TopBlockId>
+          <ShareInertiaTensor>false</ShareInertiaTensor>
+          <SafetyDetach>5</SafetyDetach>
+          <RotorEntityId xsi:nil="true" />
+          <WeldedEntityId xsi:nil="true" />
+          <SteerAngle>0</SteerAngle>
+          <Damping>0.9</Damping>
+          <Strength>3.40282347E+38</Strength>
+          <Propulsion>true</Propulsion>
+          <Friction>2.8</Friction>
+          <Power>0</Power>
+          <Height>-0.458</Height>
+          <MaxSteerAngle>0.349066</MaxSteerAngle>
+          <InvertSteer>false</InvertSteer>
+          <InvertPropulsion>false</InvertPropulsion>
+          <SpeedLimit>180</SpeedLimit>
+          <PowerNew>0.6</PowerNew>
+          <StrengthNew>0.06</StrengthNew>
+          <FrictionNew>0.5</FrictionNew>
+          <AirShockEnabled>true</AirShockEnabled>
+          <BrakingEnabled>true</BrakingEnabled>
+          <SteeringOverride>0</SteeringOverride>
+          <PropulsionOverride>0</PropulsionOverride>
+          <IsParkingEnabled>true</IsParkingEnabled>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_BatteryBlock">
+          <SubtypeName>LargeBlockBatteryBlock</SubtypeName>
+          <EntityId>73535706021773025</EntityId>
+<Min x="-12" y="4" z="2" />
+          <BlockOrientation Forward="Forward" Up="Left" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>2</NumberInGrid>
+          <Enabled>true</Enabled>
+          <CurrentStoredPower>0.8994971</CurrentStoredPower>
+          <ProducerEnabled>true</ProducerEnabled>
+          <MaxStoredPower>0</MaxStoredPower>
+          <SemiautoEnabled>false</SemiautoEnabled>
+          <OnlyDischargeEnabled>false</OnlyDischargeEnabled>
+          <ChargeMode>0</ChargeMode>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_BatteryBlock">
+          <SubtypeName>LargeBlockBatteryBlock</SubtypeName>
+          <EntityId>139278200220668439</EntityId>
+<Min x="-12" y="4" z="-1" />
+          <BlockOrientation Forward="Forward" Up="Left" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>3</NumberInGrid>
+          <Enabled>true</Enabled>
+          <CurrentStoredPower>0.8994979</CurrentStoredPower>
+          <ProducerEnabled>true</ProducerEnabled>
+          <MaxStoredPower>0</MaxStoredPower>
+          <SemiautoEnabled>false</SemiautoEnabled>
+          <OnlyDischargeEnabled>false</OnlyDischargeEnabled>
+          <ChargeMode>0</ChargeMode>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_BatteryBlock">
+          <SubtypeName>LargeBlockBatteryBlock</SubtypeName>
+          <EntityId>118315037986070801</EntityId>
+<Min x="-12" y="4" z="-2" />
+          <BlockOrientation Forward="Forward" Up="Left" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>4</NumberInGrid>
+          <Enabled>true</Enabled>
+          <CurrentStoredPower>0.8994986</CurrentStoredPower>
+          <ProducerEnabled>true</ProducerEnabled>
+          <MaxStoredPower>0</MaxStoredPower>
+          <SemiautoEnabled>false</SemiautoEnabled>
+          <OnlyDischargeEnabled>false</OnlyDischargeEnabled>
+          <ChargeMode>0</ChargeMode>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_BatteryBlock">
+          <SubtypeName>LargeBlockBatteryBlock</SubtypeName>
+          <EntityId>94864375007560590</EntityId>
+<Min x="-6" y="4" z="1" />
+          <BlockOrientation Forward="Forward" Up="Left" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>5</NumberInGrid>
+          <Enabled>true</Enabled>
+          <CurrentStoredPower>0.8995007</CurrentStoredPower>
+          <ProducerEnabled>true</ProducerEnabled>
+          <MaxStoredPower>0</MaxStoredPower>
+          <SemiautoEnabled>false</SemiautoEnabled>
+          <OnlyDischargeEnabled>false</OnlyDischargeEnabled>
+          <ChargeMode>0</ChargeMode>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_BatteryBlock">
+          <SubtypeName>LargeBlockBatteryBlock</SubtypeName>
+          <EntityId>141676523656764125</EntityId>
+<Min x="-6" y="4" z="2" />
+          <BlockOrientation Forward="Forward" Up="Left" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>6</NumberInGrid>
+          <Enabled>true</Enabled>
+          <CurrentStoredPower>0.8995046</CurrentStoredPower>
+          <ProducerEnabled>true</ProducerEnabled>
+          <MaxStoredPower>0</MaxStoredPower>
+          <SemiautoEnabled>false</SemiautoEnabled>
+          <OnlyDischargeEnabled>false</OnlyDischargeEnabled>
+          <ChargeMode>0</ChargeMode>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_BatteryBlock">
+          <SubtypeName>LargeBlockBatteryBlock</SubtypeName>
+          <EntityId>121133067260276080</EntityId>
+<Min x="-6" y="4" z="-1" />
+          <BlockOrientation Forward="Forward" Up="Left" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>7</NumberInGrid>
+          <Enabled>true</Enabled>
+          <CurrentStoredPower>0.899508357</CurrentStoredPower>
+          <ProducerEnabled>true</ProducerEnabled>
+          <MaxStoredPower>0</MaxStoredPower>
+          <SemiautoEnabled>false</SemiautoEnabled>
+          <OnlyDischargeEnabled>false</OnlyDischargeEnabled>
+          <ChargeMode>0</ChargeMode>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_BatteryBlock">
+          <SubtypeName>LargeBlockBatteryBlock</SubtypeName>
+          <EntityId>137406289571955671</EntityId>
+<Min x="-6" y="4" z="-2" />
+          <BlockOrientation Forward="Forward" Up="Left" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>8</NumberInGrid>
+          <Enabled>true</Enabled>
+          <CurrentStoredPower>0.8995088</CurrentStoredPower>
+          <ProducerEnabled>true</ProducerEnabled>
+          <MaxStoredPower>0</MaxStoredPower>
+          <SemiautoEnabled>false</SemiautoEnabled>
+          <OnlyDischargeEnabled>false</OnlyDischargeEnabled>
+          <ChargeMode>0</ChargeMode>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+<Handbrake>true</Handbrake>
+      <DisplayName>WHEEL_TEST</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>0</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>123835466073423554</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-45617.735665149572" y="-106948.85633345314" z="-185443.4066771064" />
+        <Forward x="-0.998507857" y="0.01379385" z="-0.05283903" />
+        <Up x="-0.0138577465" y="-0.9999038" z="0.000843066256" />
+        <Orientation>
+          <X>0.6881574</X>
+          <Y>-0.004462536</Y>
+          <Z>0.72552824</Z>
+          <W>0.00531743048</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_Wheel">
+          <SubtypeName>OffroadRealWheel5x5mirrored</SubtypeName>
+          <EntityId>101726291227487523</EntityId>
+<YieldLastComponent>false</YieldLastComponent>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+<DisplayName>Wheel</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>0</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>103350012499178340</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-45594.735680408361" y="-106946.6690165586" z="-185436.251251081" />
+        <Forward x="0.976141" y="-0.0133638605" z="0.21672678" />
+        <Up x="-0.0138720423" y="-0.9999037" z="0.0008236049" />
+        <Orientation>
+          <X>0.7799559</X>
+          <Y>-0.00566776749</Y>
+          <Z>-0.625795841</Z>
+          <W>-0.00401953934</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_Wheel">
+          <SubtypeName>OffroadRealWheel5x5mirrored</SubtypeName>
+          <EntityId>119288377459612554</EntityId>
+<YieldLastComponent>false</YieldLastComponent>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+<DisplayName>Wheel</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>0</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>124975134663205195</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-45572.18557054508" y="-106946.99021406837" z="-185446.37442002632" />
+        <Forward x="0.794230759" y="-0.0115191247" z="-0.607507" />
+        <Up x="-0.0138720134" y="-0.99990356" z="0.000823747832" />
+        <Orientation>
+          <X>-0.4429838</X>
+          <Y>0.003441951</Y>
+          <Z>0.8965027</Z>
+          <W>0.00603598636</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_Wheel">
+          <SubtypeName>OffroadRealWheel5x5mirrored</SubtypeName>
+          <EntityId>130116014993014966</EntityId>
+<YieldLastComponent>false</YieldLastComponent>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+<DisplayName>Wheel</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>0</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>121441377826819556</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-45609.64081651676" y="-106915.07123823829" z="-185446.09899888374" />
+        <Forward x="0.759029746" y="-0.01106669" z="-0.650961936" />
+        <Up x="0.0138719622" y="0.99990344" z="-0.00082399603" />
+        <Orientation>
+          <X>-0.003271924</X>
+          <Y>-0.417741925</Y>
+          <Z>-0.006129797</Z>
+          <W>0.9085392</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_Wheel">
+          <SubtypeName>OffroadRealWheel5x5</SubtypeName>
+          <EntityId>104901070149882684</EntityId>
+<YieldLastComponent>false</YieldLastComponent>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+<DisplayName>Wheel</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>0</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>92722829817361601</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-45588.761132068517" y="-106915.35938521095" z="-185444.34609971382" />
+        <Forward x="0.842421353" y="-0.0112508563" z="0.5387021" />
+        <Up x="0.0138719492" y="0.99990344" z="-0.0008098278" />
+        <Orientation>
+          <X>0.00627833465</X>
+          <Y>0.8771041</Y>
+          <Z>0.00297599426</Z>
+          <W>-0.480250061</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_Wheel">
+          <SubtypeName>OffroadRealWheel5x5</SubtypeName>
+          <EntityId>122826163841457407</EntityId>
+<YieldLastComponent>false</YieldLastComponent>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+<DisplayName>Wheel</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>0</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>82272718133112611</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-45583.318245715978" y="-106915.43717451759" z="-185447.04284654" />
+        <Forward x="-0.7744536" y="0.0102340523" z="-0.6325481" />
+        <Up x="0.0138705317" y="0.9999035" z="-0.000804708339" />
+        <Orientation>
+          <X>0.00260924245</X>
+          <Y>0.428624749</Y>
+          <Z>-0.006438476</Z>
+          <W>0.9034559</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_Wheel">
+          <SubtypeName>OffroadRealWheel5x5</SubtypeName>
+          <EntityId>93222031925957117</EntityId>
+<YieldLastComponent>false</YieldLastComponent>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+<DisplayName>Wheel</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>0</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+      </CubeGrids>
+    </ShipBlueprint>
+  </ShipBlueprints>
+</Definitions>
