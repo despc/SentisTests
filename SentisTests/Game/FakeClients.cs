@@ -239,6 +239,30 @@ namespace SentisTests.Game
 
         public static void SetProfile(NetworkProfile profile) => _profile = profile;
 
+        /// <summary>
+        /// Moves a fake client to a new spot at once: its replication position and its character
+        /// (teleported, then held there). Game thread.
+        /// </summary>
+        public static void MoveTo(int index, Vector3D center)
+        {
+            var client = _clients[index];
+            client.Center = center;
+            client.Radius = 0;
+            client.AngularSpeed = 0;
+            MovePosition(client, _frames / 60.0);
+            var character = client.Player?.Character;
+            if (character == null || character.MarkedForClose || character.IsDead) return;
+            character.PositionComp.SetPosition(center);
+            if (character.Physics != null) character.Physics.LinearVelocity = Vector3.Zero;
+        }
+
+        /// <summary>Whether the fake client still has a live character. Game thread.</summary>
+        public static bool HasLiveCharacter(int index)
+        {
+            var character = _clients[index].Player?.Character;
+            return character != null && !character.MarkedForClose && !character.IsDead;
+        }
+
         /// <summary>The client state of one fake client, to look at what the server has queued for it.</summary>
         public static MyClientStateBase StateOf(int index) => _clients[index].State;
 

@@ -53,6 +53,10 @@ namespace SentisTests.Scenarios
             public bool OnPlanet;
             // At the moment the rig froze: world matrices, attached tops, locked gears, integrity.
             public List<MatrixD> FrozenPoses;
+            // When this rig's own thaw was seen, and its poses KickWatchSeconds after it.
+            public DateTime? ThawedAt;
+            public List<Vector3D> AfterPoses;
+            public List<Vector3D> ThawPoses;
             public int FrozenAttached, FrozenLocked;
             public double FrozenIntegrity;
             public int FrozenBlocks;
@@ -67,8 +71,8 @@ namespace SentisTests.Scenarios
 
         private readonly List<Rig> _rigs = new List<Rig>();
         private MyPlanet _planet;
-        private readonly VRage.Voxels.MyStorageData _probe = new VRage.Voxels.MyStorageData(VRage.Voxels.MyStorageDataTypeFlags.Content);
-        private readonly Dictionary<string, object> _savedConfig = new Dictionary<string, object>();
+        private PlanetGround _ground;
+        private readonly ConfigOverride _config = new ConfigOverride();
 
         public override string Name => ScenarioName;
         public override int TimeoutSeconds => (int)(Cycles * (AwakeSeconds + FrozenSeconds + 2 * WaitStateSeconds) + 300);
@@ -80,6 +84,7 @@ namespace SentisTests.Scenarios
                 .PositionAndOrientation.Value.GetMatrix();
             _planet = MyGamePruningStructure.GetClosestPlanet(anchorM.Translation);
             Check(_planet != null, "no planet");
+            _ground = new PlanetGround(_planet);
             var planetCentre = _planet.PositionComp.GetPosition();
             var up = Vector3D.Normalize(anchorM.Translation - planetCentre);
             var east = Vector3D.Normalize(anchorM.Forward - up * Vector3D.Dot(anchorM.Forward, up));
@@ -105,13 +110,13 @@ namespace SentisTests.Scenarios
 
             var settle = WaitForSeconds(SettleSeconds, "structures settle, gears lock");
             while (settle.MoveNext()) yield return settle.Current;
-            StartMotors();
+            foreach (var rig in _rigs) RigParts.StartMotors(rig.Grids);
             foreach (var rig in _rigs)
-                Note("rig " + rig.Name + ": " + rig.Grids.Count + " grids, tops attached " + Attached(rig) + ", gears locked " + Locked(rig));
+                Note("rig " + rig.Name + ": " + rig.Grids.Count + " grids, tops attached " + RigParts.Attached(rig.Grids) + ", gears locked " + RigParts.Locked(rig.Grids));
             // Only the copies with the static grid have their gear locked; the free ones are released.
-            var unlocked = _rigs.Where(r => (r.Grids.Any(g => g.IsStatic) || r.Name.Contains("on ground")) && Locked(r) != Gears(r).Count).ToList();
+            var unlocked = _rigs.Where(r => (r.Grids.Any(g => g.IsStatic) || r.Name.Contains("on ground")) && RigParts.Locked(r.Grids) != RigParts.Gears(r.Grids).Count).ToList();
             Check(unlocked.Count == 0, "landing gear not locked to the static grid: " +
-                  string.Join(", ", unlocked.Select(r => r.Name + " " + Locked(r) + "/" + Gears(r).Count)));
+                  string.Join(", ", unlocked.Select(r => r.Name + " " + RigParts.Locked(r.Grids) + "/" + RigParts.Gears(r.Grids).Count)));
 
             // Before the freezer has touched anything: which bodies are fixed in vanilla.
             foreach (var rig in _rigs)
@@ -122,10 +127,10 @@ namespace SentisTests.Scenarios
             }
 
             // Freezer on, for real, with a short distance so the fake player decides.
-            SetConfig("FreezeDistanceDynamic", FreezeDistance);
-            SetConfig("FreezeDistanceStatic", FreezeDistance);
-            SetConfig("FreezePhysics", true);
-            SetConfig("FreezerEnabled", true);
+            _config.Set("FreezeDistanceDynamic", FreezeDistance);
+            _config.Set("FreezeDistanceStatic", FreezeDistance);
+            _config.Set("FreezePhysics", true);
+            _config.Set("FreezerEnabled", true);
             Note("freezer on: physics freeze, " + FreezeDistance + " m");
             TickMetrics.Take();
             FrameProbe.Take();
@@ -134,7 +139,7 @@ namespace SentisTests.Scenarios
             {
                 // Nobody near: wait until every rig is frozen, then hold.
                 FakeClients.RemoveAll();
-                var frozenWait = Wait(() => _rigs.All(r => r.Grids.All(g => g.Closed || IsFrozen(g))), "all structures frozen", (int)WaitStateSeconds);
+                var frozenWait = Wait(() => _rigs.All(r => r.Grids.All(g => g.Closed || FreezerState.IsFrozen(g))), "all structures frozen", (int)WaitStateSeconds);
                 while (frozenWait.MoveNext()) yield return frozenWait.Current;
                 foreach (var rig in _rigs) CaptureFrozen(rig);
                 var hold = WaitForSeconds(FrozenSeconds, "cycle " + cycle + " frozen");
@@ -146,22 +151,14 @@ namespace SentisTests.Scenarios
 
                 // A player comes: wait for the thaw, watch the first seconds for kicks, compare.
                 FakeClients.Add(2, Network, index => (index == 0 ? planetSite + north * 100 + up * 3 : spaceSite + north * 40, 0, 0), withCharacters: true);
-                var thawWait = Wait(() => _rigs.All(r => r.Grids.All(g => g.Closed || !IsFrozen(g))), "all structures thawed", (int)WaitStateSeconds);
-                while (thawWait.MoveNext()) yield return thawWait.Current;
-                var watch = DateTime.UtcNow;
-                while ((DateTime.UtcNow - watch).TotalSeconds < KickWatchSeconds)
-                {
-                    foreach (var rig in _rigs)
-                    {
-                        foreach (var g in rig.Grids.Where(g => !g.Closed && g.Physics != null))
-                            rig.MaxKick = Math.Max(rig.MaxKick, g.Physics.LinearVelocity.Length());
-                        var chassis = rig.Grids[0];
-                        if (!chassis.Closed && chassis.Physics != null)
-                            rig.MaxChassisKick = Math.Max(rig.MaxChassisKick, chassis.Physics.LinearVelocity.Length());
-                    }
-                    yield return null;
-                }
+                var thawStart = DateTime.UtcNow;
+                var thaw = WatchThaw("cycle " + cycle);
+                while (thaw.MoveNext()) yield return thaw.Current;
                 foreach (var rig in _rigs) CompareAfterThaw(rig, cycle);
+                Note("cycle " + cycle + " chassis: " + string.Join(" | ", _rigs.Select(r => r.Name + " thawed after " +
+                     (r.ThawedAt.Value - thawStart).TotalSeconds.ToString("F1") + " s, frozen->thaw " +
+                     Vector3D.Distance(r.ThawPoses[0], r.FrozenPoses[0].Translation).ToString("F2") + " m, thaw->+3s " +
+                     Vector3D.Distance(r.AfterPoses[0], r.ThawPoses[0]).ToString("F2") + " m")));
                 Note("cycle " + cycle + ": " + string.Join(" | ", _rigs.Select(Summary)));
                 var awake = WaitForSeconds(AwakeSeconds, "cycle " + cycle + " awake");
                 while (awake.MoveNext()) yield return awake.Current;
@@ -169,36 +166,34 @@ namespace SentisTests.Scenarios
             // FreezePhysics switched off and on while everything is frozen (UpdateFreezePhysics):
             // off must hand every body back to dynamic, on must freeze the free groups again.
             FakeClients.RemoveAll();
-            var toggleWait = Wait(() => _rigs.All(r => r.Grids.All(g => g.Closed || IsFrozen(g))), "all frozen before the toggle", (int)WaitStateSeconds);
+            var toggleWait = Wait(() => _rigs.All(r => r.Grids.All(g => g.Closed || FreezerState.IsFrozen(g))), "all frozen before the toggle", (int)WaitStateSeconds);
             while (toggleWait.MoveNext()) yield return toggleWait.Current;
             foreach (var rig in _rigs) CaptureFrozen(rig);
-            SetConfig("FreezePhysics", false);
+            _config.Set("FreezePhysics", false);
             var off = WaitForSeconds(3, "FreezePhysics off");
             while (off.MoveNext()) yield return off.Current;
             foreach (var rig in _rigs)
             {
                 CheckNoFixedBodies(rig, "FreezePhysics off");
-                if (rig.Grids.Any(IsPhysicsFrozen)) rig.Problems.Add("FreezePhysics off: still listed physics-frozen");
-                if (!rig.Grids.All(g => g.Closed || IsFrozen(g))) rig.Problems.Add("FreezePhysics off: logic freeze dropped");
+                if (rig.Grids.Any(FreezerState.IsPhysicsFrozen)) rig.Problems.Add("FreezePhysics off: still listed physics-frozen");
+                if (!rig.Grids.All(g => g.Closed || FreezerState.IsFrozen(g))) rig.Problems.Add("FreezePhysics off: logic freeze dropped");
             }
-            SetConfig("FreezePhysics", true);
+            _config.Set("FreezePhysics", true);
             var on = WaitForSeconds(3, "FreezePhysics on");
             while (on.MoveNext()) yield return on.Current;
             foreach (var rig in _rigs)
             {
                 var free = !rig.Grids.Any(g => g.IsStatic) && !rig.Name.Contains("on ground");
-                var physicsFrozen = rig.Grids.Count(IsPhysicsFrozen);
+                var physicsFrozen = rig.Grids.Count(FreezerState.IsPhysicsFrozen);
                 if (free && physicsFrozen != rig.Grids.Count)
                     rig.Problems.Add("FreezePhysics on: " + physicsFrozen + "/" + rig.Grids.Count + " physics-frozen");
                 if (!free && physicsFrozen > 0)
                     rig.Problems.Add("FreezePhysics on: physics frozen on a fixed group");
             }
-            Note("toggle: " + string.Join(" | ", _rigs.Select(r => r.Name + " physics-frozen " + r.Grids.Count(IsPhysicsFrozen) + "/" + r.Grids.Count)));
+            Note("toggle: " + string.Join(" | ", _rigs.Select(r => r.Name + " physics-frozen " + r.Grids.Count(FreezerState.IsPhysicsFrozen) + "/" + r.Grids.Count)));
             FakeClients.Add(2, Network, index => (index == 0 ? planetSite + north * 100 + up * 3 : spaceSite + north * 40, 0, 0), withCharacters: true);
-            var lastThaw = Wait(() => _rigs.All(r => r.Grids.All(g => g.Closed || !IsFrozen(g))), "all structures thawed after the toggle", (int)WaitStateSeconds);
+            var lastThaw = WatchThaw("after the toggle");
             while (lastThaw.MoveNext()) yield return lastThaw.Current;
-            var settleLast = WaitForSeconds(2, "after the toggle");
-            while (settleLast.MoveNext()) yield return settleLast.Current;
             foreach (var rig in _rigs) CompareAfterThaw(rig, Cycles + 1);
             FakeClients.RemoveAll();
 
@@ -209,22 +204,61 @@ namespace SentisTests.Scenarios
                 .Select(r => r.Name + ": " + string.Join("; ", r.Problems.Distinct().Take(4)))));
         }
 
+        /// <summary>
+        /// Waits for every rig to thaw, then watches each for <see cref="KickWatchSeconds"/> from its
+        /// own thaw: the fastest grid, the chassis speed, poses at the thaw and after the watch.
+        /// </summary>
+        private IEnumerator WatchThaw(string when)
+        {
+            // Rigs thaw at different moments (a world is stepped only once the player's client has it
+            // with selective physics updates), so each rig is watched from its own thaw.
+            foreach (var rig in _rigs)
+            {
+                rig.ThawedAt = null;
+                rig.AfterPoses = null;
+            }
+            var thawStart = DateTime.UtcNow;
+            while (_rigs.Any(r => r.AfterPoses == null))
+            {
+                var now = DateTime.UtcNow;
+                if ((now - thawStart).TotalSeconds > WaitStateSeconds + KickWatchSeconds)
+                    throw new ScenarioFailedException(when + ": not thawed: " + string.Join(", ", _rigs.Where(r => r.ThawedAt == null).Select(r => r.Name)));
+                foreach (var rig in _rigs)
+                {
+                    if (rig.ThawedAt == null && rig.Grids.All(g => g.Closed || !FreezerState.IsFrozen(g)))
+                    {
+                        rig.ThawedAt = now;
+                        rig.ThawPoses = rig.Grids.Select(g => g.PositionComp.GetPosition()).ToList();
+                    }
+                    if (rig.ThawedAt == null || rig.AfterPoses != null) continue;
+                    foreach (var g in rig.Grids.Where(g => !g.Closed && g.Physics != null))
+                        rig.MaxKick = Math.Max(rig.MaxKick, g.Physics.LinearVelocity.Length());
+                    var chassis = rig.Grids[0];
+                    if (!chassis.Closed && chassis.Physics != null)
+                        rig.MaxChassisKick = Math.Max(rig.MaxChassisKick, chassis.Physics.LinearVelocity.Length());
+                    if ((now - rig.ThawedAt.Value).TotalSeconds >= KickWatchSeconds)
+                        rig.AfterPoses = rig.Grids.Select(g => g.PositionComp.GetPosition()).ToList();
+                }
+                yield return null;
+            }
+        }
+
         // ------------------------------------------------------------------ checks
 
         private void CaptureFrozen(Rig rig)
         {
             rig.FrozenPoses = rig.Grids.Select(g => g.WorldMatrix).ToList();
-            rig.FrozenAttached = Attached(rig);
-            rig.FrozenLocked = Locked(rig);
+            rig.FrozenAttached = RigParts.Attached(rig.Grids);
+            rig.FrozenLocked = RigParts.Locked(rig.Grids);
             rig.FrozenIntegrity = rig.Grids.Where(g => !g.Closed).Sum(g => g.CubeBlocks.Sum(b => (double)b.Integrity));
             rig.FrozenBlocks = rig.Grids.Where(g => !g.Closed).Sum(g => g.CubeBlocks.Count);
             var fixedBodies = rig.Grids.Count(g => g.Physics?.RigidBody != null && g.Physics.RigidBody.IsFixed);
-            var physicsFrozen = rig.Grids.Count(IsPhysicsFrozen);
+            var physicsFrozen = rig.Grids.Count(FreezerState.IsPhysicsFrozen);
             var hasStatic = rig.Grids.Any(g => g.IsStatic) || rig.Name.Contains("on ground");
             if (hasStatic && physicsFrozen > 0)
                 rig.Problems.Add("physics frozen on " + physicsFrozen + " grids of a group with a static grid");
             if (physicsFrozen == rig.Grids.Count) rig.PhysicsFrozenCycles++;
-            else if (rig.Grids.All(IsFrozen)) rig.LogicOnlyCycles++;
+            else if (rig.Grids.All(FreezerState.IsFrozen)) rig.LogicOnlyCycles++;
             else rig.NotFrozenCycles++;
             if (!hasStatic && physicsFrozen > 0 && physicsFrozen < rig.Grids.Count)
                 rig.Problems.Add("only " + physicsFrozen + "/" + rig.Grids.Count + " grids physics-frozen");
@@ -239,7 +273,7 @@ namespace SentisTests.Scenarios
                 var g = rig.Grids[i];
                 if (g.Closed) continue;
                 var moved = Vector3D.Distance(g.PositionComp.GetPosition(), rig.FrozenPoses[i].Translation);
-                if (IsPhysicsFrozen(g) && moved > 0.05)
+                if (FreezerState.IsPhysicsFrozen(g) && moved > 0.05)
                     rig.Problems.Add("cycle " + cycle + ": grid " + i + " moved " + moved.ToString("F2") + " m while physics-frozen");
             }
         }
@@ -255,17 +289,24 @@ namespace SentisTests.Scenarios
                     rig.Problems.Add("cycle " + cycle + ": grid " + i + " closed");
                     continue;
                 }
-                var moved = Vector3D.Distance(g.PositionComp.GetPosition(), rig.FrozenPoses[i].Translation);
+                // A free rig in space drifts on its own pistons and hinge (nothing holds it): for it
+                // only a jump at the moment of the thaw counts, the drift is watched by the chassis speed.
+                var drifts = !rig.OnPlanet && !rig.Grids.Any(x => x.IsStatic);
+                var jumpOnly = drifts && rig.ThawPoses != null;
+                var moved = jumpOnly
+                    ? Vector3D.Distance(rig.ThawPoses[i], rig.FrozenPoses[i].Translation)
+                    : Vector3D.Distance(rig.AfterPoses != null ? rig.AfterPoses[i] : g.PositionComp.GetPosition(), rig.FrozenPoses[i].Translation);
+                var limit = jumpOnly ? 0.5 : 1.0;
                 // Moving tops (rotor, hinge, piston) move by design; bases and gear-locked ships must not.
-                var isTop = rig.Grids[0] != g && Tops(rig).Any(t => t.TopGrid == g) && !(rig.Name.Contains("WHEEL"));
-                if (!isTop && moved > 1.0)
-                    rig.Problems.Add("cycle " + cycle + ": grid " + i + " moved " + moved.ToString("F1") + " m after thaw");
-                if (rig.OnPlanet && UnderGround(g))
+                var isTop = rig.Grids[0] != g && RigParts.Tops(rig.Grids).Any(t => t.TopGrid == g) && !(rig.Name.Contains("WHEEL"));
+                if (!isTop && moved > limit)
+                    rig.Problems.Add("cycle " + cycle + ": grid " + i + (jumpOnly ? " jumped " : " moved ") + moved.ToString("F1") + " m after thaw");
+                if (rig.OnPlanet && _ground.UnderGround(g))
                     rig.Problems.Add("cycle " + cycle + ": grid " + i + " under the ground");
             }
-            var attached = Attached(rig);
+            var attached = RigParts.Attached(rig.Grids);
             if (attached < rig.FrozenAttached) rig.Problems.Add("cycle " + cycle + ": tops attached " + attached + "/" + rig.FrozenAttached);
-            var locked = Locked(rig);
+            var locked = RigParts.Locked(rig.Grids);
             if (locked < rig.FrozenLocked) rig.Problems.Add("cycle " + cycle + ": gears locked " + locked + "/" + rig.FrozenLocked);
             var integrity = rig.Grids.Where(g => !g.Closed).Sum(g => g.CubeBlocks.Sum(b => (double)b.Integrity));
             var blocks = rig.Grids.Where(g => !g.Closed).Sum(g => g.CubeBlocks.Count);
@@ -278,7 +319,7 @@ namespace SentisTests.Scenarios
         /// <summary>A grid that is not static and not physics-frozen must have a dynamic body.</summary>
         private void CheckNoFixedBodies(Rig rig, string when)
         {
-            var stuck = rig.Grids.Where(g => !g.Closed && !g.IsStatic && !IsPhysicsFrozen(g) && !rig.VanillaFixed.Contains(g.EntityId) &&
+            var stuck = rig.Grids.Where(g => !g.Closed && !g.IsStatic && !FreezerState.IsPhysicsFrozen(g) && !rig.VanillaFixed.Contains(g.EntityId) &&
                                              g.Physics?.RigidBody != null && g.Physics.RigidBody.IsFixed).ToList();
             var lost = rig.Grids.Where(g => !g.Closed && rig.VanillaFixed.Contains(g.EntityId) && g.Physics?.RigidBody != null && !g.Physics.RigidBody.IsFixed).ToList();
             if (lost.Count > 0) rig.Problems.Add(when + ": " + lost.Count + " gear-held grids no longer fixed");
@@ -288,53 +329,8 @@ namespace SentisTests.Scenarios
         }
 
         private string Summary(Rig rig) =>
-            rig.Name + " attached " + Attached(rig) + " locked " + Locked(rig) + " max speed " + rig.MaxKick.ToString("F1") +
+            rig.Name + " attached " + RigParts.Attached(rig.Grids) + " locked " + RigParts.Locked(rig.Grids) + " max speed " + rig.MaxKick.ToString("F1") +
             " chassis " + rig.MaxChassisKick.ToString("F2");
-
-        private static List<MyMechanicalConnectionBlockBase> Tops(Rig rig) =>
-            rig.Grids.Where(g => !g.Closed).SelectMany(g => g.GetFatBlocks().OfType<MyMechanicalConnectionBlockBase>()).ToList();
-
-        private static int Attached(Rig rig) => Tops(rig).Count(t => t.TopGrid != null);
-
-        private static List<MyLandingGear> Gears(Rig rig) =>
-            rig.Grids.Where(g => !g.Closed).SelectMany(g => g.GetFatBlocks().OfType<MyLandingGear>()).ToList();
-
-        private static int Locked(Rig rig) => Gears(rig).Count(g => g.LockMode == SpaceEngineers.Game.ModAPI.Ingame.LandingGearMode.Locked);
-
-        // ------------------------------------------------------------------ freezer state
-
-        private static Type FreezeLogicType => AppDomain.CurrentDomain.GetAssemblies()
-            .Select(a => a.GetType("SentisOptimisationsPlugin.Freezer.FreezeLogic")).FirstOrDefault(t => t != null)
-            ?? throw new ScenarioFailedException("SentisOptimisations freezer is not loaded");
-
-        private static bool InSet(string field, long id)
-        {
-            var set = FreezeLogicType.GetField(field, BindingFlags.Static | BindingFlags.Public).GetValue(null);
-            return (bool)set.GetType().GetMethod("Contains").Invoke(set, new object[] { id });
-        }
-
-        private static bool IsFrozen(MyCubeGrid g) => InSet("FrozenGrids", g.EntityId);
-        private static bool IsPhysicsFrozen(MyCubeGrid g) => InSet("FrozenPhysicsGrids", g.EntityId);
-
-        private void SetConfig(string property, object value)
-        {
-            var plugin = AppDomain.CurrentDomain.GetAssemblies()
-                .Select(a => a.GetType("SentisOptimisationsPlugin.SentisOptimisationsPlugin")).First(t => t != null);
-            var config = plugin.GetProperty("Config", BindingFlags.Public | BindingFlags.Static).GetValue(null);
-            var prop = config.GetType().GetProperty(property);
-            if (!_savedConfig.ContainsKey(property)) _savedConfig[property] = prop.GetValue(config);
-            prop.SetValue(config, value);
-            plugin.GetMethod("SaveConfig", BindingFlags.Public | BindingFlags.Static)?.Invoke(null, null);
-        }
-
-        private void RestoreConfig()
-        {
-            // Freezer off first, so everything thaws; then the rest.
-            if (_savedConfig.TryGetValue("FreezerEnabled", out var enabled)) SetConfig("FreezerEnabled", enabled);
-            foreach (var pair in _savedConfig.ToList())
-                if (pair.Key != "FreezerEnabled") SetConfig(pair.Key, pair.Value);
-            _savedConfig.Clear();
-        }
 
         // ------------------------------------------------------------------ structures
 
@@ -394,7 +390,7 @@ namespace SentisTests.Scenarios
             if (onPlanet)
             {
                 var up = Vector3D.Normalize(site - _planet.PositionComp.GetPosition());
-                shift += up * (Vector3D.Dot(Ground(site) - Ground(authored), up) - Vector3D.Dot(site - authored, up) + 0.3);
+                shift += up * (Vector3D.Dot(_ground.Ground(site) - _ground.Ground(authored), up) - Vector3D.Dot(site - authored, up) + 0.3);
             }
             var rig = new Rig { Name = name, Site = site, OnPlanet = onPlanet };
             foreach (var ob in group)
@@ -427,55 +423,11 @@ namespace SentisTests.Scenarios
         {
             // The large gear is 1x2x3: it takes y 0..1 under the plate at y 2.
             var parts = Plate(5, 5, 2).Append(new Part { Subtype = "LargeBlockLandingGear", Min = new Vector3I(2, 0, 1) });
-            var world = MatrixD.CreateWorld(Ground(site) + up * 3, Vector3D.Normalize(Vector3D.Cross(east, up)), up);
+            var world = MatrixD.CreateWorld(_ground.Ground(site) + up * 3, Vector3D.Normalize(Vector3D.Cross(east, up)), up);
             var grid = Spawn("gear-on-ground", world, parts);
             var rig = new Rig { Name = name, Site = site, OnPlanet = true };
             rig.Grids.Add(grid);
             return rig;
-        }
-
-        private void StartMotors()
-        {
-            foreach (var rig in _rigs)
-            foreach (var mech in Tops(rig))
-            {
-                switch (mech)
-                {
-                    case Sandbox.ModAPI.IMyPistonBase piston:
-                        piston.Velocity = 0.3f;
-                        break;
-                    case Sandbox.ModAPI.IMyMotorStator stator when !(mech is MyMotorSuspension):
-                        stator.TargetVelocityRPM = mech.BlockDefinition.Id.SubtypeName.Contains("Hinge") ? 2f : 5f;
-                        break;
-                }
-            }
-        }
-
-        // ------------------------------------------------------------------ ground
-
-        private byte ContentAt(Vector3D point)
-        {
-            var voxel = Vector3I.Floor(point - _planet.PositionLeftBottomCorner) + _planet.StorageMin;
-            _probe.Resize(Vector3I.One);
-            _planet.Storage.ReadRange(_probe, VRage.Voxels.MyStorageDataTypeFlags.Content, 0, voxel, voxel);
-            return _probe.Content(0);
-        }
-
-        private Vector3D Ground(Vector3D point)
-        {
-            var generated = _planet.GetClosestSurfacePointGlobal(ref point);
-            var up = Vector3D.Normalize(generated - _planet.PositionComp.GetPosition());
-            for (var h = 40.0; h > -40.0; h -= 0.25)
-                if (ContentAt(generated + up * h) >= 128)
-                    return generated + up * (h + 0.25);
-            return generated;
-        }
-
-        private bool UnderGround(MyCubeGrid grid)
-        {
-            var at = grid.PositionComp.WorldAABB.Center;
-            var up = Vector3D.Normalize(at - _planet.PositionComp.GetPosition());
-            return ContentAt(at + up * 1.5) >= 128;
         }
 
         public override void Cleanup()
@@ -483,7 +435,7 @@ namespace SentisTests.Scenarios
             try
             {
                 FakeClients.RemoveAll();
-                RestoreConfig();
+                _config.Restore();
             }
             finally { base.Cleanup(); }
         }
@@ -492,7 +444,7 @@ namespace SentisTests.Scenarios
         {
             try
             {
-                RestoreConfig();
+                _config.Restore();
                 foreach (var grid in MyEntities.GetEntities().OfType<MyCubeGrid>().ToList())
                 {
                     if (grid == null || grid.MarkedForClose) continue;

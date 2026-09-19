@@ -34,6 +34,7 @@ namespace SentisTests
             try
             {
                 _config = Persistent<MainConfig>.Load(Path.Combine(StoragePath, "SentisTests.cfg"));
+                Scenarios.ConfigOverride.RestoreFile = Path.Combine(StoragePath, "SentisTests.config-restore.txt");
                 ResolveReportDirectory();
 
                 ScenarioRegistry.Register(SmokeScenario.ScenarioName, () => new SmokeScenario());
@@ -54,6 +55,8 @@ namespace SentisTests
                 ScenarioRegistry.Register(WheelPerfScenario.ParkedScenarioName, () => new WheelPerfScenario(64, parked: true));
                 ScenarioRegistry.Register(GearProbeScenario.ScenarioName, () => new GearProbeScenario());
                 ScenarioRegistry.Register(FreezerPhysicsScenario.ScenarioName, () => new FreezerPhysicsScenario());
+                ScenarioRegistry.Register(FreezerStressScenario.ScenarioName, () => new FreezerStressScenario());
+                ScenarioRegistry.Register(FreezerStressScenario.ProfileScenarioName, () => new FreezerStressScenario(profile: true));
                 ScenarioRegistry.Register(WheelPerfScenario.RestoreCostScenarioName, () => new WheelPerfScenario(100, restore: true, sink: false));
                 ScenarioRegistry.Register(WheelPerfScenario.PhysicsAbScenarioName, () => new WheelPerfScenario(64, ab: true));
                 ScenarioRegistry.Register(WheelPerfScenario.RestoreSmallScenarioName, () => new WheelPerfScenario(16, rover: "SmallSuspension3x3", restore: true));
@@ -122,7 +125,13 @@ namespace SentisTests
                     Game.GridFlight.Clear();
                     _autoRunEarliest = DateTime.MaxValue;
                 }
-                else if (state == TorchSessionState.Loaded && Config != null && Config.AutoRun)
+                else if (state == TorchSessionState.Loaded)
+                {
+                    try { Scenarios.ConfigOverride.RestoreLeftovers(); }
+                    catch (Exception e) { Log.Warn(e, "putting back config left by an interrupted test failed"); }
+                }
+
+                if (state == TorchSessionState.Loaded && Config != null && Config.AutoRun)
                 {
                     _autoRunEarliest = DateTime.UtcNow.AddSeconds(Math.Max(5, Config.AutoRunDelaySeconds));
                     Log.Info("SentisTests AutoRun scheduled in {0}s: {1}", Config.AutoRunDelaySeconds,

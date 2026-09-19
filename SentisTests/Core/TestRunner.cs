@@ -395,6 +395,7 @@ namespace SentisTests.Core
             if (_active != null)
                 throw new ScenarioFailedException("scenario already running: " + _active.Name);
 
+            Scenarios.ConfigOverride.RestoreLeftovers();
             var scenario = ScenarioRegistry.Create(name);
             RunOrigin = PendingOrigin;
             RunCleanupDelaySeconds = PendingCleanupDelaySeconds;
