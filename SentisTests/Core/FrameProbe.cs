@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -29,12 +29,12 @@ namespace SentisTests.Core
         // turns into a missed frame.
         private const double ReportAboveMs = BudgetMs / 2;
 
-        private enum Section { Tools, ProjectorBuild, Physics, Refinery, ConveyorPull, ConveyorPush, RefineryUpdateProduction, RefineryRebuildQueue, RefineryRebuildQueue2, InventoryTransfer, QueueInsert, QueueClear, RefineryProcess, InvTransferOrRemove, InvAddItems, ObCreate, InvFitsBlueprint, QueueRemoveRequest, SinkSetRequired, EntitiesBefore, EntitiesAfter, SessionComponents, Harness, Bridge, ReplicationBefore, ReplicationSend, NetProcess, FakeClients, ReplFilterStateSync, ReplAddForClient, ReplRefreshReplicable, ReplGridSerialize, ReplClientAcks, ReplApplyDirty, SgInventory, SgProperty, SgPhysics, SgCreateClientData, ReplStreamingEntry, ReplRemoveForClient, GridGetObjectBuilder, InvRefreshClientData, Count }
+        private enum Section { Tools, ProjectorBuild, Physics, Refinery, ConveyorPull, ConveyorPush, RefineryUpdateProduction, RefineryRebuildQueue, RefineryRebuildQueue2, InventoryTransfer, QueueInsert, QueueClear, RefineryProcess, InvTransferOrRemove, InvAddItems, ObCreate, InvFitsBlueprint, QueueRemoveRequest, SinkSetRequired, EntitiesBefore, EntitiesAfter, SessionComponents, Harness, Bridge, ReplicationBefore, ReplicationSend, NetProcess, FakeClients, ReplFilterStateSync, ReplAddForClient, ReplRefreshReplicable, ReplGridSerialize, ReplClientAcks, ReplApplyDirty, SgInventory, SgProperty, SgPhysics, SgCreateClientData, ReplStreamingEntry, ReplRemoveForClient, GridGetObjectBuilder, InvRefreshClientData, ReplDirtyIndex, Count }
 
-        private static readonly string[] SectionNames = { "tools10", "projector.Build", "physics", "refinery.tick", "conveyor.pull", "conveyor.push", "refinery.updateProduction", "refinery.rebuildQueue", "sgi.rebuildQueue", "inventory.transfer", "queue.insert", "queue.clear", "refinery.process", "inv.transferOrRemove", "inv.addItems", "ob.createNewObject", "inv.fitsBlueprint", "queue.removeRequest", "sink.setRequired", "entities.before", "entities.after", "session.components", "harness", "bridge", "replication.updateBefore", "replication.sendUpdate", "net.receiveProcess", "fakeClients.tick", "repl.filterStateSync", "repl.addForClient", "repl.refreshReplicable", "repl.gridSerialize", "repl.clientAcks", "repl.applyDirtyGroups", "sg.inventory.serialize", "sg.property.serialize", "sg.physics.serialize", "sg.createClientData", "repl.sendStreamingEntry", "repl.removeForClient", "grid.getObjectBuilder", "inv.refreshClientData" };
+        private static readonly string[] SectionNames = { "tools10", "projector.Build", "physics", "refinery.tick", "conveyor.pull", "conveyor.push", "refinery.updateProduction", "refinery.rebuildQueue", "sgi.rebuildQueue", "inventory.transfer", "queue.insert", "queue.clear", "refinery.process", "inv.transferOrRemove", "inv.addItems", "ob.createNewObject", "inv.fitsBlueprint", "queue.removeRequest", "sink.setRequired", "entities.before", "entities.after", "session.components", "harness", "bridge", "replication.updateBefore", "replication.sendUpdate", "net.receiveProcess", "fakeClients.tick", "repl.filterStateSync", "repl.addForClient", "repl.refreshReplicable", "repl.gridSerialize", "repl.clientAcks", "repl.applyDirtyGroups", "sg.inventory.serialize", "sg.property.serialize", "sg.physics.serialize", "sg.createClientData", "repl.sendStreamingEntry", "repl.removeForClient", "grid.getObjectBuilder", "inv.refreshClientData", "repl.dirtyIndex" };
 
         // Sections timed inside another section; excluded from the top-level sum behind "other".
-        private static readonly bool[] Nested = { false, true, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, false, true, false, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true };
+        private static readonly bool[] Nested = { false, true, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, false, true, false, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true };
         private static readonly long[] _sectionTicks = new long[(int)Section.Count];
         private static readonly long[] _sectionStart = new long[(int)Section.Count];
         private static readonly int[] _sectionDepth = new int[(int)Section.Count];
@@ -149,6 +149,10 @@ namespace SentisTests.Core
             Hook(ctx, replicationServer.GetMethod("RemoveForClient", any), nameof(ReplRemovePrefix), nameof(ReplRemoveSuffix));
             Hook(ctx, replicationServer.GetMethod("OnClientAcks", any), nameof(ReplAcksPrefix), nameof(ReplAcksSuffix));
             Hook(ctx, replicationServer.GetMethod("ApplyDirtyGroups", any), nameof(ReplDirtyPrefix), nameof(ReplDirtySuffix));
+            // SentisOptimisations applies dirty groups in its own prefix and skips the game's method.
+            var dirtyIndex = AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("Optimizer.Optimizations.StateGroupClients"))
+                .FirstOrDefault(t => t != null)?.GetMethod("ApplyDirtyGroupsPrefix", any);
+            if (dirtyIndex != null) Hook(ctx, dirtyIndex, nameof(ReplDirtyIndexPrefix), nameof(ReplDirtyIndexSuffix));
             Hook(ctx, typeof(Sandbox.Game.Entities.MyCubeGrid).Assembly.GetType("Sandbox.Game.Replication.MyCubeGridReplicable")?
                     .GetMethod("Serialize", BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly),
                 nameof(ReplGridSerializePrefix), nameof(ReplGridSerializeSuffix));
@@ -356,8 +360,52 @@ namespace SentisTests.Core
         private static void ReplStreamSuffix() => End(Section.ReplStreamingEntry);
         private static void ReplRemovePrefix() => Begin(Section.ReplRemoveForClient);
         private static void ReplRemoveSuffix() => End(Section.ReplRemoveForClient);
-        private static void SgInventoryPrefix() => Begin(Section.SgInventory);
+        private static void SgInventoryPrefix(object __instance, VRage.Network.MyClientInfo forClient)
+        {
+            Begin(Section.SgInventory);
+            ClassifyInventoryWrite(__instance, forClient);
+        }
+
+        // Who the inventory writes go to: owner type, its parent type, and whether the client is
+        // looking at something, owns the entity (its character or what it controls) or neither -
+        // with the number of distinct inventory/client pairs, so a few inventories sent all the time
+        // can be told from many sent now and then.
+        private static readonly Dictionary<(Type, Type, int), long> _inventoryWrites = new Dictionary<(Type, Type, int), long>();
+        private static readonly HashSet<(object, ulong)> _inventoryPairs = new HashSet<(object, ulong)>();
+        private static readonly string[] InventoryWriteKinds = { "idle", "looking", "own" };
+
+        private static void ClassifyInventoryWrite(object group, VRage.Network.MyClientInfo forClient)
+        {
+            if (Thread.CurrentThread.ManagedThreadId != _gameThreadId || !(group is VRage.Network.IMyStateGroup stateGroup)) return;
+            var owner = stateGroup.Owner;
+            var parent = owner?.GetParent();
+            var state = forClient.State;
+            var kind = 0;
+            if (state != null && (owner == state.ControlledReplicable || owner == state.CharacterReplicable ||
+                                  parent != null && (parent == state.ControlledReplicable || parent == state.CharacterReplicable)))
+                kind = 2;
+            else if (state is Sandbox.Engine.Multiplayer.MyClientState clientState && clientState.ContextEntity != null)
+                kind = 1;
+            var key = (owner?.GetType(), parent?.GetType(), kind);
+            _inventoryWrites.TryGetValue(key, out var count);
+            _inventoryWrites[key] = count + 1;
+            _inventoryPairs.Add((group, forClient.EndpointId.Id.Value));
+        }
+
+        private static void AppendInventoryWrites(StringBuilder sb)
+        {
+            if (_inventoryWrites.Count == 0) return;
+            sb.Append(" | inventory writes: ").Append(_inventoryWrites.Values.Sum()).Append(" to ")
+                .Append(_inventoryPairs.Count).Append(" inventory/client pairs;");
+            foreach (var pair in _inventoryWrites.OrderByDescending(p => p.Value).Take(8))
+                sb.Append(' ').Append(pair.Key.Item1?.Name ?? "-").Append('/').Append(pair.Key.Item2?.Name ?? "-")
+                    .Append('/').Append(InventoryWriteKinds[pair.Key.Item3]).Append('=').Append(pair.Value);
+            _inventoryWrites.Clear();
+            _inventoryPairs.Clear();
+        }
         private static void SgInventorySuffix() => End(Section.SgInventory);
+        private static void ReplDirtyIndexPrefix() => Begin(Section.ReplDirtyIndex);
+        private static void ReplDirtyIndexSuffix() => End(Section.ReplDirtyIndex);
         private static void SgPropertyPrefix() => Begin(Section.SgProperty);
         private static void SgPropertySuffix() => End(Section.SgProperty);
         private static void SgPhysicsPrefix() => Begin(Section.SgPhysics);
@@ -523,6 +571,7 @@ namespace SentisTests.Core
                 if (_gcFrames[g] > 0)
                     sb.AppendFormat("{0}={1} (avg {2:F2}ms) ", gcNames[g], _gcFrames[g], _gcFrameMs[g] / _gcFrames[g]);
             AppendScheduledGc(sb);
+            AppendInventoryWrites(sb);
             Array.Clear(_gcFrames, 0, _gcFrames.Length);
             Array.Clear(_gcFrameMs, 0, _gcFrameMs.Length);
             Array.Clear(_windowTicks, 0, _windowTicks.Length);

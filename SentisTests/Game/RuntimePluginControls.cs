@@ -116,7 +116,7 @@ namespace SentisTests.Game
                     field.SetValue(null, 0L);
                     return value;
                 }
-                return "inventory syncs delayed=" + Take("Delayed") + " normal=" + Take("Normal") + " woken up=" + Take("WokenUp");
+                return "inventory syncs delayed=" + Take("Delayed") + " kept queued=" + Take("Kept") + " normal=" + Take("Normal") + " woken up=" + Take("WokenUp");
             }
             catch (Exception)
             {
