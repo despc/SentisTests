@@ -206,6 +206,22 @@ space turns on its own hinge and pistons when nothing holds it. The origin of it
 1.5 m in 3 s, while the centre of mass moves at under 0.3 m/s. So for that copy the test checks the jump at the
 moment of the thaw (0.01 m) and the chassis speed, not the distance.
 
+### Settling needs an observer
+
+With the setting on, a world nobody watches is not stepped, so a copy spawned with no player near hangs where it was
+put. The plate on the ground gear never landed, and its gear never locked. The runs had passed earlier only while a
+real player was connected. Now fake players stand by the copies while they settle: two in `freezer_physics`; in
+`freezer_stress`, 64 at the planet copies and then at the space copies.
+
+## Havok threads
+
+SentisOptimisations `Physics threads` (default: 80% of the logical processors) takes effect when the world loads.
+A patch on `OptimalHavokThreadCount` feeds it to `MyPhysics.LoadData`, which makes the pool once. A first version
+swapped the pool while the world ran. An A/B run that switched between 7 and 13 threads crashed Havok on the third
+swap (`0xc0000005` in Havok.dll): the old pools were kept alive, 27 threads, and the next pool could not be made.
+From the two rounds done before the crash, 13 threads were no faster than 7 in this scene: 7 threads gave 18.5 and
+22.2 ms a frame, 13 threads 21.4 ms.
+
 ## Config during the tests
 
 Both scenarios change the SentisOptimisations config: FreezerEnabled, FreezePhysics and both freeze distances.

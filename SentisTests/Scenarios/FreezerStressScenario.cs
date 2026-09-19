@@ -176,7 +176,14 @@ namespace SentisTests.Scenarios
                 yield return null;
             }
 
-            var settle = WaitForSeconds(SettleSeconds, "copies settle, gears lock");
+            // With EnableSelectivePhysicsUpdates a Havok world is stepped only for someone: without a
+            // player the copies would hang where they were spawned. The players watch the first 64
+            // copies settle, then the other 64.
+            FakeClients.Add(Players, Network, p => (_rigs[p].PlayerSpot, 0, 0), withCharacters: true);
+            var settle = WaitForSeconds(SettleSeconds, "copies settle, gears lock (first half)");
+            while (settle.MoveNext()) yield return settle.Current;
+            for (var p = 0; p < Players; p++) FakeClients.MoveTo(p, _rigs[Players + p].PlayerSpot);
+            settle = WaitForSeconds(SettleSeconds, "copies settle, gears lock (second half)");
             while (settle.MoveNext()) yield return settle.Current;
             foreach (var rig in _rigs)
             {
@@ -212,7 +219,7 @@ namespace SentisTests.Scenarios
                 _playerRig[p] = start[p].Index;
                 start[p].Occupant = p;
             }
-            FakeClients.Add(Players, Network, p => (start[p].PlayerSpot, 0, 0), withCharacters: true);
+            for (var p = 0; p < Players; p++) FakeClients.MoveTo(p, start[p].PlayerSpot);
             Note("freezer on: physics freeze, " + FreezeDistance + " m, " + Players + " players at " + Players + " of " + _rigs.Count + " copies, seed " + Seed);
             TickMetrics.Take();
             FrameProbe.Take();

@@ -108,6 +108,10 @@ namespace SentisTests.Scenarios
             _rigs.Add(BuildGearOnGround("planet, gear on ground", planetSite - north * 120, up, east));
             yield return null;
 
+            // With EnableSelectivePhysicsUpdates a Havok world is stepped only for someone: without a
+            // player the copies would hang where they were spawned. Observers for the settling; the
+            // first cycle removes them.
+            FakeClients.Add(2, Network, index => (index == 0 ? planetSite + north * 100 + up * 3 : spaceSite + north * 40, 0, 0), withCharacters: true);
             var settle = WaitForSeconds(SettleSeconds, "structures settle, gears lock");
             while (settle.MoveNext()) yield return settle.Current;
             foreach (var rig in _rigs) RigParts.StartMotors(rig.Grids);
