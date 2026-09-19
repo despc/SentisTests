@@ -29,12 +29,12 @@ namespace SentisTests.Core
         // turns into a missed frame.
         private const double ReportAboveMs = BudgetMs / 2;
 
-        private enum Section { Tools, ProjectorBuild, Physics, Refinery, ConveyorPull, ConveyorPush, RefineryUpdateProduction, RefineryRebuildQueue, RefineryRebuildQueue2, InventoryTransfer, QueueInsert, QueueClear, RefineryProcess, InvTransferOrRemove, InvAddItems, ObCreate, InvFitsBlueprint, QueueRemoveRequest, SinkSetRequired, EntitiesBefore, EntitiesAfter, SessionComponents, Harness, Bridge, ReplicationBefore, ReplicationSend, NetProcess, FakeClients, ReplFilterStateSync, ReplAddForClient, ReplRefreshReplicable, ReplGridSerialize, ReplClientAcks, ReplApplyDirty, SgInventory, SgProperty, SgPhysics, SgCreateClientData, ReplStreamingEntry, ReplRemoveForClient, GridGetObjectBuilder, InvRefreshClientData, ReplDirtyIndex, Count }
+        private enum Section { Tools, ProjectorBuild, Physics, Refinery, ConveyorPull, ConveyorPush, RefineryUpdateProduction, RefineryRebuildQueue, RefineryRebuildQueue2, InventoryTransfer, QueueInsert, QueueClear, RefineryProcess, InvTransferOrRemove, InvAddItems, ObCreate, InvFitsBlueprint, QueueRemoveRequest, SinkSetRequired, EntitiesBefore, EntitiesAfter, SessionComponents, Harness, Bridge, ReplicationBefore, ReplicationSend, NetProcess, FakeClients, ReplFilterStateSync, ReplAddForClient, ReplRefreshReplicable, ReplGridSerialize, ReplClientAcks, ReplApplyDirty, SgInventory, SgProperty, SgPhysics, SgCreateClientData, ReplStreamingEntry, ReplRemoveForClient, GridGetObjectBuilder, InvRefreshClientData, ReplDirtyIndex, DrillUpdate10, DrillAfterSim, DrillUpdate100, MiningSchedule, DrillCutFinish, DrillResults, VoxelNotify, Count }
 
-        private static readonly string[] SectionNames = { "tools10", "projector.Build", "physics", "refinery.tick", "conveyor.pull", "conveyor.push", "refinery.updateProduction", "refinery.rebuildQueue", "sgi.rebuildQueue", "inventory.transfer", "queue.insert", "queue.clear", "refinery.process", "inv.transferOrRemove", "inv.addItems", "ob.createNewObject", "inv.fitsBlueprint", "queue.removeRequest", "sink.setRequired", "entities.before", "entities.after", "session.components", "harness", "bridge", "replication.updateBefore", "replication.sendUpdate", "net.receiveProcess", "fakeClients.tick", "repl.filterStateSync", "repl.addForClient", "repl.refreshReplicable", "repl.gridSerialize", "repl.clientAcks", "repl.applyDirtyGroups", "sg.inventory.serialize", "sg.property.serialize", "sg.physics.serialize", "sg.createClientData", "repl.sendStreamingEntry", "repl.removeForClient", "grid.getObjectBuilder", "inv.refreshClientData", "repl.dirtyIndex" };
+        private static readonly string[] SectionNames = { "tools10", "projector.Build", "physics", "refinery.tick", "conveyor.pull", "conveyor.push", "refinery.updateProduction", "refinery.rebuildQueue", "sgi.rebuildQueue", "inventory.transfer", "queue.insert", "queue.clear", "refinery.process", "inv.transferOrRemove", "inv.addItems", "ob.createNewObject", "inv.fitsBlueprint", "queue.removeRequest", "sink.setRequired", "entities.before", "entities.after", "session.components", "harness", "bridge", "replication.updateBefore", "replication.sendUpdate", "net.receiveProcess", "fakeClients.tick", "repl.filterStateSync", "repl.addForClient", "repl.refreshReplicable", "repl.gridSerialize", "repl.clientAcks", "repl.applyDirtyGroups", "sg.inventory.serialize", "sg.property.serialize", "sg.physics.serialize", "sg.createClientData", "repl.sendStreamingEntry", "repl.removeForClient", "grid.getObjectBuilder", "inv.refreshClientData", "repl.dirtyIndex", "drill.update10", "drill.afterSim", "drill.update100", "mining.schedule", "drill.cutFinish", "drill.results", "voxel.notifyChanged" };
 
         // Sections timed inside another section; excluded from the top-level sum behind "other".
-        private static readonly bool[] Nested = { false, true, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, false, true, false, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true };
+        private static readonly bool[] Nested = { false, true, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, false, true, false, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, false, true, true };
         private static readonly long[] _sectionTicks = new long[(int)Section.Count];
         private static readonly long[] _sectionStart = new long[(int)Section.Count];
         private static readonly int[] _sectionDepth = new int[(int)Section.Count];
@@ -153,6 +153,19 @@ namespace SentisTests.Core
             var dirtyIndex = AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("Optimizer.Optimizations.StateGroupClients"))
                 .FirstOrDefault(t => t != null)?.GetMethod("ApplyDirtyGroupsPrefix", any);
             if (dirtyIndex != null) Hook(ctx, dirtyIndex, nameof(ReplDirtyIndexPrefix), nameof(ReplDirtyIndexSuffix));
+            Hook(ctx, typeof(MyShipDrill).GetMethod("UpdateBeforeSimulation10", any, null, Type.EmptyTypes, null),
+                nameof(DrillUpdate10Prefix), nameof(DrillUpdate10Suffix));
+            Hook(ctx, typeof(MyShipDrill).GetMethod("UpdateAfterSimulation", any, null, Type.EmptyTypes, null),
+                nameof(DrillAfterSimPrefix), nameof(DrillAfterSimSuffix));
+            Hook(ctx, typeof(MyShipDrill).GetMethod("UpdateAfterSimulation100", any, null, Type.EmptyTypes, null),
+                nameof(DrillUpdate100Prefix), nameof(DrillUpdate100Suffix));
+            var mining = typeof(MyShipDrill).Assembly.GetType("Sandbox.Game.GameSystems.MyShipMiningSystem");
+            Hook(ctx, mining?.GetMethod("ScheduleCutouts", any), nameof(MiningSchedulePrefix), nameof(MiningScheduleSuffix));
+            Hook(ctx, mining?.GetNestedType("ClusterCutOut", any)?.GetMethod("Finish", any),
+                nameof(DrillCutFinishPrefix), nameof(DrillCutFinishSuffix));
+            Hook(ctx, typeof(MyDrillBase).GetMethod("OnDrillResults", any), nameof(DrillResultsPrefix), nameof(DrillResultsSuffix));
+            Hook(ctx, typeof(MyShipDrill).Assembly.GetType("Sandbox.Engine.Voxels.MyVoxelGenerator")?.GetMethod("NotifyVoxelChanged", any),
+                nameof(VoxelNotifyPrefix), nameof(VoxelNotifySuffix));
             Hook(ctx, typeof(Sandbox.Game.Entities.MyCubeGrid).Assembly.GetType("Sandbox.Game.Replication.MyCubeGridReplicable")?
                     .GetMethod("Serialize", BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly),
                 nameof(ReplGridSerializePrefix), nameof(ReplGridSerializeSuffix));
@@ -414,6 +427,20 @@ namespace SentisTests.Core
         private static void SgCreateSuffix() => End(Section.SgCreateClientData);
         private static void ReplGridSerializePrefix() => Begin(Section.ReplGridSerialize);
         private static void ReplGridSerializeSuffix() => End(Section.ReplGridSerialize);
+        private static void DrillUpdate10Prefix() => Begin(Section.DrillUpdate10);
+        private static void DrillUpdate10Suffix() => End(Section.DrillUpdate10);
+        private static void DrillAfterSimPrefix() => Begin(Section.DrillAfterSim);
+        private static void DrillAfterSimSuffix() => End(Section.DrillAfterSim);
+        private static void DrillUpdate100Prefix() => Begin(Section.DrillUpdate100);
+        private static void DrillUpdate100Suffix() => End(Section.DrillUpdate100);
+        private static void MiningSchedulePrefix() => Begin(Section.MiningSchedule);
+        private static void MiningScheduleSuffix() => End(Section.MiningSchedule);
+        private static void DrillCutFinishPrefix() => Begin(Section.DrillCutFinish);
+        private static void DrillCutFinishSuffix() => End(Section.DrillCutFinish);
+        private static void DrillResultsPrefix() => Begin(Section.DrillResults);
+        private static void DrillResultsSuffix() => End(Section.DrillResults);
+        private static void VoxelNotifyPrefix() => Begin(Section.VoxelNotify);
+        private static void VoxelNotifySuffix() => End(Section.VoxelNotify);
         public static void BridgeBegin() => Begin(Section.Bridge);
         public static void BridgeEnd() => End(Section.Bridge);
 

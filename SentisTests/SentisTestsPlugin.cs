@@ -41,6 +41,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(FrozenRadiusWeldScenario.ScenarioName, () => new FrozenRadiusWeldScenario());
                 ScenarioRegistry.Register(WelderPerfScenario.ScenarioName, () => new WelderPerfScenario());
                 ScenarioRegistry.Register(RefineryPerfScenario.ScenarioName, () => new RefineryPerfScenario());
+                ScenarioRegistry.Register(DrillPerfScenario.ScenarioName, () => new DrillPerfScenario());
                 ScenarioRegistry.Register(SavePerfScenario.ScenarioName, () => new SavePerfScenario());
                 ScenarioRegistry.Register(FrozenSavePerfScenario.ScenarioName, () => new FrozenSavePerfScenario());
                 ScenarioRegistry.Register(ReplicationPerfScenario.ScenarioName, () => new ReplicationPerfScenario());
