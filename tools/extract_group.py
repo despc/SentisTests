@@ -6,7 +6,8 @@ A wheeled vehicle is several grids: the chassis and one grid per wheel, joined b
 suspension's <TopBlockId> (the id of the wheel block on the wheel grid). Rotors, pistons and
 hinges work the same way. extract_authored.py takes one grid; this one follows every
 <TopBlockId> from the named grid (and from what it reaches) and writes all of them as a
-ship blueprint (MyObjectBuilder_Definitions/ShipBlueprints), the chassis first.
+ship blueprint (MyObjectBuilder_Definitions/ShipBlueprints), the chassis first. Landing gears are
+followed too (<AttachedEntityId>): a ship locked to a station brings the station along.
 
 Entity ids stay, because the links are made of them; the scenario remaps them for every copy
 (MyEntities.RemapObjectBuilderCollection). Saved transforms stay too. Ownership, names (the
@@ -52,7 +53,8 @@ def extract(display_name, out_path, save_path):
             continue
         seen.add(start)
         grids.append(grid)
-        for top in re.findall(r"<TopBlockId>(\d+)</TopBlockId>", grid):
+        # Rotor/piston/suspension tops, and what landing gears are locked to.
+        for top in re.findall(r"<TopBlockId>(\d+)</TopBlockId>", grid) + re.findall(r"<AttachedEntityId>(\d+)</AttachedEntityId>", grid):
             i = src.find("<EntityId>%s</EntityId>" % top)
             if i < 0:
                 sys.exit("top block %s not in the save" % top)

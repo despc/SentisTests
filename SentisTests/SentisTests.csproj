@@ -70,6 +70,7 @@
     <!-- Authored integration-test fixtures, embedded so deployed DLLs are self-contained. -->
     <EmbeddedResource Include="Resources\DrillTest.xml" />
     <EmbeddedResource Include="Resources\WheelTest.xml" />
+    <EmbeddedResource Include="Resources\FreezerTest.xml" />
     <EmbeddedResource Include="Resources\MixedShip.xml" />
     <EmbeddedResource Include="Resources\PlatformWithProjection.xml" />
     <EmbeddedResource Include="Resources\ProductionGrid.xml" />

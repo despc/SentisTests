@@ -536,7 +536,15 @@ namespace SentisTests.Game
             var grids = definitions?.ShipBlueprints?.FirstOrDefault()?.CubeGrids?.ToList();
             if (grids == null || grids.Count == 0)
                 throw new Core.ScenarioFailedException(resourceName + " holds no grids");
+            // Landing gears keep the id of the grid they are locked to, and their object builder has
+            // no Remap: without this a copy would reach for the original station.
+            var oldIds = grids.Select(g => g.EntityId).ToList();
             MyEntities.RemapObjectBuilderCollection(grids);
+            var newIds = new Dictionary<long, long>();
+            for (var i = 0; i < grids.Count; i++) newIds[oldIds[i]] = grids[i].EntityId;
+            foreach (var gear in grids.SelectMany(g => g.CubeBlocks).OfType<Sandbox.Common.ObjectBuilders.MyObjectBuilder_LandingGear>())
+                if (gear.AttachedEntityId.HasValue && newIds.TryGetValue(gear.AttachedEntityId.Value, out var remapped))
+                    gear.AttachedEntityId = remapped;
             var owner = PlayerIdentityId();
             for (var i = 0; i < grids.Count; i++)
             {

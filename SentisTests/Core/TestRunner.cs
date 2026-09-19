@@ -249,7 +249,10 @@ namespace SentisTests.Core
                 }
                 catch (Exception e)
                 {
-                    throw new ScenarioFailedException("step threw at [" + _active.Progress + "]: " + e.Message);
+                    // The real cause, not the reflection wrapper, and where it came from.
+                    var cause = e.GetBaseException();
+                    SentisTestsPlugin.Log.Error(cause, "[TEST] " + _active.Name + " step threw at [" + _active.Progress + "]");
+                    throw new ScenarioFailedException("step threw at [" + _active.Progress + "]: " + cause.GetType().Name + ": " + cause.Message);
                 }
 
                 if (!moved)

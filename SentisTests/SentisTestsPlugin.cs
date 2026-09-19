@@ -52,6 +52,8 @@ namespace SentisTests
                 ScenarioRegistry.Register(WheelPerfScenario.Small3LagScenarioName, () => new WheelPerfScenario(32, lag: true, rover: "SmallSuspension3x3"));
                 ScenarioRegistry.Register(WheelPerfScenario.RestoreScenarioName, () => new WheelPerfScenario(16, restore: true));
                 ScenarioRegistry.Register(WheelPerfScenario.ParkedScenarioName, () => new WheelPerfScenario(64, parked: true));
+                ScenarioRegistry.Register(GearProbeScenario.ScenarioName, () => new GearProbeScenario());
+                ScenarioRegistry.Register(FreezerPhysicsScenario.ScenarioName, () => new FreezerPhysicsScenario());
                 ScenarioRegistry.Register(WheelPerfScenario.RestoreCostScenarioName, () => new WheelPerfScenario(100, restore: true, sink: false));
                 ScenarioRegistry.Register(WheelPerfScenario.PhysicsAbScenarioName, () => new WheelPerfScenario(64, ab: true));
                 ScenarioRegistry.Register(WheelPerfScenario.RestoreSmallScenarioName, () => new WheelPerfScenario(16, rover: "SmallSuspension3x3", restore: true));
