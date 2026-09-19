@@ -44,6 +44,8 @@ namespace SentisTests
                 ScenarioRegistry.Register(SavePerfScenario.ScenarioName, () => new SavePerfScenario());
                 ScenarioRegistry.Register(FrozenSavePerfScenario.ScenarioName, () => new FrozenSavePerfScenario());
                 ScenarioRegistry.Register(ReplicationPerfScenario.ScenarioName, () => new ReplicationPerfScenario());
+                ScenarioRegistry.Register(ReplicationPerfScenario.AllocScenarioName, () => new ReplicationPerfScenario(allocProbe: true));
+                ScenarioRegistry.Register(PatchAuditScenario.ScenarioName, () => new PatchAuditScenario());
                 ScenarioRegistry.Register(MixedWeldScenario.ScenarioName, () => new MixedWeldScenario());
                 ScenarioRegistry.Register(HandWeldScenario.ScenarioName, () => new HandWeldScenario());
                 ScenarioRegistry.Register(ProductionScenario.ScenarioName, () => new ProductionScenario());
@@ -53,6 +55,7 @@ namespace SentisTests
                 try
                 {
                     FrameProbe.Install(torch.Managers.GetManager<PatchManager>());
+                    AllocProbe.Init(torch.Managers.GetManager<PatchManager>());
                 }
                 catch (Exception e)
                 {

@@ -54,7 +54,20 @@ namespace SentisTests.Scenarios
         private Sandbox.Game.Entities.MyCubeGrid _firstGrid;
         private bool _initialFreezerEnabled;
 
-        public override string Name => ScenarioName;
+        /// <summary>
+        /// The same load, but the steady window runs with <see cref="AllocProbe"/> attributing
+        /// allocations and time to every updated type; the test ends after that window.
+        /// </summary>
+        public const string AllocScenarioName = "replication_alloc";
+
+        private readonly bool _allocProbe;
+
+        public ReplicationPerfScenario(bool allocProbe = false)
+        {
+            _allocProbe = allocProbe;
+        }
+
+        public override string Name => _allocProbe ? AllocScenarioName : ScenarioName;
         public override int TimeoutSeconds =>
             300 + (int)(ClientCount * JoinIntervalSeconds) + JoinTimeoutSeconds + (int)(BaselineSeconds + SteadySeconds);
 
@@ -192,14 +205,27 @@ namespace SentisTests.Scenarios
             Check(indexVerify.Mismatches == 0, indexVerify.Mismatches + " state group client index mismatches: " + indexVerify.FirstDifference);
 
             Check(GridFlight.Count == ShipCount, "only " + GridFlight.Count + " of " + ShipCount + " ships are still flying");
+            if (_allocProbe)
+            {
+                Note("ALLOC PROBE " + AllocProbe.Start());
+                TickMetrics.Take();
+                FrameProbe.Take();
+                FakeClients.Take(1);
+            }
             Note("STEADY WINDOW START (" + FakeClients.Count + " clients)");
             var steadyWatch = Stopwatch.StartNew();
             var steady = WaitForSeconds(SteadySeconds, "steady replication with " + FakeClients.Count + " clients");
             while (steady.MoveNext()) yield return steady.Current;
+            var allocReport = _allocProbe ? AllocProbe.Stop() : null;
             Note("STEADY WINDOW END | " + RuntimePluginControls.TakeStateGroupStats() + " | " +
                  RuntimePluginControls.TakeInventoryDeltaStats() + " | " +
                  FakeClients.Take(steadyWatch.Elapsed.TotalSeconds) + " | " +
                  TickMetrics.Take().Format() + " | " + FrameProbe.Take());
+            if (_allocProbe)
+            {
+                Note(allocReport);
+                yield break;
+            }
 
             var opening = CheckTerminalOpening();
             while (opening.MoveNext()) yield return opening.Current;
@@ -233,7 +259,11 @@ namespace SentisTests.Scenarios
 
         public override void Cleanup()
         {
-            try { Restore(); }
+            try
+            {
+                if (AllocProbe.Running) AllocProbe.Stop();
+                Restore();
+            }
             finally { base.Cleanup(); }
         }
 
