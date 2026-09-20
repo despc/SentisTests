@@ -29,12 +29,12 @@ namespace SentisTests.Core
         // turns into a missed frame.
         private const double ReportAboveMs = BudgetMs / 2;
 
-        private enum Section { Tools, ProjectorBuild, Physics, Refinery, ConveyorPull, ConveyorPush, RefineryUpdateProduction, RefineryRebuildQueue, RefineryRebuildQueue2, InventoryTransfer, QueueInsert, QueueClear, RefineryProcess, InvTransferOrRemove, InvAddItems, ObCreate, InvFitsBlueprint, QueueRemoveRequest, SinkSetRequired, EntitiesBefore, EntitiesAfter, SessionComponents, Harness, Bridge, ReplicationBefore, ReplicationSend, NetProcess, FakeClients, ReplFilterStateSync, ReplAddForClient, ReplRefreshReplicable, ReplGridSerialize, ReplClientAcks, ReplApplyDirty, SgInventory, SgProperty, SgPhysics, SgCreateClientData, ReplStreamingEntry, ReplRemoveForClient, GridGetObjectBuilder, InvRefreshClientData, ReplDirtyIndex, DrillUpdate10, DrillAfterSim, DrillUpdate100, MiningSchedule, DrillCutFinish, DrillResults, VoxelNotify, WheelSystem, SuspensionUpdate, MechUpdateBefore, WheelUpdateBefore, WheelUpdateAfter, WheelContact, Count }
+        private enum Section { Tools, ProjectorBuild, Physics, Refinery, ConveyorPull, ConveyorPush, RefineryUpdateProduction, RefineryRebuildQueue, RefineryRebuildQueue2, InventoryTransfer, QueueInsert, QueueClear, RefineryProcess, InvTransferOrRemove, InvAddItems, ObCreate, InvFitsBlueprint, QueueRemoveRequest, SinkSetRequired, EntitiesBefore, EntitiesAfter, SessionComponents, Harness, Bridge, ReplicationBefore, ReplicationSend, NetProcess, FakeClients, ReplFilterStateSync, ReplAddForClient, ReplRefreshReplicable, ReplGridSerialize, ReplClientAcks, ReplApplyDirty, SgInventory, SgProperty, SgPhysics, SgCreateClientData, ReplStreamingEntry, ReplRemoveForClient, GridGetObjectBuilder, InvRefreshClientData, ReplDirtyIndex, DrillUpdate10, DrillAfterSim, DrillUpdate100, MiningSchedule, DrillCutFinish, DrillResults, VoxelNotify, WheelSystem, SuspensionUpdate, MechUpdateBefore, WheelUpdateBefore, WheelUpdateAfter, WheelContact, GrindActivate, GrindSphere, GrindDecrease, GrindMoveItems, GridRaze, GridUpdateVisual, GridSendStockpile, GridSendIntegrity, GridDisconnects, GridInventoryMass, GrindAnimation, GrindEmptyInv, GrindSpawnStockpile, DamageBefore, DamageAfter, DamageDestroyed, FactionReputation, ThrustUpdate, ThrustRecompute, ThrustThrusts, ThrustBlock100, PowerDistributor, GasGenerator100, GasTank100, ConveyorPullRequest, GasGenerator, GasTank, GasSetCapacities, GasCheckProducing, Count }
 
-        private static readonly string[] SectionNames = { "tools10", "projector.Build", "physics", "refinery.tick", "conveyor.pull", "conveyor.push", "refinery.updateProduction", "refinery.rebuildQueue", "sgi.rebuildQueue", "inventory.transfer", "queue.insert", "queue.clear", "refinery.process", "inv.transferOrRemove", "inv.addItems", "ob.createNewObject", "inv.fitsBlueprint", "queue.removeRequest", "sink.setRequired", "entities.before", "entities.after", "session.components", "harness", "bridge", "replication.updateBefore", "replication.sendUpdate", "net.receiveProcess", "fakeClients.tick", "repl.filterStateSync", "repl.addForClient", "repl.refreshReplicable", "repl.gridSerialize", "repl.clientAcks", "repl.applyDirtyGroups", "sg.inventory.serialize", "sg.property.serialize", "sg.physics.serialize", "sg.createClientData", "repl.sendStreamingEntry", "repl.removeForClient", "grid.getObjectBuilder", "inv.refreshClientData", "repl.dirtyIndex", "drill.update10", "drill.afterSim", "drill.update100", "mining.schedule", "drill.cutFinish", "drill.results", "voxel.notifyChanged", "wheels.system", "suspension.update", "mech.updateBefore", "wheel.updateBefore", "wheel.updateAfter", "wheel.contact" };
+        private static readonly string[] SectionNames = { "tools10", "projector.Build", "physics", "refinery.tick", "conveyor.pull", "conveyor.push", "refinery.updateProduction", "refinery.rebuildQueue", "sgi.rebuildQueue", "inventory.transfer", "queue.insert", "queue.clear", "refinery.process", "inv.transferOrRemove", "inv.addItems", "ob.createNewObject", "inv.fitsBlueprint", "queue.removeRequest", "sink.setRequired", "entities.before", "entities.after", "session.components", "harness", "bridge", "replication.updateBefore", "replication.sendUpdate", "net.receiveProcess", "fakeClients.tick", "repl.filterStateSync", "repl.addForClient", "repl.refreshReplicable", "repl.gridSerialize", "repl.clientAcks", "repl.applyDirtyGroups", "sg.inventory.serialize", "sg.property.serialize", "sg.physics.serialize", "sg.createClientData", "repl.sendStreamingEntry", "repl.removeForClient", "grid.getObjectBuilder", "inv.refreshClientData", "repl.dirtyIndex", "drill.update10", "drill.afterSim", "drill.update100", "mining.schedule", "drill.cutFinish", "drill.results", "voxel.notifyChanged", "wheels.system", "suspension.update", "mech.updateBefore", "wheel.updateBefore", "wheel.updateAfter", "wheel.contact", "grind.activate", "grind.sphere", "grind.decrease", "grind.moveItems", "grid.raze", "grid.updateVisual", "grid.sendStockpile", "grid.sendIntegrity", "grid.disconnects", "grid.inventoryMass", "grind.animation", "grind.emptyInventories", "grind.spawnStockpile", "damage.before", "damage.after", "damage.destroyed", "faction.reputation", "thrust.update", "thrust.recompute", "thrust.thrusts", "thrust.block100", "power.distributor", "gas.generator100", "gas.tank100", "conveyor.pullRequest", "gas.generator", "gas.tank", "gas.setCapacities", "gas.checkProducing" };
 
         // Sections timed inside another section; excluded from the top-level sum behind "other".
-        private static readonly bool[] Nested = { false, true, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, false, true, false, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, false, true, true, true, true, true, true, true, true };
+        private static readonly bool[] Nested = { false, true, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, false, true, false, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true };
         private static readonly long[] _sectionTicks = new long[(int)Section.Count];
         private static readonly long[] _sectionStart = new long[(int)Section.Count];
         private static readonly int[] _sectionDepth = new int[(int)Section.Count];
@@ -177,6 +177,42 @@ namespace SentisTests.Core
             Hook(ctx, wheel?.GetMethod("UpdateBeforeSimulation", any, null, Type.EmptyTypes, null), nameof(WheelUpdateBeforePrefix), nameof(WheelUpdateBeforeSuffix));
             Hook(ctx, wheel?.GetMethod("UpdateAfterSimulation", any, null, Type.EmptyTypes, null), nameof(WheelUpdateAfterPrefix), nameof(WheelUpdateAfterSuffix));
             Hook(ctx, wheel?.GetMethod("ContactPointCallback", any), nameof(WheelContactPrefix), nameof(WheelContactSuffix));
+            var cubeGrid = typeof(Sandbox.Game.Entities.MyCubeGrid);
+            var slimBlock = typeof(Sandbox.Game.Entities.Cube.MySlimBlock);
+            var grinder = typeof(Sandbox.Game.Weapons.MyShipGrinder);
+            Hook(ctx, grinder.GetMethod("Activate", any), nameof(GrindActivatePrefix), nameof(GrindActivateSuffix));
+            Hook(ctx, cubeGrid.GetMethod("GetBlocksInsideSphereInternal", any), nameof(GrindSpherePrefix), nameof(GrindSphereSuffix));
+            Hook(ctx, slimBlock.GetMethod("DecreaseMountLevel", any), nameof(GrindDecreasePrefix), nameof(GrindDecreaseSuffix));
+            Hook(ctx, slimBlock.GetMethod("MoveItemsFromConstructionStockpile", any), nameof(GrindMoveItemsPrefix), nameof(GrindMoveItemsSuffix));
+            Hook(ctx, cubeGrid.GetMethod("RazeBlock", any, null, new[] { typeof(VRageMath.Vector3I), typeof(ulong) }, null), nameof(GridRazePrefix), nameof(GridRazeSuffix));
+            Hook(ctx, slimBlock.GetMethod("UpdateVisual", any), nameof(GridUpdateVisualPrefix), nameof(GridUpdateVisualSuffix));
+            Hook(ctx, cubeGrid.GetMethod("SendStockpileChanged", any), nameof(GridSendStockpilePrefix), nameof(GridSendStockpileSuffix));
+            Hook(ctx, cubeGrid.GetMethod("SendIntegrityChanged", any), nameof(GridSendIntegrityPrefix), nameof(GridSendIntegritySuffix));
+            Hook(ctx, cubeGrid.GetMethod("DetectDisconnects", any), nameof(GridDisconnectsPrefix), nameof(GridDisconnectsSuffix));
+            Hook(ctx, cubeGrid.GetMethod("UpdateInventoryMass", any), nameof(GridInventoryMassPrefix), nameof(GridInventoryMassSuffix));
+            Hook(ctx, grinder.GetMethod("StartAnimation", any), nameof(GrindAnimationPrefix), nameof(GrindAnimationSuffix));
+            Hook(ctx, grinder.GetMethod("StopAnimation", any), nameof(GrindAnimationPrefix), nameof(GrindAnimationSuffix));
+            var damage = typeof(Sandbox.Game.GameSystems.MyDamageSystem);
+            Hook(ctx, grinder.GetMethod("EmptyBlockInventories", any), nameof(GrindEmptyInvPrefix), nameof(GrindEmptyInvSuffix));
+            Hook(ctx, slimBlock.GetMethod("SpawnConstructionStockpile", any), nameof(GrindSpawnStockpilePrefix), nameof(GrindSpawnStockpileSuffix));
+            Hook(ctx, damage.GetMethod("RaiseBeforeDamageApplied", any), nameof(DamageBeforePrefix), nameof(DamageBeforeSuffix));
+            Hook(ctx, damage.GetMethod("RaiseAfterDamageApplied", any), nameof(DamageAfterPrefix), nameof(DamageAfterSuffix));
+            Hook(ctx, damage.GetMethod("RaiseDestroyed", any), nameof(DamageDestroyedPrefix), nameof(DamageDestroyedSuffix));
+            Hook(ctx, typeof(Sandbox.Game.Multiplayer.MyFactionCollection).GetMethod("DamageFactionPlayerReputation", any), nameof(FactionReputationPrefix), nameof(FactionReputationSuffix));
+            var thrustComp = typeof(Sandbox.Game.GameSystems.MyEntityThrustComponent);
+            Hook(ctx, First(thrustComp, "UpdateBeforeSimulation"), nameof(ThrustUpdatePrefix), nameof(ThrustUpdateSuffix));
+            Hook(ctx, First(thrustComp, "RecomputeThrustParameters"), nameof(ThrustRecomputePrefix), nameof(ThrustRecomputeSuffix));
+            Hook(ctx, First(thrustComp, "UpdateThrusts"), nameof(ThrustThrustsPrefix), nameof(ThrustThrustsSuffix));
+            Hook(ctx, First(typeof(Sandbox.Game.Entities.MyThrust), "UpdateBeforeSimulation100"), nameof(ThrustBlock100Prefix), nameof(ThrustBlock100Suffix));
+            Hook(ctx, typeof(Sandbox.Game.EntityComponents.MyResourceDistributorComponent).GetMethod("UpdateBeforeSimulation", any, null, System.Type.EmptyTypes, null),
+                nameof(PowerDistributorPrefix), nameof(PowerDistributorSuffix));
+            Hook(ctx, First(typeof(Sandbox.Game.Entities.Blocks.MyGasGenerator), "UpdateAfterSimulation100"), nameof(GasGenerator100Prefix), nameof(GasGenerator100Suffix));
+            Hook(ctx, First(typeof(Sandbox.Game.Entities.Blocks.MyGasTank), "UpdateAfterSimulation100"), nameof(GasTank100Prefix), nameof(GasTank100Suffix));
+            Hook(ctx, First(typeof(MyGridConveyorSystem), "PullItem"), nameof(ConveyorPullRequestPrefix), nameof(ConveyorPullRequestSuffix));
+            Hook(ctx, First(typeof(Sandbox.Game.Entities.Blocks.MyGasGenerator), "UpdateAfterSimulation"), nameof(GasGeneratorPrefix), nameof(GasGeneratorSuffix));
+            Hook(ctx, First(typeof(Sandbox.Game.Entities.Blocks.MyGasTank), "UpdateAfterSimulation"), nameof(GasTankPrefix), nameof(GasTankSuffix));
+            Hook(ctx, First(typeof(Sandbox.Game.Entities.Blocks.MyGasGenerator), "SetRemainingCapacities"), nameof(GasSetCapacitiesPrefix), nameof(GasSetCapacitiesSuffix));
+            Hook(ctx, First(typeof(Sandbox.Game.Entities.Blocks.MyGasGenerator), "CheckProducigState"), nameof(GasCheckProducingPrefix), nameof(GasCheckProducingSuffix));
             Hook(ctx, typeof(Sandbox.Game.Entities.MyCubeGrid).Assembly.GetType("Sandbox.Game.Replication.MyCubeGridReplicable")?
                     .GetMethod("Serialize", BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly),
                 nameof(ReplGridSerializePrefix), nameof(ReplGridSerializeSuffix));
@@ -192,6 +228,16 @@ namespace SentisTests.Core
                 nameof(SgCreatePrefix), nameof(SgCreateSuffix));
             patchManager.Commit();
             _installed = true;
+        }
+
+        /// <summary>The method declared on the type itself; overloads take the one with most parameters.</summary>
+        private static MethodInfo First(Type type, string name)
+        {
+            MethodInfo best = null;
+            foreach (var method in type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+                if (method.Name == name && (best == null || method.GetParameters().Length > best.GetParameters().Length))
+                    best = method;
+            return best;
         }
 
         private static void Hook(PatchContext ctx, MethodInfo target, string prefix, string suffix)
@@ -464,6 +510,83 @@ namespace SentisTests.Core
         private static void WheelUpdateAfterSuffix() => End(Section.WheelUpdateAfter);
         private static void WheelContactPrefix() => Begin(Section.WheelContact);
         private static void WheelContactSuffix() => End(Section.WheelContact);
+        private static void GrindActivatePrefix() => Begin(Section.GrindActivate);
+        private static void GrindActivateSuffix() => End(Section.GrindActivate);
+        private static void GrindSpherePrefix() => Begin(Section.GrindSphere);
+        private static void GrindSphereSuffix() => End(Section.GrindSphere);
+        private static void GrindDecreasePrefix() => Begin(Section.GrindDecrease);
+        private static void GrindDecreaseSuffix() => End(Section.GrindDecrease);
+        private static void GrindMoveItemsPrefix() => Begin(Section.GrindMoveItems);
+        private static void GrindMoveItemsSuffix() => End(Section.GrindMoveItems);
+        private static void GridRazePrefix() => Begin(Section.GridRaze);
+        private static void GridRazeSuffix() => End(Section.GridRaze);
+        private static long _visualStart;
+        private static int _slowVisualLogged;
+
+        private static void GridUpdateVisualPrefix()
+        {
+            Begin(Section.GridUpdateVisual);
+            _visualStart = Stopwatch.GetTimestamp();
+        }
+
+        /// <summary>A slow block visual update, logged with the block (the first 40 per session).</summary>
+        private static void GridUpdateVisualSuffix(Sandbox.Game.Entities.Cube.MySlimBlock __instance)
+        {
+            End(Section.GridUpdateVisual);
+            if (Thread.CurrentThread.ManagedThreadId != _gameThreadId || _slowVisualLogged >= 40) return;
+            var ms = (Stopwatch.GetTimestamp() - _visualStart) * 1000.0 / Stopwatch.Frequency;
+            if (ms < 5) return;
+            _slowVisualLogged++;
+            SentisTestsPlugin.Log.Info("FrameProbe: slow UpdateVisual " + ms.ToString("F1") + " ms: " + __instance.BlockDefinition.Id.SubtypeName +
+                                       ", build ratio " + __instance.BuildLevelRatio.ToString("F2") + ", fat " + (__instance.FatBlock?.GetType().Name ?? "none") +
+                                       ", construction model " + (__instance.FatBlock?.Model?.AssetName ?? "-"));
+        }
+        private static void GridSendStockpilePrefix() => Begin(Section.GridSendStockpile);
+        private static void GridSendStockpileSuffix() => End(Section.GridSendStockpile);
+        private static void GridSendIntegrityPrefix() => Begin(Section.GridSendIntegrity);
+        private static void GridSendIntegritySuffix() => End(Section.GridSendIntegrity);
+        private static void GridDisconnectsPrefix() => Begin(Section.GridDisconnects);
+        private static void GridDisconnectsSuffix() => End(Section.GridDisconnects);
+        private static void GridInventoryMassPrefix() => Begin(Section.GridInventoryMass);
+        private static void GridInventoryMassSuffix() => End(Section.GridInventoryMass);
+        private static void GrindAnimationPrefix() => Begin(Section.GrindAnimation);
+        private static void GrindAnimationSuffix() => End(Section.GrindAnimation);
+        private static void GrindEmptyInvPrefix() => Begin(Section.GrindEmptyInv);
+        private static void GrindEmptyInvSuffix() => End(Section.GrindEmptyInv);
+        private static void GrindSpawnStockpilePrefix() => Begin(Section.GrindSpawnStockpile);
+        private static void GrindSpawnStockpileSuffix() => End(Section.GrindSpawnStockpile);
+        private static void DamageBeforePrefix() => Begin(Section.DamageBefore);
+        private static void DamageBeforeSuffix() => End(Section.DamageBefore);
+        private static void DamageAfterPrefix() => Begin(Section.DamageAfter);
+        private static void DamageAfterSuffix() => End(Section.DamageAfter);
+        private static void DamageDestroyedPrefix() => Begin(Section.DamageDestroyed);
+        private static void DamageDestroyedSuffix() => End(Section.DamageDestroyed);
+        private static void FactionReputationPrefix() => Begin(Section.FactionReputation);
+        private static void FactionReputationSuffix() => End(Section.FactionReputation);
+        private static void ThrustUpdatePrefix() => Begin(Section.ThrustUpdate);
+        private static void ThrustUpdateSuffix() => End(Section.ThrustUpdate);
+        private static void ThrustRecomputePrefix() => Begin(Section.ThrustRecompute);
+        private static void ThrustRecomputeSuffix() => End(Section.ThrustRecompute);
+        private static void ThrustThrustsPrefix() => Begin(Section.ThrustThrusts);
+        private static void ThrustThrustsSuffix() => End(Section.ThrustThrusts);
+        private static void ThrustBlock100Prefix() => Begin(Section.ThrustBlock100);
+        private static void ThrustBlock100Suffix() => End(Section.ThrustBlock100);
+        private static void PowerDistributorPrefix() => Begin(Section.PowerDistributor);
+        private static void PowerDistributorSuffix() => End(Section.PowerDistributor);
+        private static void GasGenerator100Prefix() => Begin(Section.GasGenerator100);
+        private static void GasGenerator100Suffix() => End(Section.GasGenerator100);
+        private static void GasTank100Prefix() => Begin(Section.GasTank100);
+        private static void GasTank100Suffix() => End(Section.GasTank100);
+        private static void ConveyorPullRequestPrefix() => Begin(Section.ConveyorPullRequest);
+        private static void ConveyorPullRequestSuffix() => End(Section.ConveyorPullRequest);
+        private static void GasGeneratorPrefix() => Begin(Section.GasGenerator);
+        private static void GasGeneratorSuffix() => End(Section.GasGenerator);
+        private static void GasTankPrefix() => Begin(Section.GasTank);
+        private static void GasTankSuffix() => End(Section.GasTank);
+        private static void GasSetCapacitiesPrefix() => Begin(Section.GasSetCapacities);
+        private static void GasSetCapacitiesSuffix() => End(Section.GasSetCapacities);
+        private static void GasCheckProducingPrefix() => Begin(Section.GasCheckProducing);
+        private static void GasCheckProducingSuffix() => End(Section.GasCheckProducing);
         public static void BridgeBegin() => Begin(Section.Bridge);
         public static void BridgeEnd() => End(Section.Bridge);
 

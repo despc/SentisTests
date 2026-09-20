@@ -36,6 +36,11 @@ namespace SentisTests.Scenarios
                 for (var z = 0; z < 2; z++)
                     blocks.Add(new BlockSpec(armor, new Vector3I(x, 0, z)));
 
+            // With the vanilla EnableSelectivePhysicsUpdates a cluster is only stepped while it holds
+            // a character or something replicated to a client, so the grid needs a watcher beside it
+            // or it keeps its velocity and never moves.
+            FakeClients.Add(1, new FakeClients.NetworkProfile { RttMs = 50 }, p => (spawn + new Vector3D(0, 20, 0), 0, 0), withCharacters: true);
+
             Note("spawning 4-block dynamic grid");
             var smokeOb = WorldApi.GridOb(WorldApi.EntityPrefix + "smoke", MyCubeSize.Large, false, spawn, blocks);
             smokeOb.LinearVelocity = new SerializableVector3(15f, 0f, 0f);
@@ -112,6 +117,12 @@ namespace SentisTests.Scenarios
 
             Check(moved > 10, "grid should have moved >10m, moved " + moved.ToString("F1") + "m");
             Note("grid moved " + moved.ToString("F1") + "m - simulation OK");
+        }
+
+        public override void Cleanup()
+        {
+            try { FakeClients.RemoveAll(); }
+            finally { base.Cleanup(); }
         }
     }
 }

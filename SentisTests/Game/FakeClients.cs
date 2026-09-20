@@ -179,6 +179,8 @@ namespace SentisTests.Game
             var ctx = patchManager.AcquireContext();
             var sendPacket = typeof(MyNetworkWriter).GetMethod(nameof(MyNetworkWriter.SendPacket), BindingFlags.Static | BindingFlags.Public);
             ctx.GetPattern(sendPacket).Prefixes.Add(typeof(FakeClients).GetMethod(nameof(SendPacketPrefix), BindingFlags.Static | BindingFlags.NonPublic));
+            var getCheckpoint = typeof(Sandbox.Game.World.MySession).GetMethod(nameof(Sandbox.Game.World.MySession.GetCheckpoint), BindingFlags.Instance | BindingFlags.Public);
+            ctx.GetPattern(getCheckpoint).Suffixes.Add(typeof(FakeClients).GetMethod(nameof(ClientCheckpointSuffix), BindingFlags.Static | BindingFlags.NonPublic));
             patchManager.Commit();
             _installed = true;
         }
@@ -367,6 +369,30 @@ namespace SentisTests.Game
         }
 
         private static bool IsFake(ulong id) => id >= BaseSteamId && id < BaseSteamId + MaxClients;
+
+        /// <summary>
+        /// Fake players out of the world a real client downloads when it joins. The client loads
+        /// every connected player of the checkpoint and dereferences InitNewPlayer's result, which is
+        /// null for a player whose Steam client it does not know: a real player could not join while a
+        /// test with fake clients ran ("error loading world", NullReferenceException in
+        /// MyPlayerCollection.LoadPlayerInternal). Saves are not touched.
+        /// </summary>
+        private static void ClientCheckpointSuffix(VRage.Game.MyObjectBuilder_Checkpoint __result, bool isClientRequest)
+        {
+            if (!isClientRequest || __result == null) return;
+            StripFake(__result.ConnectedPlayers);
+            StripFake(__result.DisconnectedPlayers);
+            StripFake(__result.AllPlayersData);
+            StripFake(__result.AllPlayersColors);
+            __result.AllPlayers?.RemoveAll(p => IsFake(p.SteamId));
+        }
+
+        private static void StripFake<T>(VRage.Serialization.SerializableDictionary<VRage.Game.MyObjectBuilder_Checkpoint.PlayerId, T> players)
+        {
+            if (players?.Dictionary == null) return;
+            foreach (var key in players.Dictionary.Keys.Where(k => IsFake(k.GetClientId())).ToList())
+                players.Dictionary.Remove(key);
+        }
 
         private static bool SendPacketPrefix(MyNetworkWriter.MyPacketDescriptor packet)
         {

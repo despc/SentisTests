@@ -57,6 +57,10 @@ namespace SentisTests
                 ScenarioRegistry.Register(FreezerPhysicsScenario.ScenarioName, () => new FreezerPhysicsScenario());
                 ScenarioRegistry.Register(FreezerStressScenario.ScenarioName, () => new FreezerStressScenario());
                 ScenarioRegistry.Register(FreezerStressScenario.ProfileScenarioName, () => new FreezerStressScenario(profile: true));
+                ScenarioRegistry.Register(GrinderPerfScenario.ScenarioName, () => new GrinderPerfScenario());
+                ScenarioRegistry.Register(ThrustPerfScenario.IonScenarioName, () => new ThrustPerfScenario(atmospheric: false));
+                ScenarioRegistry.Register(ThrustPerfScenario.AtmoScenarioName, () => new ThrustPerfScenario(atmospheric: true));
+                ScenarioRegistry.Register(GasPerfScenario.ScenarioName, () => new GasPerfScenario());
                 ScenarioRegistry.Register(WheelPerfScenario.RestoreCostScenarioName, () => new WheelPerfScenario(100, restore: true, sink: false));
                 ScenarioRegistry.Register(WheelPerfScenario.PhysicsAbScenarioName, () => new WheelPerfScenario(64, ab: true));
                 ScenarioRegistry.Register(WheelPerfScenario.RestoreSmallScenarioName, () => new WheelPerfScenario(16, rover: "SmallSuspension3x3", restore: true));
