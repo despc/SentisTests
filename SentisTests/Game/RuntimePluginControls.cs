@@ -244,6 +244,36 @@ namespace SentisTests.Game
             }
         }
 
+        /// <summary>The load the plugin charges to one programmable block, in ms of every frame.</summary>
+        public static double PbLoadMsPerFrame(object programmableBlock)
+        {
+            var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.PbLoad");
+            if (type == null) return 0;
+            var method = type.GetMethod("LoadMsPerFrame", BindingFlags.Public | BindingFlags.Static);
+            if (method == null) throw new InvalidOperationException("PbLoad.LoadMsPerFrame is unavailable");
+            return Convert.ToDouble(method.Invoke(null, new[] { programmableBlock }));
+        }
+
+        /// <summary>What every running script costs the server together, in ms of every frame.</summary>
+        public static double PbTotalMsPerFrame()
+        {
+            var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.PbLoad");
+            if (type == null) return 0;
+            var method = type.GetMethod("TotalMsPerFrame", BindingFlags.Public | BindingFlags.Static);
+            if (method == null) throw new InvalidOperationException("PbLoad.TotalMsPerFrame is unavailable");
+            return Convert.ToDouble(method.Invoke(null, null));
+        }
+
+        /// <summary>The plugin's own list of the heaviest programmable blocks.</summary>
+        public static string PbTop(int count)
+        {
+            var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.PbLoad");
+            if (type == null) return "plugin not loaded";
+            var method = type.GetMethod("Top", BindingFlags.Public | BindingFlags.Static);
+            if (method == null) throw new InvalidOperationException("PbLoad.Top is unavailable");
+            return (string)method.Invoke(null, new object[] { count });
+        }
+
         /// <summary>
         /// What the plugin's physics load monitor measured: the average and the last physics step in
         /// milliseconds and how many frames it has seen. Zero frames means the patch never ran.
