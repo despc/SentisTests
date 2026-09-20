@@ -258,6 +258,13 @@ namespace SentisTests.Game
             if (character.Physics != null) character.Physics.LinearVelocity = Vector3.Zero;
         }
 
+        /// <summary>The character of a fake client, or null. Game thread.</summary>
+        public static Sandbox.Game.Entities.Character.MyCharacter Character(int index)
+        {
+            var character = _clients[index].Player?.Character;
+            return character == null || character.MarkedForClose ? null : character;
+        }
+
         /// <summary>Whether the fake client still has a live character. Game thread.</summary>
         public static bool HasLiveCharacter(int index)
         {

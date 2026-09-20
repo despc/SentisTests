@@ -64,6 +64,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(PbPerfScenario.ScenarioName, () => new PbPerfScenario());
                 ScenarioRegistry.Register(VoxelStreamScenario.ScenarioName, () => new VoxelStreamScenario());
                 ScenarioRegistry.Register(GridStreamScenario.ScenarioName, () => new GridStreamScenario());
+                ScenarioRegistry.Register(CharacterPerfScenario.ScenarioName, () => new CharacterPerfScenario());
                 ScenarioRegistry.Register(WheelPerfScenario.RestoreCostScenarioName, () => new WheelPerfScenario(100, restore: true, sink: false));
                 ScenarioRegistry.Register(WheelPerfScenario.PhysicsAbScenarioName, () => new WheelPerfScenario(64, ab: true));
                 ScenarioRegistry.Register(WheelPerfScenario.RestoreSmallScenarioName, () => new WheelPerfScenario(16, rover: "SmallSuspension3x3", restore: true));
