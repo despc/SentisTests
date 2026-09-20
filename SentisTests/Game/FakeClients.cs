@@ -265,6 +265,18 @@ namespace SentisTests.Game
             return character == null || character.MarkedForClose ? null : character;
         }
 
+        /// <summary>
+        /// Hands a controllable block - a remote control, a cockpit - to a fake client, the way a
+        /// player takes control of a ship from far away. Game thread.
+        /// </summary>
+        public static bool TakeControl(int index, Sandbox.Game.Entities.IMyControllableEntity block)
+        {
+            var player = _clients[index].Player;
+            if (player?.Controller == null || block == null) return false;
+            player.Controller.TakeControl(block);
+            return player.Controller.ControlledEntity?.Entity == block.Entity;
+        }
+
         /// <summary>Whether the fake client still has a live character. Game thread.</summary>
         public static bool HasLiveCharacter(int index)
         {
