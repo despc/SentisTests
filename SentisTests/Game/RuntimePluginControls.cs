@@ -244,6 +244,23 @@ namespace SentisTests.Game
             }
         }
 
+        /// <summary>
+        /// What the plugin kept off the game thread for voxel streaming: blobs compressed inside the
+        /// send, blobs rebuilt by the background cache, and the milliseconds of both.
+        /// </summary>
+        public static (long Offloaded, long OffloadedMs, long Rebuilt, long OnGameThread) VoxelStreamWork()
+        {
+            long Read(string typeName, string field)
+            {
+                var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin." + typeName);
+                var info = type?.GetField(field, BindingFlags.Public | BindingFlags.Static);
+                return info == null ? 0 : Convert.ToInt64(info.GetValue(null));
+            }
+
+            return (Read("VoxelStreamAsync", "Offloaded"), Read("VoxelStreamAsync", "OffloadedMs"),
+                Read("VoxelStreamCache", "Rebuilt"), Read("VoxelStreamAsync", "OnGameThread"));
+        }
+
         /// <summary>The load the plugin charges to one programmable block, in ms of every frame.</summary>
         public static double PbLoadMsPerFrame(object programmableBlock)
         {
