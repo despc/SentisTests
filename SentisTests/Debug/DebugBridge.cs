@@ -293,6 +293,9 @@ namespace SentisTests.Debug
                 case "/freezer":
                     SendJson(ctx, 200, RunGameThread(FreezerState));
                     break;
+                case "/physics":
+                    SendJson(ctx, 200, PhysicsStep());
+                    break;
                 case "/status":
                     SendJson(ctx, 200, RunGameThread(() =>
                     {
@@ -1075,6 +1078,13 @@ namespace SentisTests.Debug
         {
             return Obj("enabled", Game.RuntimePluginControls.FreezerEnabled,
                 "frozenGridCount", Game.RuntimePluginControls.FrozenGridCount);
+        }
+
+        /// <summary>What the plugin's physics load monitor sees right now; no game thread needed.</summary>
+        private static JObject PhysicsStep()
+        {
+            var step = Game.RuntimePluginControls.PhysicsStep;
+            return Obj("averageMs", step.AverageMs, "lastMs", step.LastMs, "frames", step.Frames);
         }
 
         private static JObject SetFreezer(bool enabled)

@@ -244,6 +244,22 @@ namespace SentisTests.Game
             }
         }
 
+        /// <summary>
+        /// What the plugin's physics load monitor measured: the average and the last physics step in
+        /// milliseconds and how many frames it has seen. Zero frames means the patch never ran.
+        /// </summary>
+        public static (double AverageMs, double LastMs, double Frames) PhysicsStep
+        {
+            get
+            {
+                var type = PluginType("SentisOptimisations", "Optimizer.Optimizations.PhysicsLoadMonitor");
+                if (type == null) return (0, 0, 0);
+                double Read(string name) =>
+                    Convert.ToDouble(type.GetProperty(name, BindingFlags.Public | BindingFlags.Static)?.GetValue(null) ?? 0.0);
+                return (Read("AverageMs"), Read("LastMs"), Read("Frames"));
+            }
+        }
+
         public static float WelderRadiusMultiplier
         {
             get
