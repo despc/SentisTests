@@ -29,6 +29,17 @@ namespace SentisTests.Scenarios
         public const string ScenarioName = "mixed_weld";
 
         // Cleanup may remove only grids created during this run; pre-existing player grids are never debris.
+        private bool _initialFreezerEnabled;
+        private float _initialWelderMultiplier;
+        private bool _settingsCaptured;
+
+        /// <summary>
+        /// Wide enough to cover a three-cell block's centre from under the plate: the welder's own
+        /// definition gives 2.26 m, and the centres of the jump drive and the safe zone sit just
+        /// outside twice that - measured 0.1 to 1.4 m short - so the slab stopped two blocks from
+        /// done with both reported buildable and untouched.
+        /// </summary>
+        private const float WelderRadiusMultiplier = 4f;
         private readonly HashSet<long> _preexistingGridIds = new HashSet<long>();
         private Vector3D? _platformPos;
 
@@ -64,6 +75,23 @@ namespace SentisTests.Scenarios
         public override IEnumerator Run()
         {
             WorldApi.EnsureUnpaused("mixed_weld start");
+
+            // The rig stands where no player ever comes, so the freezer takes it: a frozen grid is
+            // off the update lists, its welders stop being activated, and the slab creeps forward
+            // only in the moments the freezer lets it wake. Measured at a stall: 418 welder
+            // activations where a running ship does thousands, with ship and platform both frozen.
+            // The freezing of a welding rig is frozen_radius_weld's subject, not this one's.
+            _initialFreezerEnabled = RuntimePluginControls.FreezerEnabled;
+            _initialWelderMultiplier = RuntimePluginControls.WelderRadiusMultiplier;
+            _settingsCaptured = true;
+            RuntimePluginControls.SetFreezerEnabled(false);
+
+            // The slab is not flat: a jump drive and a safe zone are three cells tall, and their
+            // centres - which is what both the engine and the plugin measure to - sit a layer above
+            // the plate, outside a stock 4.5 m sensor from the pose the boat has to keep. The boat
+            // cannot simply rise to them: it would then stand inside the volume those blocks need.
+            // So the tools reach further instead, which is what the option is for.
+            RuntimePluginControls.SetWelderRadiusMultiplier(WelderRadiusMultiplier);
             _preexistingGridIds.Clear();
             foreach (var existing in MyEntities.GetEntities().OfType<MyCubeGrid>())
                 _preexistingGridIds.Add(existing.EntityId);
@@ -302,6 +330,11 @@ namespace SentisTests.Scenarios
             Check(welders.All(w => w.UseConveyorSystem),
                 "all welders must have UseConveyorSystem=true in MixedShip.xml");
 
+            var sensorRadius = welders.Count == 0 ? 0 : WorldApi.SensorSphere(welders[0]).Radius;
+            Note("welder sensor radius " + sensorRadius.ToString("F1") + " m (multiplier x" +
+                 WelderRadiusMultiplier.ToString("F1") + ", live setting x" +
+                 RuntimePluginControls.WelderRadiusMultiplier.ToString("F1") + ")");
+
             // -------------------------------------------------------- welding
             // Boat hovers so the cluster covers the target block; the CENTER sensor sits
             // straight over it and the four satellites cover the neighbours - up to five
@@ -344,7 +377,10 @@ namespace SentisTests.Scenarios
                         {
                             var c = ((Sandbox.Game.Entities.Cube.MySlimBlock)slimObj).WorldAABB.Center;
                             if (Math.Abs(c.X - wx) > 0.5) continue;
-                            if (col.Any(p => Math.Abs(p.Z - c.Z) < 0.5)) continue;
+                            // Two cells of one column may share a Z and differ in height - a jump
+                            // drive or a safe zone is three cells tall and its centre sits a layer
+                            // above the plate - and the walk has to visit both.
+                            if (col.Any(p => Math.Abs(p.Z - c.Z) < 0.5 && Math.Abs(p.Y - c.Y) < 0.5)) continue;
                             col.Add(new Vector3D(wx, c.Y, c.Z));
                         }
                     col.Sort((a, b) => a.Z.CompareTo(b.Z));
@@ -367,6 +403,11 @@ namespace SentisTests.Scenarios
             Vector3D SerpTarget()
             {
                 var c = serpColumns[serpCol][serpForward ? serpRow : serpColumns[serpCol].Count - 1 - serpRow];
+                // The pose stays where the operator calibrated it, under the plate. Raising the
+                // boat to the height of a three-cell block - a jump drive, a safe zone - puts the
+                // boat inside the volume that block needs, and the projector answers
+                // IntersectedWithSomethingElse instead of building it. Reaching those blocks is
+                // the sensor's job, see the radius multiplier in Run.
                 return new Vector3D(c.X + serpColumnShipDx, serpShipY, c.Z + serpColumnShipDz);
             }
             void SerpAdvance()
@@ -583,7 +624,10 @@ namespace SentisTests.Scenarios
                         ", finished=" + finished + ", steel=" + WorldApi.CountSteel(welders[0].GetInventory()) +
                         ", probe=" + WeldersProbe(welders) +
                         ", projector=" + (projector.IsWorking ? "working" : "NOT working") +
-                        ", census=" + BuildCheckCensus(projector) + ")");
+                        ", census=" + BuildCheckCensus(projector) + ") | " + PluginCounters() +
+                        " | tools activated: " + welders.Count(WorldApi.ToolIsActivated) + "/" + welders.Count +
+                        " | frozen: ship=" + RuntimePluginControls.IsGridFrozen(ship.EntityId) +
+                        " platform=" + RuntimePluginControls.IsGridFrozen(platform.EntityId));
                 }
 
                 yield return null;
@@ -691,6 +735,20 @@ namespace SentisTests.Scenarios
         // ------------------------------------------------------------ cleanup
         // Tracking covers the two main grids. This hook removes only stale mixed_weld/debug rigs
         // and tiny grids created after this run began; pre-existing player grids are never debris.
+        public override void Cleanup()
+        {
+            try
+            {
+                if (_settingsCaptured)
+                {
+                    _settingsCaptured = false;
+                    RuntimePluginControls.SetFreezerEnabled(_initialFreezerEnabled);
+                    RuntimePluginControls.SetWelderRadiusMultiplier(_initialWelderMultiplier);
+                }
+            }
+            finally { base.Cleanup(); }
+        }
+
         public override void CleanupLeftovers()
         {
             var platformPos = _platformPos;
@@ -728,6 +786,26 @@ namespace SentisTests.Scenarios
 
         // Full verdict of the game's own build check over the whole projected set: how many blocks
         // pass, and under which rejection reason the rest fail. Turns a silent stall into a name.
+
+        /// <summary>The plugin's own welder counters, read by name so the test does not link it.</summary>
+        private static string PluginCounters()
+        {
+            try
+            {
+                var type = AppDomain.CurrentDomain.GetAssemblies()
+                    .Select(a => a.GetType("Optimizer.Optimizations.WelderDiagnostics"))
+                    .FirstOrDefault(t => t != null);
+                if (type == null) return "plugin counters: n/a";
+                var snapshot = type.GetMethod("Snapshot",
+                    System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
+                return "plugin counters: " + (snapshot == null ? "n/a" : snapshot.Invoke(null, null));
+            }
+            catch (Exception e)
+            {
+                return "plugin counters: n/a (" + e.Message + ")";
+            }
+        }
+
         private static string BuildCheckCensus(MyProjectorBase projector)
         {
             var pg = projector.ProjectedGrid;
