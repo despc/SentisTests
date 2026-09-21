@@ -71,6 +71,13 @@ namespace SentisTests
                 ScenarioRegistry.Register(PistonPerfScenario.ScenarioName, () => new PistonPerfScenario());
                 ScenarioRegistry.Register(PistonExtendScenario.ScenarioName, () => new PistonExtendScenario());
                 ScenarioRegistry.Register(PistonStackScenario.ScenarioName, () => new PistonStackScenario());
+                ScenarioRegistry.Register(ExplosionScenario.ScenarioName, () => new ExplosionScenario());
+                ScenarioRegistry.Register(ExplosionFriendlyFireScenario.ScenarioName, () => new ExplosionFriendlyFireScenario());
+                ScenarioRegistry.Register(WarheadChainScenario.ScenarioName, () => new WarheadChainScenario());
+                ScenarioRegistry.Register(CockpitEjectScenario.ScenarioName, () => new CockpitEjectScenario());
+                ScenarioRegistry.Register(LootJumpDriveScenario.ScenarioName, () => new LootJumpDriveScenario());
+                ScenarioRegistry.Register(WarheadMassScenario.ChainScenarioName, () => new WarheadMassScenario(all: false));
+                ScenarioRegistry.Register(WarheadMassScenario.AllScenarioName, () => new WarheadMassScenario(all: true));
                 ScenarioRegistry.Register(FreezeProductionScenario.ScenarioName, () => new FreezeProductionScenario());
                 ScenarioRegistry.Register(FreezePowerScenario.ScenarioName, () => new FreezePowerScenario());
                 ScenarioRegistry.Register(ProjectionStreamScenario.ScenarioName, () => new ProjectionStreamScenario());

@@ -167,7 +167,12 @@ namespace SentisTests.Core
                 int closed = 0;
                 foreach (var entity in Sandbox.Game.Entities.MyEntities.GetEntities())
                 {
-                    var ename = entity.Name ?? (entity as Sandbox.Game.Entities.Character.MyCharacter)?.DisplayName;
+                    // Grids carry the test prefix in Name; characters and safe zones (whose Name
+                    // is their entity id) only in DisplayName. A safe zone left by a killed run
+                    // forbids damage on the test site: explosions found every warhead a dud.
+                    var ename = entity.Name;
+                    if (string.IsNullOrEmpty(ename) || !ename.StartsWith(Game.WorldApi.EntityPrefix) && !LegacyNames.Contains(ename))
+                        ename = entity.DisplayName;
                     if (string.IsNullOrEmpty(ename)) continue;
                     if (!ename.StartsWith(Game.WorldApi.EntityPrefix) && !LegacyNames.Contains(ename)) continue;
                     if (entity.MarkedForClose) continue;
