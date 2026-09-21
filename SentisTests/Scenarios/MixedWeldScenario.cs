@@ -29,17 +29,7 @@ namespace SentisTests.Scenarios
         public const string ScenarioName = "mixed_weld";
 
         // Cleanup may remove only grids created during this run; pre-existing player grids are never debris.
-        private bool _initialFreezerEnabled;
-        private float _initialWelderMultiplier;
-        private bool _settingsCaptured;
-
-        /// <summary>
-        /// Wide enough to cover a three-cell block's centre from under the plate: the welder's own
-        /// definition gives 2.26 m, and the centres of the jump drive and the safe zone sit just
-        /// outside twice that - measured 0.1 to 1.4 m short - so the slab stopped two blocks from
-        /// done with both reported buildable and untouched.
-        /// </summary>
-        private const float WelderRadiusMultiplier = 4f;
+        private static readonly FakeClients.NetworkProfile Network = new FakeClients.NetworkProfile { RttMs = 50 };
         private readonly HashSet<long> _preexistingGridIds = new HashSet<long>();
         private Vector3D? _platformPos;
 
@@ -76,22 +66,12 @@ namespace SentisTests.Scenarios
         {
             WorldApi.EnsureUnpaused("mixed_weld start");
 
-            // The rig stands where no player ever comes, so the freezer takes it: a frozen grid is
-            // off the update lists, its welders stop being activated, and the slab creeps forward
-            // only in the moments the freezer lets it wake. Measured at a stall: 418 welder
-            // activations where a running ship does thousands, with ship and platform both frozen.
-            // The freezing of a welding rig is frozen_radius_weld's subject, not this one's.
-            _initialFreezerEnabled = RuntimePluginControls.FreezerEnabled;
-            _initialWelderMultiplier = RuntimePluginControls.WelderRadiusMultiplier;
-            _settingsCaptured = true;
-            RuntimePluginControls.SetFreezerEnabled(false);
-
-            // The slab is not flat: a jump drive and a safe zone are three cells tall, and their
-            // centres - which is what both the engine and the plugin measure to - sit a layer above
-            // the plate, outside a stock 4.5 m sensor from the pose the boat has to keep. The boat
-            // cannot simply rise to them: it would then stand inside the volume those blocks need.
-            // So the tools reach further instead, which is what the option is for.
-            RuntimePluginControls.SetWelderRadiusMultiplier(WelderRadiusMultiplier);
+            // A welding rig with nobody around is a rig the freezer takes: a frozen grid is off the
+            // update lists, its welders stop being activated, and the slab creeps forward only in
+            // the moments the freezer lets it wake - measured at a stall, 418 welder activations
+            // where a running ship does eighteen thousand. So an engineer stands on site, the way a
+            // real one would, and the freezer leaves the place alone. The tools keep whatever
+            // radius the server gives them.
             _preexistingGridIds.Clear();
             foreach (var existing in MyEntities.GetEntities().OfType<MyCubeGrid>())
                 _preexistingGridIds.Add(existing.EntityId);
@@ -331,8 +311,7 @@ namespace SentisTests.Scenarios
                 "all welders must have UseConveyorSystem=true in MixedShip.xml");
 
             var sensorRadius = welders.Count == 0 ? 0 : WorldApi.SensorSphere(welders[0]).Radius;
-            Note("welder sensor radius " + sensorRadius.ToString("F1") + " m (multiplier x" +
-                 WelderRadiusMultiplier.ToString("F1") + ", live setting x" +
+            Note("welder sensor radius " + sensorRadius.ToString("F1") + " m (server multiplier x" +
                  RuntimePluginControls.WelderRadiusMultiplier.ToString("F1") + ")");
 
             // -------------------------------------------------------- welding
@@ -351,6 +330,12 @@ namespace SentisTests.Scenarios
             var slabArea = new BoundingBoxD(slabBb.Min - new Vector3D(1.5, 1.5, 1.5), slabBb.Max + new Vector3D(1.5, 1.5, 1.5));
             // Standby spot: outboard of the welding plane, not above the deck.
             var holdCenter = slabBb.Center + approach * 12.0;
+
+            // The engineer who ordered the build stands off to one side of it. That is all the
+            // freezer needs to leave the site running - and it is what happens on a real server,
+            // where nobody welds a blueprint from three kilometres away.
+            FakeClients.RemoveAll();
+            FakeClients.Add(1, Network, p => (slabBb.Center + approach * 30.0, 0, 0), withCharacters: true);
 
             // SERPENTINE, PROVEN ON THE LIVE RIG. The boat parks its welder
             // cluster under the plate at a locked pose and walks a boustrophedon over the projected
@@ -739,12 +724,7 @@ namespace SentisTests.Scenarios
         {
             try
             {
-                if (_settingsCaptured)
-                {
-                    _settingsCaptured = false;
-                    RuntimePluginControls.SetFreezerEnabled(_initialFreezerEnabled);
-                    RuntimePluginControls.SetWelderRadiusMultiplier(_initialWelderMultiplier);
-                }
+                FakeClients.RemoveAll();
             }
             finally { base.Cleanup(); }
         }
