@@ -20,6 +20,9 @@ namespace SentisTests.Scenarios
 
         public override string Name => ScenarioName;
 
+        /// <summary>Nobody stands here: the boat has to freeze, that is the whole subject.</summary>
+        protected override bool KeepSiteAwake => false;
+
         protected override IEnumerator BeforeWelding(MyCubeGrid ship, SpaceWelder welder)
         {
             _initialFreezerEnabled = RuntimePluginControls.FreezerEnabled;

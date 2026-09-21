@@ -404,8 +404,44 @@ namespace SentisTests.Core
             _active = scenario;
             _stopwatch = Stopwatch.StartNew();
             _stack.Clear();
+
+            // Characters and identities of fake clients are saved into the world like any other,
+            // so a run that was killed - or a server restart in the middle of a session - can leave
+            // an astronaut standing on a test site. One is enough to keep the freezer off the whole
+            // place: frozen_radius_weld waited ninety seconds for a boat that a leftover engineer
+            // twenty metres away was holding awake.
+            try
+            {
+                var purged = Game.FakeClients.PurgeLeftovers() + PurgeTestCharacters();
+                if (purged > 0) Log.Info("[TEST] {0} leftover astronauts removed before {1}", purged, name);
+            }
+            catch (Exception e) { Log.Warn("leftover purge before {0} failed: {1}", name, e.Message); }
+
             _stack.Push(scenario.Run());
             Log.Info("[TEST] started: " + name);
+        }
+
+
+        /// <summary>
+        /// Astronauts a scenario put in the world under the test prefix and did not take away -
+        /// hand_weld's engineers, for one. They are saved with the world, and one of them standing
+        /// on a site is enough to keep the freezer away from everything around it.
+        /// </summary>
+        private static int PurgeTestCharacters()
+        {
+            var removed = 0;
+            foreach (var character in Sandbox.Game.Entities.MyEntities.GetEntities()
+                         .OfType<Sandbox.Game.Entities.Character.MyCharacter>().ToList())
+            {
+                if (character.MarkedForClose) continue;
+                var named = (character.DisplayName ?? "").StartsWith(Game.WorldApi.EntityPrefix, StringComparison.Ordinal) ||
+                            (character.Name ?? "").StartsWith(Game.WorldApi.EntityPrefix, StringComparison.Ordinal);
+                if (!named) continue;
+                character.Close();
+                removed++;
+            }
+
+            return removed;
         }
 
         private static void WriteReport(TestResult result)

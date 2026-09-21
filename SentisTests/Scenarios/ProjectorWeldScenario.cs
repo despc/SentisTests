@@ -34,6 +34,15 @@ namespace SentisTests.Scenarios
     {
         public const string ScenarioName = "projector_weld";
 
+        private static readonly FakeClients.NetworkProfile Network = new FakeClients.NetworkProfile { RttMs = 50 };
+
+        /// <summary>
+        /// Whether somebody stands on the site while it is built. Normally yes - a site with nobody
+        /// at it is a site the freezer takes, and the welding stops. A scenario about freezing says
+        /// no: it is waiting for exactly that.
+        /// </summary>
+        protected virtual bool KeepSiteAwake => true;
+
         private const int SlabX = 10;  // hologram footprint, blocks
         private const int SlabZ = 10;
         private const int SlabY = 1;
@@ -173,6 +182,14 @@ namespace SentisTests.Scenarios
             var slabBb = preview0.PositionComp.WorldAABB;
             var slabTopY = slabBb.Max.Y;
             var slabCenter = (slabBb.Min + slabBb.Max) * 0.5;
+
+            // Somebody has to be standing there. A site with nobody at it is a site the freezer
+            // takes: the grids come off the update lists, the welder stops being activated, and the
+            // slab stops halfway - seen here at 6 blocks of 100 with the tool reporting six
+            // projected blocks in front of it and a container full of steel behind it.
+            FakeClients.RemoveAll();
+            if (KeepSiteAwake)
+                FakeClients.Add(1, Network, p => (slabCenter + new Vector3D(0, 40, 0), 0, 0), withCharacters: true);
             // spawn straight over the slab: the approach stays over open sky, nothing to clip
             var shipPos = new Vector3D(slabCenter.X, slabTopY + 18.0, slabCenter.Z);
             Note("spawning construction boat at " + shipPos.ToString("F0") +
@@ -386,6 +403,12 @@ namespace SentisTests.Scenarios
         protected virtual IEnumerator BeforeWelding(MyCubeGrid ship, SpaceWelder welder)
         {
             yield break;
+        }
+
+        public override void Cleanup()
+        {
+            try { FakeClients.RemoveAll(); }
+            finally { base.Cleanup(); }
         }
 
     }

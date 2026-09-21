@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -316,6 +316,12 @@ namespace SentisTests.Game
                     {
                         _server.OnClientLeft(clients[i].Id);
                         var player = clients[i].Player;
+                        // The body goes first. Removing the player takes its identity with it, and
+                        // a character left behind then has neither name nor identity - nothing to
+                        // recognise it by later, while it stands there keeping the freezer off
+                        // whatever site it was spawned on.
+                        var character = player?.Character;
+                        if (character != null && !character.MarkedForClose) character.Close();
                         if (player != null) Sync.Players.RemovePlayer(player);
                         if (Sync.Clients.HasClient(clients[i].Id.Value)) Sync.Clients.RemoveClient(clients[i].Id.Value);
                     }
@@ -347,7 +353,10 @@ namespace SentisTests.Game
                 var byIdentity = identity != null && (identity.DisplayName ?? "").StartsWith(NamePrefix, StringComparison.Ordinal);
                 var byName = (character.DisplayName ?? "").StartsWith(NamePrefix, StringComparison.Ordinal) ||
                              (character.Name ?? "").StartsWith(NamePrefix, StringComparison.Ordinal);
-                if (!byIdentity && !byName) continue;
+                // An orphan is one of ours too: a body whose identity is gone and whom no player
+                // controls is what an earlier run left behind when it removed its clients.
+                var orphan = identity == null && !IsControlledByAPlayer(character);
+                if (!byIdentity && !byName && !orphan) continue;
                 character.Close();
                 removed++;
             }
@@ -368,6 +377,15 @@ namespace SentisTests.Game
                 catch (Exception e) { SentisTestsPlugin.Log.Error(e, "FakeClients: removing identity " + identity.DisplayName + " failed"); }
             }
             return removed;
+        }
+
+
+        /// <summary>Whether any player in the session is this character.</summary>
+        private static bool IsControlledByAPlayer(Sandbox.Game.Entities.Character.MyCharacter character)
+        {
+            foreach (var player in Sync.Players.GetOnlinePlayers())
+                if (player?.Character == character) return true;
+            return false;
         }
 
         private static void Bind()
