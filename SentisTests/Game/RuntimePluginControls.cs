@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Reflection;
 
@@ -69,6 +69,21 @@ namespace SentisTests.Game
         }
 
         /// <summary>Grid stream builder cache counters since the last call (SentisOptimisations), or "-".</summary>
+        /// <summary>How many streamed grids the plugin's budget has put off to a later frame.</summary>
+        public static long StreamsDeferred
+        {
+            get
+            {
+                try
+                {
+                    var type = PluginType("SentisOptimisations", "Optimizer.Optimizations.StreamingSerializeBudget");
+                    var field = type.GetField("Deferred", BindingFlags.Public | BindingFlags.Static);
+                    return field == null ? -1 : (long)field.GetValue(null);
+                }
+                catch { return -1; }
+            }
+        }
+
         public static string TakeGridStreamBuilderStats()
         {
             try

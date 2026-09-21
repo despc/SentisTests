@@ -861,6 +861,116 @@ namespace SentisTests.Game
         private static readonly FieldInfo ClientReplicablesField = ClientType.GetField("Replicables");
         private static readonly FieldInfo ClientDirtyQueueField = ClientType.GetField("DirtyQueue");
 
+        /// <summary>
+        /// What each fake client has been given of these entities: fully replicated, still pending,
+        /// or not there at all. This is the server's own per-client replicable table, so it answers
+        /// the question a player asks when a grid will not appear - whether the server ever sent it.
+        /// </summary>
+        public static string Arrivals(IEnumerable<VRage.Game.Entity.MyEntity> entities)
+        {
+            var text = new System.Text.StringBuilder();
+            var clients = _clients;
+            var count = _clientCount;
+            foreach (var entity in entities)
+            {
+                if (entity == null) continue;
+                int ready = 0, pending = 0, missing = 0;
+                for (var i = 0; i < count; i++)
+                {
+                    var serverClient = ServerClient(clients[i]);
+                    var table = serverClient == null ? null : ClientReplicablesField.GetValue(serverClient);
+                    var found = false;
+                    var isPending = false;
+                    if (table is IEnumerable rows)
+                    {
+                        foreach (var row in rows)
+                        {
+                            var pair = row.GetType();
+                            var replicable = pair.GetProperty("Key")?.GetValue(row);
+                            if (EntityOf(replicable) != entity) continue;
+                            found = true;
+                            var data = pair.GetProperty("Value")?.GetValue(row);
+                            var flag = data?.GetType().GetField("IsPending") ??
+                                       (MemberInfo)data?.GetType().GetProperty("IsPending");
+                            var value = (flag as FieldInfo)?.GetValue(data) ?? (flag as PropertyInfo)?.GetValue(data);
+                            isPending = value is bool b && b;
+                            break;
+                        }
+                    }
+
+                    if (!found) missing++;
+                    else if (isPending) pending++;
+                    else ready++;
+                }
+
+                if (text.Length > 0) text.Append("; ");
+                text.Append(Describe(entity)).Append(": ready ").Append(ready)
+                    .Append(", pending ").Append(pending).Append(", missing ").Append(missing);
+            }
+
+            return text.Length == 0 ? "nothing to report" : text.ToString();
+        }
+
+        /// <summary>How many (entity, client) pairs are still not fully replicated.</summary>
+        public static int ArrivedCount(IEnumerable<VRage.Game.Entity.MyEntity> entities)
+        {
+            var outstanding = 0;
+            var clients = _clients;
+            var count = _clientCount;
+            foreach (var entity in entities)
+            {
+                if (entity == null) continue;
+                for (var i = 0; i < count; i++)
+                {
+                    var serverClient = ServerClient(clients[i]);
+                    var table = serverClient == null ? null : ClientReplicablesField.GetValue(serverClient);
+                    var ready = false;
+                    if (table is IEnumerable rows)
+                    {
+                        foreach (var row in rows)
+                        {
+                            var pair = row.GetType();
+                            if (EntityOf(pair.GetProperty("Key")?.GetValue(row)) != entity) continue;
+                            var data = pair.GetProperty("Value")?.GetValue(row);
+                            var flag = data?.GetType().GetField("IsPending") ??
+                                       (MemberInfo)data?.GetType().GetProperty("IsPending");
+                            var value = (flag as FieldInfo)?.GetValue(data) ?? (flag as PropertyInfo)?.GetValue(data);
+                            ready = !(value is bool b && b);
+                            break;
+                        }
+                    }
+
+                    if (!ready) outstanding++;
+                }
+            }
+
+            return outstanding;
+        }
+
+        private static string Describe(VRage.Game.Entity.MyEntity entity)
+        {
+            var grid = entity as Sandbox.Game.Entities.MyCubeGrid;
+            if (grid == null) return entity.GetType().Name + " " + entity.EntityId;
+            return (string.IsNullOrEmpty(grid.DisplayName) ? grid.EntityId.ToString() : grid.DisplayName) +
+                   " (" + grid.BlocksCount + " blocks)";
+        }
+
+        /// <summary>The entity behind a replicable, whatever the replicable calls it.</summary>
+        private static VRage.Game.Entity.MyEntity EntityOf(object replicable)
+        {
+            if (replicable == null) return null;
+            var type = replicable.GetType();
+            var property = type.GetProperty("Instance") ?? type.GetProperty("Entity");
+            var value = property?.GetValue(replicable);
+            if (value == null)
+            {
+                var method = type.GetMethod("GetEntity", Type.EmptyTypes);
+                value = method?.Invoke(replicable, null);
+            }
+
+            return value as VRage.Game.Entity.MyEntity;
+        }
+
         private static object ServerClient(FakeClient client) =>
             _serverClients != null && _serverClients.Contains(client.Endpoint) ? _serverClients[client.Endpoint] : null;
 
