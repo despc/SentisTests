@@ -83,65 +83,107 @@ namespace SentisTests.Scenarios
     }
 
     /// <summary>
-    /// SentisOptimisations config changed for a run and put back afterwards. Torch saves the
-    /// config file on every change, so the original values also go to <see cref="RestoreFile"/>
-    /// until they are put back: a run killed halfway (a restart) leaves that file, and
-    /// <see cref="RestoreLeftovers"/> puts the originals back on the next session load or run.
+    /// Plugin config changed for a run and put back afterwards. Torch saves a plugin's config file
+    /// on every change - "in memory only" does not exist - so the original values also go to
+    /// <see cref="RestoreFile"/> the first time a run touches them, and stay there until they are
+    /// put back. <see cref="RestoreLeftovers"/> puts back whatever is still in it: before every
+    /// run, after every run, and on the next session load if the server was killed halfway.
+    ///
+    /// Keys are "Plugin:Property" - <see cref="Optimisations"/> or <see cref="Gameplay"/>; a key
+    /// without a plugin is a SentisOptimisations one, as the file used to hold only those.
     /// </summary>
     internal sealed class ConfigOverride
     {
         /// <summary>Set by the plugin at init: a file next to its config.</summary>
         public static string RestoreFile;
 
+        public const string Optimisations = "SentisOptimisations";
+        public const string Gameplay = "SentisGameplayImprovements";
+
+        private readonly string _plugin;
         private readonly Dictionary<string, object> _saved = new Dictionary<string, object>();
+
+        public ConfigOverride(string plugin = Optimisations) => _plugin = plugin;
 
         public void Set(string property, object value)
         {
-            var config = Config();
+            var config = Config(_plugin);
             var prop = config.GetType().GetProperty(property);
             if (!_saved.ContainsKey(property))
-            {
-                // A value left in the file by a killed run is the real original.
-                var leftover = ReadFile();
-                _saved[property] = leftover.TryGetValue(property, out var original)
-                    ? Parse(prop, original)
-                    : prop.GetValue(config);
-                WriteFile(leftover, _saved);
-            }
+                _saved[property] = Remember(_plugin, property);
             prop.SetValue(config, value);
         }
 
         public void Restore()
         {
             // Freezer off first, so everything thaws; then the rest.
-            var config = Config();
+            var config = Config(_plugin);
             if (_saved.TryGetValue("FreezerEnabled", out var enabled)) config.GetType().GetProperty("FreezerEnabled").SetValue(config, enabled);
             foreach (var pair in _saved)
                 if (pair.Key != "FreezerEnabled") config.GetType().GetProperty(pair.Key).SetValue(config, pair.Value);
+            var file = ReadFile();
+            foreach (var key in _saved.Keys) file.Remove(Key(_plugin, key));
+            WriteFile(file);
             _saved.Clear();
-            DeleteFile();
         }
 
-        /// <summary>Puts back the originals a killed run left in <see cref="RestoreFile"/>.</summary>
+        /// <summary>
+        /// The original value of the setting, noted in <see cref="RestoreFile"/> before a run
+        /// changes it - unless it is noted there already: then that one is the real original.
+        /// </summary>
+        public static object Remember(string plugin, string property)
+        {
+            var config = Config(plugin);
+            var prop = config.GetType().GetProperty(property)
+                       ?? throw new InvalidOperationException(plugin + " has no setting " + property);
+            var file = ReadFile();
+            if (file.TryGetValue(Key(plugin, property), out var original)) return Parse(prop, original);
+            var value = prop.GetValue(config);
+            file[Key(plugin, property)] = Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture);
+            WriteFile(file);
+            return value;
+        }
+
+        /// <summary>Puts back every original still in <see cref="RestoreFile"/>.</summary>
         public static void RestoreLeftovers()
         {
             var leftover = ReadFile();
             if (leftover.Count == 0) return;
-            var config = Config();
-            foreach (var pair in leftover.OrderBy(p => p.Key == "FreezerEnabled" ? 0 : 1))
+            foreach (var pair in leftover.OrderBy(p => p.Key.EndsWith("FreezerEnabled") ? 0 : 1))
             {
-                var prop = config.GetType().GetProperty(pair.Key);
-                if (prop != null) prop.SetValue(config, Parse(prop, pair.Value));
+                var colon = pair.Key.IndexOf(':');
+                var plugin = colon > 0 ? pair.Key.Substring(0, colon) : Optimisations;
+                var property = colon > 0 ? pair.Key.Substring(colon + 1) : pair.Key;
+                try
+                {
+                    var config = Config(plugin);
+                    var prop = config.GetType().GetProperty(property);
+                    if (prop != null) prop.SetValue(config, Parse(prop, pair.Value));
+                }
+                catch (Exception e)
+                {
+                    TestScenario.Log.Warn("could not put back " + pair.Key + ": " + e.Message);
+                }
             }
             DeleteFile();
-            TestScenario.Log.Warn("SentisOptimisations config left by an interrupted test put back: " + string.Join(", ", leftover.Keys));
+            TestScenario.Log.Warn("plugin config left changed by a test put back: " + string.Join(", ", leftover.Keys));
         }
 
-        private static object Config()
+        private static string Key(string plugin, string property) => plugin + ":" + property;
+
+        private static object Config(string plugin)
         {
-            var plugin = AppDomain.CurrentDomain.GetAssemblies()
-                .Select(a => a.GetType("SentisOptimisationsPlugin.SentisOptimisationsPlugin")).First(t => t != null);
-            return plugin.GetProperty("Config", BindingFlags.Public | BindingFlags.Static).GetValue(null);
+            var typeName = plugin == Gameplay
+                ? "SentisGameplayImprovements.SentisGameplayImprovementsPlugin"
+                : "SentisOptimisationsPlugin.SentisOptimisationsPlugin";
+            var type = AppDomain.CurrentDomain.GetAssemblies()
+                .Select(a => a.GetType(typeName)).FirstOrDefault(t => t != null)
+                ?? throw new InvalidOperationException(plugin + " is not loaded");
+            var property = type.GetProperty("Config", BindingFlags.Public | BindingFlags.Static | BindingFlags.NonPublic);
+            if (property != null) return property.GetValue(null);
+            var field = type.GetField("_config", BindingFlags.Static | BindingFlags.NonPublic);
+            var persistent = field?.GetValue(null) ?? throw new InvalidOperationException(plugin + " has no config");
+            return persistent.GetType().GetProperty("Data")?.GetValue(persistent) ?? persistent;
         }
 
         private static object Parse(PropertyInfo prop, string value) =>
@@ -154,18 +196,23 @@ namespace SentisTests.Scenarios
             foreach (var line in System.IO.File.ReadAllLines(RestoreFile))
             {
                 var eq = line.IndexOf('=');
-                if (eq > 0) values[line.Substring(0, eq)] = line.Substring(eq + 1);
+                if (eq <= 0) continue;
+                var key = line.Substring(0, eq);
+                if (key.IndexOf(':') < 0) key = Key(Optimisations, key);
+                values[key] = line.Substring(eq + 1);
             }
             return values;
         }
 
-        private static void WriteFile(Dictionary<string, string> leftover, Dictionary<string, object> saved)
+        private static void WriteFile(Dictionary<string, string> values)
         {
             if (RestoreFile == null) return;
-            var all = new Dictionary<string, string>(leftover);
-            foreach (var pair in saved)
-                all[pair.Key] = Convert.ToString(pair.Value, System.Globalization.CultureInfo.InvariantCulture);
-            System.IO.File.WriteAllLines(RestoreFile, all.Select(p => p.Key + "=" + p.Value));
+            if (values.Count == 0)
+            {
+                DeleteFile();
+                return;
+            }
+            System.IO.File.WriteAllLines(RestoreFile, values.Select(p => p.Key + "=" + p.Value));
         }
 
         private static void DeleteFile()

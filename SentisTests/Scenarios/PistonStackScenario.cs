@@ -24,7 +24,13 @@ namespace SentisTests.Scenarios
     ///     pistons put it and nothing leaning over;
     ///  2. it is knocked sideways, the tip hardest, and has to calm down again;
     ///  3. it retracts all the way, and extends all the way back, and at both ends it has to be one
-    ///     straight stack of the right height.
+    ///     straight stack of the right height;
+    ///  4. the freezer takes it three times - standing still, swaying, and with every piston on its
+    ///     way down - and gives it back each time. A stack like this is half static, half dynamic:
+    ///     the base is a static grid, every grid above it a dynamic body held by a piston. Frozen at
+    ///     rest or swaying, all of those have to be fixed bodies and nothing may move; frozen on the
+    ///     move, only its logic is frozen. Thawed, the bodies have to be dynamic again, and the
+    ///     stack whole, straight, the right height, calm, and its pistons working.
     /// </summary>
     public sealed class PistonStackScenario : TestScenario
     {
@@ -150,10 +156,114 @@ namespace SentisTests.Scenarios
             Check(Lean(baseGrid, up) < LeanToleranceM, "the extended stack leans: " + shapeUp);
             CheckCalm("extended again");
 
+            // ------------------------------------------------------------- frozen and thawed
+            _config.Set("FreezerEnabled", true);
+            _config.Set("FreezePhysics", true);
+            _config.Set("DelayBeforeFreezeSec", 2);
+            _config.Set("FreezeDistanceStatic", 500);
+            _config.Set("FreezeDistanceDynamic", 500);
+            var cycles = new List<string>();
+
+            // still
+            var cycle = FreezeCycle("still", blocks, baseGrid, up, extendedHeight, watchFrom, cycles);
+            while (cycle.MoveNext()) yield return cycle.Current;
+
+            // swaying: the player leaves right after the knock, so the freeze catches it mid-swing
+            chain = Chain();
+            for (var i = 1; i < chain.Count; i++)
+                chain[i].Physics.LinearVelocity += side * (KnockSpeed * i / (chain.Count - 1));
+            cycle = FreezeCycle("swaying", blocks, baseGrid, up, extendedHeight, watchFrom, cycles);
+            while (cycle.MoveNext()) yield return cycle.Current;
+
+            // on the move: frozen with every piston travelling down, and after the thaw it has to
+            // carry on - and come back up to its full height
+            foreach (var p in pistons) ((Sandbox.ModAPI.IMyPistonBase)p).Velocity = -TravelSpeed;
+            var travel = WaitForSeconds(3, "the pistons start down");
+            while (travel.MoveNext()) yield return travel.Current;
+            Check(pistons.All(p => ((Sandbox.ModAPI.IMyPistonBase)p).CurrentPosition < p.MaxLimit - 0.5f),
+                "the pistons did not move down before the freeze");
+            cycle = FreezeCycle("moving", blocks, baseGrid, up, null, watchFrom, cycles, physics: false);
+            while (cycle.MoveNext()) yield return cycle.Current;
+            foreach (var p in pistons) ((Sandbox.ModAPI.IMyPistonBase)p).Velocity = TravelSpeed;
+            upAgain = Wait(() => pistons.All(p => ((Sandbox.ModAPI.IMyPistonBase)p).CurrentPosition >= p.MaxLimit - 0.01f),
+                "every piston extended after the thaw (" + State() + ")", TravelSeconds);
+            while (upAgain.MoveNext()) yield return upAgain.Current;
+            rest = WaitForSeconds(3, "the stack comes to rest");
+            while (rest.MoveNext()) yield return rest.Current;
+            CheckWhole(blocks, "extended after the frozen travel");
+            Check(Math.Abs(Height(baseGrid, up) - extendedHeight) < HeightToleranceM,
+                "after the frozen travel the stack is not back at its height: " + Shape(baseGrid, up));
+            Check(Lean(baseGrid, up) < LeanToleranceM, "after the frozen travel the stack leans: " + Shape(baseGrid, up));
+
             Note("PISTON STACK RESULT | " + _grids.Count + " grids, " + pistons.Count + " pistons held together: settled " +
                  shape0 + " | knocked, calm in " + calmIn.ToString("F1") + " s | retracted " + shapeDown +
-                 " | extended again " + shapeUp);
+                 " | extended again " + shapeUp + " | freeze/thaw: " + string.Join("; ", cycles));
         }
+
+        /// <summary>
+        /// The player leaves, the freezer takes the stack; the player comes back, the stack thaws
+        /// and has to be what it was. At rest its physics is frozen too - every carried grid a fixed
+        /// body, nothing moving; with its pistons on the move only its logic is, as it always was:
+        /// the freezer does not fix bodies whose pistons' logic ran ahead of them in a world no
+        /// longer stepped.
+        /// </summary>
+        private IEnumerator FreezeCycle(string what, int blocks, MyCubeGrid baseGrid, Vector3D up, double? height,
+            Vector3D watchFrom, List<string> cycles, bool physics = true)
+        {
+            FakeClients.RemoveAll();
+            var frozen = Wait(() => _grids.All(g => RuntimePluginControls.IsGridFrozen(g.EntityId)),
+                what + ": the stack frozen (" + FreezeState() + ")", 30);
+            while (frozen.MoveNext()) yield return frozen.Current;
+            if (physics)
+            {
+                var fixedUp = Wait(() => _grids.Where(g => !g.IsStatic).All(g => RuntimePluginControls.IsGridPhysicsFrozen(g.EntityId)),
+                    what + ": the stack frozen with its physics (" + FreezeState() + ")", 10);
+                while (fixedUp.MoveNext()) yield return fixedUp.Current;
+            }
+
+            var carried = _grids.Count(g => !g.IsStatic);
+            var fixedBodies = _grids.Where(g => !g.IsStatic).Count(g => g.Physics?.RigidBody != null && g.Physics.RigidBody.IsFixed);
+            var physicsFrozen = _grids.Count(g => RuntimePluginControls.IsGridPhysicsFrozen(g.EntityId));
+            if (physics)
+                Check(fixedBodies == carried, what + ": only " + fixedBodies + " of " + carried + " carried grids are fixed bodies");
+            else
+                Check(physicsFrozen == 0, what + ": the physics of " + physicsFrozen + " grids was frozen with the pistons on the move");
+            CheckWhole(blocks, what + ", frozen");
+            var tip = Tip();
+            var hold = WaitForSeconds(5, what + ": held frozen");
+            while (hold.MoveNext()) yield return hold.Current;
+            var drift = Vector3D.Distance(Tip(), tip);
+            if (physics)
+                Check(drift < 0.01, what + ": the frozen stack moved " + drift.ToString("F3") + " m");
+
+            FakeClients.Add(1, Network, p => (watchFrom, 0, 0), withCharacters: true);
+            var thawed = Wait(() => _grids.All(g => !RuntimePluginControls.IsGridFrozen(g.EntityId)) &&
+                                    _grids.Where(g => !g.IsStatic).All(g => g.Physics?.RigidBody != null && !g.Physics.RigidBody.IsFixed),
+                what + ": the stack thawed (" + FreezeState() + ")", 30);
+            while (thawed.MoveNext()) yield return thawed.Current;
+            var thawedAt = DateTime.UtcNow;
+            CheckWhole(blocks, what + ", thawed");
+
+            if (height.HasValue)
+            {
+                var calm = Wait(() => Calm(), what + ": the thawed stack calms down (" + Shape(baseGrid, up) + ")", CalmWithinSeconds);
+                while (calm.MoveNext()) yield return calm.Current;
+                var settle = WaitForSeconds(2, what + ": the thawed stack settles");
+                while (settle.MoveNext()) yield return settle.Current;
+                CheckWhole(blocks, what + ", thawed and settled");
+                Check(Math.Abs(Height(baseGrid, up) - height.Value) < HeightToleranceM,
+                    what + ": the thawed stack is not at its height: " + Shape(baseGrid, up));
+                Check(Lean(baseGrid, up) < LeanToleranceM, what + ": the thawed stack leans: " + Shape(baseGrid, up));
+                CheckCalm(what + ", thawed");
+            }
+            cycles.Add(what + " - frozen " + fixedBodies + " fixed bodies, drift " + drift.ToString("F3") + " m, thawed " +
+                       Shape(baseGrid, up) + " after " + (DateTime.UtcNow - thawedAt).TotalSeconds.ToString("F1") + " s");
+        }
+
+        private string FreezeState() =>
+            "frozen " + _grids.Count(g => RuntimePluginControls.IsGridFrozen(g.EntityId)) + "/" + _grids.Count +
+            ", physics frozen " + _grids.Count(g => RuntimePluginControls.IsGridPhysicsFrozen(g.EntityId)) +
+            ", fixed bodies " + _grids.Count(g => g.Physics?.RigidBody != null && g.Physics.RigidBody.IsFixed);
 
         // ------------------------------------------------------------------ the stack
 
@@ -170,9 +280,46 @@ namespace SentisTests.Scenarios
                    ", frozen " + _grids.Count(g => RuntimePluginControls.IsGridFrozen(g.EntityId)) +
                    ", in scene " + _grids.Count(g => g.InScene) +
                    ", gravity " + (_grids.Count > 1 && _grids[1].Physics != null ? _grids[1].Physics.Gravity.Length().ToString("F1") : "-") +
-                   " | power " + WorldApi.DescribePower(_grids[0]) +
-                   " | base blocks " + string.Join(",", _grids[0].GetFatBlocks().Select(b => b.BlockDefinition.Id.SubtypeName));
+                   ", fixed bodies " + _grids.Count(g => g.Physics?.RigidBody != null && g.Physics.RigidBody.IsFixed) +
+                   " | pistons updating each frame " + pistons.Count(p => (p.NeedsUpdate & VRage.ModAPI.MyEntityUpdateEnum.EACH_FRAME) != 0) +
+                   ", no constraint " + pistons.Count(p => Constraint(p) == null) +
+                   ", constraint between fixed bodies " + pistons.Count(p => Constraint(p) is Havok.HkConstraint c && c.RigidBodyA != null && c.RigidBodyB != null && c.RigidBodyA.IsFixed && c.RigidBodyB.IsFixed) +
+                   ", head fixed " + pistons.Count(p => Head(p)?.RigidBody != null && Head(p).RigidBody.IsFixed) +
+                   " | impulses axial/sideways (limit " + (pistons.Count > 0 ? ((float)pistons[0].MaxImpulseAxis).ToString("F0") + "/" + ((float)pistons[0].MaxImpulseNonAxis).ToString("F0") : "-") + "): " +
+                   string.Join(" ", pistons.Select(Impulses)) +
+                   " | power " + WorldApi.DescribePower(_grids[0]);
         }
+
+        private static readonly System.Reflection.PropertyInfo ConstraintProperty =
+            typeof(MyMechanicalConnectionBlockBase).GetProperty("Constraint",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+
+        private static readonly System.Reflection.FieldInfo HeadField =
+            typeof(MyPistonBase).GetField("m_subpartPhysics", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        private static Havok.HkConstraint Constraint(MyPistonBase piston) => ConstraintProperty?.GetValue(piston) as Havok.HkConstraint;
+
+        private static readonly System.Reflection.MethodInfo ImpulsesMethod =
+            typeof(MyPistonBase).GetMethod("GetConstraintImpulses", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        private static string Impulses(MyPistonBase piston)
+        {
+            try
+            {
+                var constraint = Constraint(piston);
+                if (constraint == null || !constraint.InWorld || ImpulsesMethod == null) return "-";
+                var args = new object[] { constraint, 0f, 0f };
+                ImpulsesMethod.Invoke(piston, args);
+                return ((float)args[1]).ToString("F0") + "/" + ((float)args[2]).ToString("F0");
+            }
+            catch (Exception e)
+            {
+                return "?" + e.GetType().Name;
+            }
+        }
+
+        private static Sandbox.Engine.Physics.MyPhysicsBody Head(MyPistonBase piston) =>
+            HeadField?.GetValue(piston) as Sandbox.Engine.Physics.MyPhysicsBody;
 
         private List<MyPistonBase> Pistons() =>
             _grids.SelectMany(g => g.GetFatBlocks().OfType<MyPistonBase>()).ToList();

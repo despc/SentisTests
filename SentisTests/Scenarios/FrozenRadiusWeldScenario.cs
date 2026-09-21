@@ -60,6 +60,15 @@ namespace SentisTests.Scenarios
 
             Check(Math.Abs(welder.DetectorSphere.Radius - baseline * 2f) < 0.001f,
                 "welder radius changed during thaw");
+
+            // Nobody stood here so that the boat would freeze; now somebody has to, or Havok does
+            // not step this cluster (EnableSelectivePhysicsUpdates) and the thawed boat hangs where
+            // it is, never reaching the slab. It only ever passed with the operator in the world.
+            FakeClients.Add(1, new FakeClients.NetworkProfile { RttMs = 50 },
+                p => (ship.PositionComp.GetPosition() + new VRageMath.Vector3D(0, 40, 0), 0, 0), withCharacters: true);
+            var arrive = WaitForSeconds(5, "a player arrives at the site");
+            while (arrive.MoveNext())
+                yield return arrive.Current;
             Note("construction boat thawed; doubled radius preserved; starting real vanilla projection welding");
         }
 

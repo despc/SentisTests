@@ -335,6 +335,12 @@ namespace SentisTests.Core
                 catch (Exception e) { Log.Warn("leftover cleanup failed for {0}: {1}", scenario.Name, e.Message); }
             }
 
+            // Whatever the scenario put back or forgot to, the plugin settings it touched go back to
+            // what they were before it: Torch writes every change to the config file, and a stand
+            // left with the freezer off or the welders at x100 skews every run after it.
+            try { Scenarios.ConfigOverride.RestoreLeftovers(); }
+            catch (Exception e) { Log.Warn("config restore failed after {0}: {1}", scenario.Name, e.Message); }
+
             if (delay < 0)
             {
                 foreach (var entity in scenario.TakeTracked())

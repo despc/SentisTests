@@ -983,30 +983,7 @@
           <MaxImpulseAxis>50000</MaxImpulseAxis>
           <MaxImpulseNonAxis>50000</MaxImpulseNonAxis>
         </MyObjectBuilder_CubeBlock>
-        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_ExtendedPistonBase">
-          <SubtypeName>LargePistonBase</SubtypeName>
-          <EntityId>73021358460568357</EntityId>
-<Min x="-4" y="4" z="1" />
-          <BlockOrientation Forward="Left" Up="Backward" />
-<ShareMode>Faction</ShareMode>
-          <ShowOnHUD>false</ShowOnHUD>
-          <ShowInTerminal>true</ShowInTerminal>
-          <ShowInToolbarConfig>true</ShowInToolbarConfig>
-          <ShowInInventory>true</ShowInInventory>
-          <NumberInGrid>2</NumberInGrid>
-          <Enabled>true</Enabled>
-          <TopBlockId>142677767332662809</TopBlockId>
-          <ShareInertiaTensor>false</ShareInertiaTensor>
-          <SafetyDetach>5</SafetyDetach>
-          <Velocity>0</Velocity>
-          <MaxLimit>1</MaxLimit>
-          <MinLimit>0</MinLimit>
-          <Reverse>false</Reverse>
-          <CurrentPosition>8.189681</CurrentPosition>
-          <MaxImpulseAxis>50000</MaxImpulseAxis>
-          <MaxImpulseNonAxis>50000</MaxImpulseNonAxis>
-        </MyObjectBuilder_CubeBlock>
-        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_LandingGear">
+<MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_LandingGear">
           <SubtypeName>LargeBlockLandingGear</SubtypeName>
           <EntityId>89829360298912517</EntityId>
 <Min x="-23" y="4" z="-1" />
@@ -1422,38 +1399,6 @@
         </MyObjectBuilder_CubeBlock>
       </CubeBlocks>
       <DisplayName>Subgrid</DisplayName>
-      <DestructibleBlocks>true</DestructibleBlocks>
-      <IsRespawnGrid>false</IsRespawnGrid>
-      <LocalCoordSys>0</LocalCoordSys>
-      <TargetingTargets />
-      <NPCGridClaimElapsed xsi:nil="true" />
-    </CubeGrid>
-<CubeGrid>
-      <SubtypeName />
-      <EntityId>90061138024138491</EntityId>
-      <PersistentFlags>CastShadows InScene</PersistentFlags>
-<PositionAndOrientation>
-        <Position x="-45544.835218166932" y="-106892.84170851661" z="-185458.91331324039" />
-        <Forward x="-0.436374038" y="0.8935021" z="0.105980068" />
-        <Up x="-0.8702011" y="-0.4490435" z="0.202756077" />
-        <Orientation>
-          <X>0.6677904</X>
-          <Y>-0.327178866</Y>
-          <Z>0.5278046</Z>
-          <W>0.41040504</W>
-        </Orientation>
-      </PositionAndOrientation>
-      <LocalPositionAndOrientation xsi:nil="true" />
-      <GridSizeEnum>Large</GridSizeEnum>
-      <CubeBlocks>
-        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_PistonTop">
-          <SubtypeName>LargePistonTop</SubtypeName>
-          <EntityId>142677767332662809</EntityId>
-<ParentEntityId>73021358460568357</ParentEntityId>
-          <YieldLastComponent>false</YieldLastComponent>
-        </MyObjectBuilder_CubeBlock>
-      </CubeBlocks>
-<DisplayName>Subgrid</DisplayName>
       <DestructibleBlocks>true</DestructibleBlocks>
       <IsRespawnGrid>false</IsRespawnGrid>
       <LocalCoordSys>0</LocalCoordSys>

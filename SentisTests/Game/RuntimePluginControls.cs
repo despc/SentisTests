@@ -36,9 +36,9 @@ namespace SentisTests.Game
                 "SentisOptimisationsPlugin.SentisOptimisationsPlugin");
             if (type == null) return; // plugin not loaded (isolation runs)
             var config = Config(type);
-            // In memory only, like every setting a scenario touches: a run that is cut short - the
-            // server killed or restarted mid-scenario - must leave the stand's config files as the
-            // operator set them. Saving here once left the freezer off and the welders at x100.
+            // Torch writes the change to the config file at once, so the operator's value is noted
+            // first: the runner puts it back after the run, or after a restart if the run was killed.
+            Scenarios.ConfigOverride.Remember(Scenarios.ConfigOverride.Optimisations, "FreezerEnabled");
             config.GetType().GetProperty("FreezerEnabled").SetValue(config, enabled);
         }
 
@@ -55,7 +55,8 @@ namespace SentisTests.Game
         {
             var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.SentisOptimisationsPlugin");
             var config = Config(type);
-            config.GetType().GetProperty("AntifreezeBlocksSubtypes").SetValue(config, subtypes);   // in memory only
+            Scenarios.ConfigOverride.Remember(Scenarios.ConfigOverride.Optimisations, "AntifreezeBlocksSubtypes");
+            config.GetType().GetProperty("AntifreezeBlocksSubtypes").SetValue(config, subtypes);
         }
 
         /// <summary>Public static field or property of the SentisOptimisations FrozenGridSaveCache.</summary>
@@ -244,6 +245,17 @@ namespace SentisTests.Game
             return (bool)contains.Invoke(frozen, new object[] { gridId });
         }
 
+        /// <summary>Whether the freezer turned this grid's body into a fixed one (FreezePhysics).</summary>
+        public static bool IsGridPhysicsFrozen(long gridId)
+        {
+            var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.Freezer.FreezeLogic");
+            var frozen = type.GetField("FrozenPhysicsGrids", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
+            var contains = frozen?.GetType().GetMethod("Contains", new[] { typeof(long) });
+            if (contains == null)
+                throw new InvalidOperationException("FreezeLogic.FrozenPhysicsGrids is unavailable");
+            return (bool)contains.Invoke(frozen, new object[] { gridId });
+        }
+
         public static int FrozenGridCount
         {
             get
@@ -336,7 +348,8 @@ namespace SentisTests.Game
             var type = PluginType("SentisGameplayImprovements",
                 "SentisGameplayImprovements.SentisGameplayImprovementsPlugin");
             var config = Config(type);
-            config.GetType().GetProperty("WelderRadiusMultiplier").SetValue(config, multiplier);   // in memory only
+            Scenarios.ConfigOverride.Remember(Scenarios.ConfigOverride.Gameplay, "WelderRadiusMultiplier");
+            config.GetType().GetProperty("WelderRadiusMultiplier").SetValue(config, multiplier);
         }
     }
 }

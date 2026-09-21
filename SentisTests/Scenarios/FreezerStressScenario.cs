@@ -13,7 +13,7 @@ namespace SentisTests.Scenarios
 {
     /// <summary>
     /// Stress test of the SentisOptimisations freezer with FreezePhysics on: 64 copies of
-    /// FREEZER_TEST_WITH_SUBGRIDS (a chassis on six wheels, piston chains and a hinge, 12 tops) on
+    /// FREEZER_TEST_WITH_SUBGRIDS (a chassis on six wheels, piston chains and a hinge, 11 tops) on
     /// flat spots all over the planet and 64 scattered through space far above it. Every fourth
     /// copy keeps its landing gear locked to its static wall (logic-only freeze), the rest are free
     /// (their physics gets frozen). 64 fake players with characters stand at 64 of the 128 copies,

@@ -117,7 +117,15 @@ namespace SentisTests.Scenarios
             Check(!_near.Frozen, "the near site froze although a player is standing at it");
             Check(_far.Frozen, "the far site did not freeze, so there is nothing to compare against");
 
+            // A battery books its charge every 100 frames, and the booking due at the moment of the
+            // freeze can still land a frame or two after it - about a second and a half of the
+            // reactor's output, which came out as a site "still running" whenever the freeze
+            // happened to fall that way. The frozen window starts once that one is booked.
+            var booked = WaitUntil(null, 3, "the last booking before the freeze lands");
+            while (booked.MoveNext()) yield return booked.Current;
+
             var before = new[] { _near.Read(), _far.Read() };
+            Note("far site frozen: " + _far.FreezeState());
             var measuring = WaitUntil(null, RunSeconds, "measuring");
             while (measuring.MoveNext()) yield return measuring.Current;
             var frozenWindow = new[] { _near.Read().Minus(before[0]), _far.Read().Minus(before[1]) };
@@ -213,6 +221,17 @@ namespace SentisTests.Scenarios
             public MyGasTank HydrogenTank;
             public List<MyGasTank> HydrogenTanks = new List<MyGasTank>();
             public List<MySolarPanel> Panels = new List<MySolarPanel>();
+
+            public string FreezeState() =>
+                string.Join(", ", new[] { SolarGrid, ReactorGrid, EngineGrid }.Select(g =>
+                    g.DisplayName.Substring(g.DisplayName.LastIndexOf('-') + 1) +
+                    (g.IsStatic ? " static" : " dynamic") +
+                    (RuntimePluginControls.IsGridFrozen(g.EntityId) ? " frozen" : " running") +
+                    (RuntimePluginControls.IsGridPhysicsFrozen(g.EntityId) ? " physics-frozen" : "") +
+                    (g.Physics?.RigidBody != null && g.Physics.RigidBody.IsFixed ? " fixed" : " not fixed") +
+                    ", updates " + g.NeedsUpdate)) +
+                " | batteries " + string.Join(", ", new[] { SolarBattery, ReactorBattery, EngineBattery }.Select(b =>
+                    b.CurrentStoredPower.ToString("F4") + " MWh " + (b.IsWorking ? "working" : "off") + " " + b.NeedsUpdate));
 
             public bool Frozen =>
                 RuntimePluginControls.IsGridFrozen(SolarGrid.EntityId) &&

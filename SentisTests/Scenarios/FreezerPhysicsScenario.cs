@@ -18,10 +18,16 @@ namespace SentisTests.Scenarios
     /// <summary>
     /// Freezer physics freeze/unfreeze (SentisOptimisations, FreezePhysics) on the operator's
     /// FREEZER_TEST_WITH_SUBGRIDS: a chassis on six wheels with piston chains and a hinge (all
-    /// subgrids) and a landing gear locked to a static grid. Four copies: on the planet and in
-    /// open space, each once as built (gear locked to its static grid - the freezer must not freeze
-    /// the physics of a group with a static grid) and once without the static grid, gear released
-    /// (the whole group of subgrids gets its physics frozen).
+    /// subgrids) and a landing gear locked to a static grid. (Its second piston on the chassis is
+    /// gone from the copy: its head was jammed into a wheel and kept pushing the chassis along,
+    /// which read as a jump after the thaw.) Four copies: on the planet and in
+    /// open space, each once as built (gear locked to its static grid) and once without the static
+    /// grid, gear released. A free copy gets the physics of every grid frozen; a copy whose chassis
+    /// the game holds on its gear stays logic-only - frozen around that chassis on a planet, its
+    /// wheels came back at a hundred metres a second - and the chassis must still be fixed after
+    /// every thaw. (A group held only by a static grid, like a stack of pistons on a base, is frozen
+    /// with its physics too: piston_stack.) No grid may come out of a thaw faster than
+    /// <see cref="MaxThawSpeed"/>.
     /// The freezer runs for real with a 500 m distance; a fake player with a character is added
     /// next to the structures (they wake up) and removed (they freeze), <see cref="Cycles"/> times.
     /// After every thaw each structure is compared with the moment it froze: movement of every
@@ -40,6 +46,8 @@ namespace SentisTests.Scenarios
         private const double WaitStateSeconds = 40;
         private const double SettleSeconds = 10;
         private const double KickWatchSeconds = 3;
+        /// <summary>Faster than this right after a thaw, a grid was thrown, not settled.</summary>
+        private const double MaxThawSpeed = 20;
         private const double SpaceHeightM = 150000;
         internal const string ResourceName = "SentisTests.Resources.FreezerTest.xml";
 
@@ -112,6 +120,11 @@ namespace SentisTests.Scenarios
             // player the copies would hang where they were spawned. Observers for the settling; the
             // first cycle removes them.
             FakeClients.Add(2, Network, index => (index == 0 ? planetSite + north * 100 + up * 3 : spaceSite + north * 40, 0, 0), withCharacters: true);
+            // The freezer may have taken a copy in the moment before the observers came: what is
+            // fixed in vanilla can only be told once every copy is thawed.
+            var thawedFirst = Wait(() => _rigs.All(r => r.Grids.All(g => g.Closed || !FreezerState.IsFrozen(g) && !FreezerState.IsPhysicsFrozen(g))),
+                "every copy thawed before anything is measured", (int)WaitStateSeconds);
+            while (thawedFirst.MoveNext()) yield return thawedFirst.Current;
             var settle = WaitForSeconds(SettleSeconds, "structures settle, gears lock");
             while (settle.MoveNext()) yield return settle.Current;
             foreach (var rig in _rigs) RigParts.StartMotors(rig.Grids);
@@ -125,7 +138,8 @@ namespace SentisTests.Scenarios
             // Before the freezer has touched anything: which bodies are fixed in vanilla.
             foreach (var rig in _rigs)
             {
-                foreach (var g in rig.Grids.Where(g => !g.IsStatic && g.Physics?.RigidBody != null && g.Physics.RigidBody.IsFixed))
+                foreach (var g in rig.Grids.Where(g => !g.IsStatic && !FreezerState.IsPhysicsFrozen(g) &&
+                                                       g.Physics?.RigidBody != null && g.Physics.RigidBody.IsFixed))
                     rig.VanillaFixed.Add(g.EntityId);
                 if (rig.VanillaFixed.Count > 0) Note("vanilla keeps " + rig.VanillaFixed.Count + " grids of " + rig.Name + " with a fixed body");
             }
@@ -185,14 +199,13 @@ namespace SentisTests.Scenarios
             _config.Set("FreezePhysics", true);
             var on = WaitForSeconds(3, "FreezePhysics on");
             while (on.MoveNext()) yield return on.Current;
+            // every dynamic grid frozen again - unless the game holds one of the group on a gear
             foreach (var rig in _rigs)
             {
-                var free = !rig.Grids.Any(g => g.IsStatic) && !rig.Name.Contains("on ground");
+                var freezable = Freezable(rig);
                 var physicsFrozen = rig.Grids.Count(FreezerState.IsPhysicsFrozen);
-                if (free && physicsFrozen != rig.Grids.Count)
-                    rig.Problems.Add("FreezePhysics on: " + physicsFrozen + "/" + rig.Grids.Count + " physics-frozen");
-                if (!free && physicsFrozen > 0)
-                    rig.Problems.Add("FreezePhysics on: physics frozen on a fixed group");
+                if (physicsFrozen != freezable)
+                    rig.Problems.Add("FreezePhysics on: " + physicsFrozen + "/" + freezable + " grids physics-frozen");
             }
             Note("toggle: " + string.Join(" | ", _rigs.Select(r => r.Name + " physics-frozen " + r.Grids.Count(FreezerState.IsPhysicsFrozen) + "/" + r.Grids.Count)));
             FakeClients.Add(2, Network, index => (index == 0 ? planetSite + north * 100 + up * 3 : spaceSite + north * 40, 0, 0), withCharacters: true);
@@ -200,6 +213,12 @@ namespace SentisTests.Scenarios
             while (lastThaw.MoveNext()) yield return lastThaw.Current;
             foreach (var rig in _rigs) CompareAfterThaw(rig, Cycles + 1);
             FakeClients.RemoveAll();
+
+            // A thaw must be quiet: tops turning and chassis settling stay within a few metres a
+            // second, a body thrown at a hundred is a thaw gone wrong even if nothing came off.
+            foreach (var rig in _rigs)
+                if (rig.MaxKick > MaxThawSpeed)
+                    rig.Problems.Add("a grid at " + rig.MaxKick.ToString("F1") + " m/s right after a thaw");
 
             Note("FREEZER RESULT | " + string.Join(" | ", _rigs.Select(r => r.Name + ": physics frozen " + r.PhysicsFrozenCycles + ", logic only " +
                  r.LogicOnlyCycles + ", not frozen " + r.NotFrozenCycles + ", max speed after thaw " + r.MaxKick.ToString("F1") + " m/s (chassis " + r.MaxChassisKick.ToString("F2") + "), problems " +
@@ -249,6 +268,14 @@ namespace SentisTests.Scenarios
 
         // ------------------------------------------------------------------ checks
 
+        /// <summary>
+        /// How many grids of the rig the freezer should make fixed: every dynamic one - held in
+        /// place by a static grid or not - unless the game holds one of them on a landing gear;
+        /// then none, the group stays logic-only.
+        /// </summary>
+        private static int Freezable(Rig rig) =>
+            rig.VanillaFixed.Count > 0 ? 0 : rig.Grids.Count(g => !g.Closed && !g.IsStatic);
+
         private void CaptureFrozen(Rig rig)
         {
             rig.FrozenPoses = rig.Grids.Select(g => g.WorldMatrix).ToList();
@@ -258,14 +285,16 @@ namespace SentisTests.Scenarios
             rig.FrozenBlocks = rig.Grids.Where(g => !g.Closed).Sum(g => g.CubeBlocks.Count);
             var fixedBodies = rig.Grids.Count(g => g.Physics?.RigidBody != null && g.Physics.RigidBody.IsFixed);
             var physicsFrozen = rig.Grids.Count(FreezerState.IsPhysicsFrozen);
-            var hasStatic = rig.Grids.Any(g => g.IsStatic) || rig.Name.Contains("on ground");
-            if (hasStatic && physicsFrozen > 0)
-                rig.Problems.Add("physics frozen on " + physicsFrozen + " grids of a group with a static grid");
-            if (physicsFrozen == rig.Grids.Count) rig.PhysicsFrozenCycles++;
+            var freezable = Freezable(rig);
+            if (rig.Grids.Any(g => g.IsStatic && FreezerState.IsPhysicsFrozen(g)))
+                rig.Problems.Add("physics frozen on the static grid");
+            if (freezable == 0 && physicsFrozen > 0)
+                rig.Problems.Add("physics frozen on " + physicsFrozen + " grids of a group the game holds on a landing gear");
+            if (freezable > 0 && physicsFrozen == freezable) rig.PhysicsFrozenCycles++;
             else if (rig.Grids.All(FreezerState.IsFrozen)) rig.LogicOnlyCycles++;
             else rig.NotFrozenCycles++;
-            if (!hasStatic && physicsFrozen > 0 && physicsFrozen < rig.Grids.Count)
-                rig.Problems.Add("only " + physicsFrozen + "/" + rig.Grids.Count + " grids physics-frozen");
+            if (physicsFrozen > 0 && physicsFrozen < freezable)
+                rig.Problems.Add("only " + physicsFrozen + "/" + freezable + " dynamic grids physics-frozen");
             if (physicsFrozen > 0 && fixedBodies < physicsFrozen)
                 rig.Problems.Add("physics-frozen but body not fixed on " + (physicsFrozen - fixedBodies) + " grids");
         }
