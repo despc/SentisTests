@@ -539,12 +539,23 @@ namespace SentisTests.Game
             // Landing gears keep the id of the grid they are locked to, and their object builder has
             // no Remap: without this a copy would reach for the original station.
             var oldIds = grids.Select(g => g.EntityId).ToList();
+            var blocks = grids.SelectMany(g => g.CubeBlocks).ToList();
+            var oldBlockIds = blocks.Select(b => b.EntityId).ToList();
             MyEntities.RemapObjectBuilderCollection(grids);
             var newIds = new Dictionary<long, long>();
             for (var i = 0; i < grids.Count; i++) newIds[oldIds[i]] = grids[i].EntityId;
             foreach (var gear in grids.SelectMany(g => g.CubeBlocks).OfType<Sandbox.Common.ObjectBuilders.MyObjectBuilder_LandingGear>())
                 if (gear.AttachedEntityId.HasValue && newIds.TryGetValue(gear.AttachedEntityId.Value, out var remapped))
                     gear.AttachedEntityId = remapped;
+            // The top of a piston, rotor or hinge names the block holding it (ParentEntityId), and the
+            // game, on spawning it, finds that block and tells it to re-attach. Left as saved, a copy
+            // named the ORIGINAL piston in the world, and every spawn of the copy tore the original
+            // stack apart. It has to name the copy's own piston, or nothing.
+            var newBlockIds = new Dictionary<long, long>();
+            for (var i = 0; i < blocks.Count; i++)
+                if (oldBlockIds[i] != 0) newBlockIds[oldBlockIds[i]] = blocks[i].EntityId;
+            foreach (var top in blocks.OfType<Sandbox.Common.ObjectBuilders.MyObjectBuilder_AttachableTopBlockBase>())
+                top.ParentEntityId = top.ParentEntityId != 0 && newBlockIds.TryGetValue(top.ParentEntityId, out var parent) ? parent : 0;
             var owner = PlayerIdentityId();
             for (var i = 0; i < grids.Count; i++)
             {

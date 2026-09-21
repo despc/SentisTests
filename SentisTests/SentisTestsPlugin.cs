@@ -68,6 +68,9 @@ namespace SentisTests
                 ScenarioRegistry.Register(RemoteControlAnchorScenario.ScenarioName, () => new RemoteControlAnchorScenario());
                 ScenarioRegistry.Register(LaserAntennaControlScenario.ScenarioName, () => new LaserAntennaControlScenario());
                 ScenarioRegistry.Register(LaserLinkAwakeScenario.ScenarioName, () => new LaserLinkAwakeScenario());
+                ScenarioRegistry.Register(PistonPerfScenario.ScenarioName, () => new PistonPerfScenario());
+                ScenarioRegistry.Register(PistonExtendScenario.ScenarioName, () => new PistonExtendScenario());
+                ScenarioRegistry.Register(PistonStackScenario.ScenarioName, () => new PistonStackScenario());
                 ScenarioRegistry.Register(FreezeProductionScenario.ScenarioName, () => new FreezeProductionScenario());
                 ScenarioRegistry.Register(FreezePowerScenario.ScenarioName, () => new FreezePowerScenario());
                 ScenarioRegistry.Register(ProjectionStreamScenario.ScenarioName, () => new ProjectionStreamScenario());

@@ -1,0 +1,1057 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <ShipBlueprints>
+    <ShipBlueprint xsi:type="MyObjectBuilder_ShipBlueprintDefinition">
+      <Id Type="MyObjectBuilder_ShipBlueprintDefinition" Subtype="Static Grid 8636" />
+      <CubeGrids>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>138264407934040877</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-5547.4308780148885" y="-85981.8267557785" z="-222633.33410219883" />
+        <Forward x="0.3347965" y="0.133091673" z="-0.932844" />
+        <Up x="0.8668668" y="0.3445865" z="0.360280573" />
+        <Orientation>
+          <X>0.151628911</X>
+          <Y>-0.102891587</Y>
+          <Z>-0.552010357</Z>
+          <W>0.8134535</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_BatteryBlock">
+          <SubtypeName>LargeBlockBatteryBlock</SubtypeName>
+          <EntityId>125344641458858391</EntityId>
+<ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>1</NumberInGrid>
+          <Enabled>true</Enabled>
+          <CurrentStoredPower>0.898135364</CurrentStoredPower>
+          <ProducerEnabled>true</ProducerEnabled>
+          <MaxStoredPower>0</MaxStoredPower>
+          <SemiautoEnabled>false</SemiautoEnabled>
+          <OnlyDischargeEnabled>false</OnlyDischargeEnabled>
+          <ChargeMode>0</ChargeMode>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_BatteryBlock">
+          <SubtypeName>LargeBlockBatteryBlock</SubtypeName>
+          <EntityId>128673688240739187</EntityId>
+<Min x="0" y="0" z="-1" />
+          <BlockOrientation Forward="Left" Up="Up" />
+<ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>1</NumberInGrid>
+          <Enabled>true</Enabled>
+          <CurrentStoredPower>0.8982158</CurrentStoredPower>
+          <ProducerEnabled>true</ProducerEnabled>
+          <MaxStoredPower>0</MaxStoredPower>
+          <SemiautoEnabled>false</SemiautoEnabled>
+          <OnlyDischargeEnabled>false</OnlyDischargeEnabled>
+          <ChargeMode>0</ChargeMode>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_BatteryBlock">
+          <SubtypeName>LargeBlockBatteryBlock</SubtypeName>
+          <EntityId>78214111618137797</EntityId>
+<Min x="0" y="1" z="0" />
+          <BlockOrientation Forward="Left" Up="Up" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>2</NumberInGrid>
+          <Enabled>true</Enabled>
+          <CurrentStoredPower>0.8981353</CurrentStoredPower>
+          <ProducerEnabled>true</ProducerEnabled>
+          <MaxStoredPower>0</MaxStoredPower>
+          <SemiautoEnabled>false</SemiautoEnabled>
+          <OnlyDischargeEnabled>false</OnlyDischargeEnabled>
+          <ChargeMode>0</ChargeMode>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_BatteryBlock">
+          <SubtypeName>LargeBlockBatteryBlock</SubtypeName>
+          <EntityId>84428374424290487</EntityId>
+<Min x="-1" y="0" z="-1" />
+          <BlockOrientation Forward="Down" Up="Left" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>3</NumberInGrid>
+          <Enabled>true</Enabled>
+          <CurrentStoredPower>0.898135364</CurrentStoredPower>
+          <ProducerEnabled>true</ProducerEnabled>
+          <MaxStoredPower>0</MaxStoredPower>
+          <SemiautoEnabled>false</SemiautoEnabled>
+          <OnlyDischargeEnabled>false</OnlyDischargeEnabled>
+          <ChargeMode>0</ChargeMode>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_BatteryBlock">
+          <SubtypeName>LargeBlockBatteryBlock</SubtypeName>
+          <EntityId>134096078974461322</EntityId>
+<Min x="-1" y="0" z="0" />
+          <BlockOrientation Forward="Down" Up="Left" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>4</NumberInGrid>
+          <Enabled>true</Enabled>
+          <CurrentStoredPower>0.898135245</CurrentStoredPower>
+          <ProducerEnabled>true</ProducerEnabled>
+          <MaxStoredPower>0</MaxStoredPower>
+          <SemiautoEnabled>false</SemiautoEnabled>
+          <OnlyDischargeEnabled>false</OnlyDischargeEnabled>
+          <ChargeMode>0</ChargeMode>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_BatteryBlock">
+          <SubtypeName>LargeBlockBatteryBlock</SubtypeName>
+          <EntityId>108290342544020812</EntityId>
+<Min x="0" y="2" z="0" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>5</NumberInGrid>
+          <Enabled>true</Enabled>
+          <CurrentStoredPower>0.8981353</CurrentStoredPower>
+          <ProducerEnabled>true</ProducerEnabled>
+          <MaxStoredPower>0</MaxStoredPower>
+          <SemiautoEnabled>false</SemiautoEnabled>
+          <OnlyDischargeEnabled>false</OnlyDischargeEnabled>
+          <ChargeMode>0</ChargeMode>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_BatteryBlock">
+          <SubtypeName>LargeBlockBatteryBlock</SubtypeName>
+          <EntityId>109203266169122609</EntityId>
+<Min x="0" y="3" z="0" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>6</NumberInGrid>
+          <Enabled>true</Enabled>
+          <CurrentStoredPower>0.898135245</CurrentStoredPower>
+          <ProducerEnabled>true</ProducerEnabled>
+          <MaxStoredPower>0</MaxStoredPower>
+          <SemiautoEnabled>false</SemiautoEnabled>
+          <OnlyDischargeEnabled>false</OnlyDischargeEnabled>
+          <ChargeMode>0</ChargeMode>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_ExtendedPistonBase">
+          <SubtypeName>LargePistonBase</SubtypeName>
+          <EntityId>105828862911703379</EntityId>
+<Min x="-3" y="3" z="0" />
+          <BlockOrientation Forward="Forward" Up="Left" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>1</NumberInGrid>
+          <Enabled>true</Enabled>
+          <TopBlockId>117489519256465703</TopBlockId>
+          <ShareInertiaTensor>false</ShareInertiaTensor>
+          <SafetyDetach>5</SafetyDetach>
+          <Velocity>0.08</Velocity>
+          <MaxLimit>1</MaxLimit>
+          <MinLimit>0</MinLimit>
+          <Reverse>false</Reverse>
+          <CurrentPosition>10</CurrentPosition>
+          <MaxImpulseAxis>50000</MaxImpulseAxis>
+          <MaxImpulseNonAxis>50000</MaxImpulseNonAxis>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+      <IsStatic>true</IsStatic>
+      <DisplayName>Static Grid 8636</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>172</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>90052125046300706</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-5546.53128294706" y="-85965.155468225421" z="-222630.63269245712" />
+        <Forward x="0.3347965" y="0.133091837" z="-0.932844" />
+        <Up x="-0.369672269" y="0.9291622" z="-0.000108338892" />
+        <Orientation>
+          <X>0.0344338678</X>
+          <Y>-0.179978669</Y>
+          <Z>0.185022175</Z>
+          <W>0.9654992</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_PistonTop">
+          <SubtypeName>LargePistonTop</SubtypeName>
+          <EntityId>117489519256465703</EntityId>
+<ParentEntityId>105828862911703379</ParentEntityId>
+          <YieldLastComponent>false</YieldLastComponent>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_ExtendedPistonBase">
+          <SubtypeName>LargePistonBase</SubtypeName>
+          <EntityId>129032776800369796</EntityId>
+<Min x="0" y="1" z="0" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>1</NumberInGrid>
+          <Enabled>true</Enabled>
+          <TopBlockId>90238649124082465</TopBlockId>
+          <ShareInertiaTensor>false</ShareInertiaTensor>
+          <SafetyDetach>5</SafetyDetach>
+          <Velocity>0.08</Velocity>
+          <MaxLimit>1</MaxLimit>
+          <MinLimit>0</MinLimit>
+          <Reverse>false</Reverse>
+          <CurrentPosition>10</CurrentPosition>
+          <MaxImpulseAxis>50000</MaxImpulseAxis>
+          <MaxImpulseNonAxis>50000</MaxImpulseNonAxis>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+      <ConveyorLines>
+        <MyObjectBuilder_ConveyorLine>
+          <StartPosition x="0" y="0" z="0" />
+          <StartDirection>Up</StartDirection>
+          <EndPosition x="0" y="1" z="0" />
+          <EndDirection>Down</EndDirection>
+          <Sections />
+          <ConveyorLineType>LARGE_LINE</ConveyorLineType>
+        </MyObjectBuilder_ConveyorLine>
+      </ConveyorLines>
+      <DisplayName>Subgrid</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>0</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>139641947642884254</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-5552.136940524575" y="-85951.0699846744" z="-222630.63493359176" />
+        <Forward x="0.3347962" y="0.133092284" z="-0.932844043" />
+        <Up x="-0.370869517" y="0.9286848" z="-0.0006055832" />
+        <Orientation>
+          <X>0.0343097821</X>
+          <Y>-0.180002317</Y>
+          <Z>0.185689121</Z>
+          <W>0.9653712</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_PistonTop">
+          <SubtypeName>LargePistonTop</SubtypeName>
+          <EntityId>90238649124082465</EntityId>
+<ParentEntityId>129032776800369796</ParentEntityId>
+          <YieldLastComponent>false</YieldLastComponent>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_ExtendedPistonBase">
+          <SubtypeName>LargePistonBase</SubtypeName>
+          <EntityId>128712475068462349</EntityId>
+<Min x="0" y="1" z="0" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>1</NumberInGrid>
+          <Enabled>true</Enabled>
+          <TopBlockId>135105138267314090</TopBlockId>
+          <ShareInertiaTensor>false</ShareInertiaTensor>
+          <SafetyDetach>5</SafetyDetach>
+          <Velocity>0.08</Velocity>
+          <MaxLimit>1</MaxLimit>
+          <MinLimit>0</MinLimit>
+          <Reverse>false</Reverse>
+          <CurrentPosition>10</CurrentPosition>
+          <MaxImpulseAxis>50000</MaxImpulseAxis>
+          <MaxImpulseNonAxis>50000</MaxImpulseNonAxis>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+      <ConveyorLines>
+        <MyObjectBuilder_ConveyorLine>
+          <StartPosition x="0" y="0" z="0" />
+          <StartDirection>Up</StartDirection>
+          <EndPosition x="0" y="1" z="0" />
+          <EndDirection>Down</EndDirection>
+          <Sections />
+          <ConveyorLineType>LARGE_LINE</ConveyorLineType>
+        </MyObjectBuilder_ConveyorLine>
+      </ConveyorLines>
+      <DisplayName>Subgrid</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>0</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>129160020771375399</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-5557.7576909518211" y="-85936.9905931949" z="-222630.6434537181" />
+        <Forward x="0.334796131" y="0.133092433" z="-0.932844" />
+        <Up x="-0.371273518" y="0.9285232" z="-0.000773482" />
+        <Orientation>
+          <X>0.0342678837</X>
+          <Y>-0.1800103</Y>
+          <Z>0.185914248</Z>
+          <W>0.965327859</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_PistonTop">
+          <SubtypeName>LargePistonTop</SubtypeName>
+          <EntityId>135105138267314090</EntityId>
+<ParentEntityId>128712475068462349</ParentEntityId>
+          <YieldLastComponent>false</YieldLastComponent>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_ExtendedPistonBase">
+          <SubtypeName>LargePistonBase</SubtypeName>
+          <EntityId>99558503669978143</EntityId>
+<Min x="0" y="1" z="0" />
+          <BlockOrientation Forward="Left" Up="Up" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>1</NumberInGrid>
+          <Enabled>true</Enabled>
+          <TopBlockId>90741374666393740</TopBlockId>
+          <ShareInertiaTensor>false</ShareInertiaTensor>
+          <SafetyDetach>5</SafetyDetach>
+          <Velocity>0.08</Velocity>
+          <MaxLimit>1</MaxLimit>
+          <MinLimit>0</MinLimit>
+          <Reverse>false</Reverse>
+          <CurrentPosition>10</CurrentPosition>
+          <MaxImpulseAxis>50000</MaxImpulseAxis>
+          <MaxImpulseNonAxis>50000</MaxImpulseNonAxis>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+      <ConveyorLines>
+        <MyObjectBuilder_ConveyorLine>
+          <StartPosition x="0" y="0" z="0" />
+          <StartDirection>Up</StartDirection>
+          <EndPosition x="0" y="1" z="0" />
+          <EndDirection>Down</EndDirection>
+          <Sections />
+          <ConveyorLineType>LARGE_LINE</ConveyorLineType>
+        </MyObjectBuilder_ConveyorLine>
+      </ConveyorLines>
+      <DisplayName>Subgrid</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>0</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>137908271982356362</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-5563.3881593203514" y="-85922.91506123537" z="-222630.65600979415" />
+        <Forward x="-0.865802646" y="-0.347252965" z="-0.3602792" />
+        <Up x="-0.3718834" y="0.9282789" z="-0.00102691352" />
+        <Orientation>
+          <X>-0.107515216</X>
+          <Y>0.5552485</Y>
+          <Z>0.155887887</Z>
+          <W>0.8098386</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_PistonTop">
+          <SubtypeName>LargePistonTop</SubtypeName>
+          <EntityId>90741374666393740</EntityId>
+<ParentEntityId>99558503669978143</ParentEntityId>
+          <YieldLastComponent>false</YieldLastComponent>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_ExtendedPistonBase">
+          <SubtypeName>LargePistonBase</SubtypeName>
+          <EntityId>103068052809335441</EntityId>
+<Min x="0" y="1" z="0" />
+          <BlockOrientation Forward="Left" Up="Up" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>1</NumberInGrid>
+          <Enabled>true</Enabled>
+          <TopBlockId>105636309720764970</TopBlockId>
+          <ShareInertiaTensor>false</ShareInertiaTensor>
+          <SafetyDetach>5</SafetyDetach>
+          <Velocity>0.08</Velocity>
+          <MaxLimit>1</MaxLimit>
+          <MinLimit>0</MinLimit>
+          <Reverse>false</Reverse>
+          <CurrentPosition>10</CurrentPosition>
+          <MaxImpulseAxis>50000</MaxImpulseAxis>
+          <MaxImpulseNonAxis>50000</MaxImpulseNonAxis>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+      <ConveyorLines>
+        <MyObjectBuilder_ConveyorLine>
+          <StartPosition x="0" y="0" z="0" />
+          <StartDirection>Up</StartDirection>
+          <EndPosition x="0" y="1" z="0" />
+          <EndDirection>Down</EndDirection>
+          <Sections />
+          <ConveyorLineType>LARGE_LINE</ConveyorLineType>
+        </MyObjectBuilder_ConveyorLine>
+      </ConveyorLines>
+      <DisplayName>Subgrid</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>0</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>139949768280463222</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-5569.0270066714256" y="-85908.842858552875" z="-222630.67204105941" />
+        <Forward x="-0.334795654" y="-0.133093029" z="0.9328443" />
+        <Up x="-0.37256363" y="0.9280057" z="-0.0013095066" />
+        <Orientation>
+          <X>-0.186633319</X>
+          <Y>0.965189159</Y>
+          <Z>0.0341341048</Z>
+          <W>0.180035546</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_PistonTop">
+          <SubtypeName>LargePistonTop</SubtypeName>
+          <EntityId>105636309720764970</EntityId>
+<ParentEntityId>103068052809335441</ParentEntityId>
+          <YieldLastComponent>false</YieldLastComponent>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_ExtendedPistonBase">
+          <SubtypeName>LargePistonBase</SubtypeName>
+          <EntityId>122740435930736455</EntityId>
+<Min x="0" y="1" z="0" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>1</NumberInGrid>
+          <Enabled>true</Enabled>
+          <TopBlockId>112393515994774890</TopBlockId>
+          <ShareInertiaTensor>false</ShareInertiaTensor>
+          <SafetyDetach>5</SafetyDetach>
+          <Velocity>0.08</Velocity>
+          <MaxLimit>1</MaxLimit>
+          <MinLimit>0</MinLimit>
+          <Reverse>false</Reverse>
+          <CurrentPosition>10</CurrentPosition>
+          <MaxImpulseAxis>50000</MaxImpulseAxis>
+          <MaxImpulseNonAxis>50000</MaxImpulseNonAxis>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+      <ConveyorLines>
+        <MyObjectBuilder_ConveyorLine>
+          <StartPosition x="0" y="0" z="0" />
+          <StartDirection>Up</StartDirection>
+          <EndPosition x="0" y="1" z="0" />
+          <EndDirection>Down</EndDirection>
+          <Sections />
+          <ConveyorLineType>LARGE_LINE</ConveyorLineType>
+        </MyObjectBuilder_ConveyorLine>
+      </ConveyorLines>
+      <DisplayName>Subgrid</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>0</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>85926931329006681</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-5574.6738408064812" y="-85894.773901224078" z="-222630.69139683334" />
+        <Forward x="-0.334795564" y="-0.133093178" z="0.932844341" />
+        <Up x="-0.3729219" y="0.927861631" z="-0.0014584884" />
+        <Orientation>
+          <X>-0.1868331</X>
+          <Y>0.9651505</Y>
+          <Z>0.0340969265</Z>
+          <W>0.18004258</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_PistonTop">
+          <SubtypeName>LargePistonTop</SubtypeName>
+          <EntityId>112393515994774890</EntityId>
+<ParentEntityId>122740435930736455</ParentEntityId>
+          <YieldLastComponent>false</YieldLastComponent>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_ExtendedPistonBase">
+          <SubtypeName>LargePistonBase</SubtypeName>
+          <EntityId>76078716354306351</EntityId>
+<Min x="0" y="1" z="0" />
+          <BlockOrientation Forward="Left" Up="Up" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>1</NumberInGrid>
+          <Enabled>true</Enabled>
+          <TopBlockId>101536533479988561</TopBlockId>
+          <ShareInertiaTensor>false</ShareInertiaTensor>
+          <SafetyDetach>5</SafetyDetach>
+          <Velocity>0.08</Velocity>
+          <MaxLimit>1</MaxLimit>
+          <MinLimit>0</MinLimit>
+          <Reverse>false</Reverse>
+          <CurrentPosition>10</CurrentPosition>
+          <MaxImpulseAxis>50000</MaxImpulseAxis>
+          <MaxImpulseNonAxis>50000</MaxImpulseNonAxis>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+      <ConveyorLines>
+        <MyObjectBuilder_ConveyorLine>
+          <StartPosition x="0" y="0" z="0" />
+          <StartDirection>Up</StartDirection>
+          <EndPosition x="0" y="1" z="0" />
+          <EndDirection>Down</EndDirection>
+          <Sections />
+          <ConveyorLineType>LARGE_LINE</ConveyorLineType>
+        </MyObjectBuilder_ConveyorLine>
+      </ConveyorLines>
+      <DisplayName>Subgrid</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>0</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>119288626420980830</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-5580.3264403796165" y="-85880.7072641849" z="-222630.7131501445" />
+        <Forward x="0.8652385" y="0.348659277" z="0.360276282" />
+        <Up x="-0.373195142" y="0.927751541" z="-0.0015720427" />
+        <Orientation>
+          <X>0.1563088</X>
+          <Y>-0.8097566</Y>
+          <Z>0.108128585</Z>
+          <W>0.555130661</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_PistonTop">
+          <SubtypeName>LargePistonTop</SubtypeName>
+          <EntityId>101536533479988561</EntityId>
+<ParentEntityId>76078716354306351</ParentEntityId>
+          <YieldLastComponent>false</YieldLastComponent>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_ExtendedPistonBase">
+          <SubtypeName>LargePistonBase</SubtypeName>
+          <EntityId>121939903990096071</EntityId>
+<Min x="0" y="1" z="0" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>1</NumberInGrid>
+          <Enabled>true</Enabled>
+          <TopBlockId>143047333117230134</TopBlockId>
+          <ShareInertiaTensor>false</ShareInertiaTensor>
+          <SafetyDetach>5</SafetyDetach>
+          <Velocity>0.08</Velocity>
+          <MaxLimit>1</MaxLimit>
+          <MinLimit>0</MinLimit>
+          <Reverse>false</Reverse>
+          <CurrentPosition>10</CurrentPosition>
+          <MaxImpulseAxis>50000</MaxImpulseAxis>
+          <MaxImpulseNonAxis>50000</MaxImpulseNonAxis>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+      <ConveyorLines>
+        <MyObjectBuilder_ConveyorLine>
+          <StartPosition x="0" y="0" z="0" />
+          <StartDirection>Up</StartDirection>
+          <EndPosition x="0" y="1" z="0" />
+          <EndDirection>Down</EndDirection>
+          <Sections />
+          <ConveyorLineType>LARGE_LINE</ConveyorLineType>
+        </MyObjectBuilder_ConveyorLine>
+      </ConveyorLines>
+      <DisplayName>Subgrid</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>0</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>103615234293010414</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-5585.9836602663963" y="-85866.6425135135" z="-222630.73682797042" />
+        <Forward x="0.865186155" y="0.3487901" z="0.360276043" />
+        <Up x="-0.373317152" y="0.927702367" z="-0.00162276626" />
+        <Orientation>
+          <X>0.156347945</X>
+          <Y>-0.809748948</Y>
+          <Z>0.108185627</Z>
+          <W>0.5551197</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_PistonTop">
+          <SubtypeName>LargePistonTop</SubtypeName>
+          <EntityId>143047333117230134</EntityId>
+<ParentEntityId>121939903990096071</ParentEntityId>
+          <YieldLastComponent>false</YieldLastComponent>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_ExtendedPistonBase">
+          <SubtypeName>LargePistonBase</SubtypeName>
+          <EntityId>134692051191883219</EntityId>
+<Min x="0" y="1" z="0" />
+          <BlockOrientation Forward="Left" Up="Up" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>1</NumberInGrid>
+          <Enabled>true</Enabled>
+          <TopBlockId>120110662309846137</TopBlockId>
+          <ShareInertiaTensor>false</ShareInertiaTensor>
+          <SafetyDetach>5</SafetyDetach>
+          <Velocity>0.08</Velocity>
+          <MaxLimit>1</MaxLimit>
+          <MinLimit>0</MinLimit>
+          <Reverse>false</Reverse>
+          <CurrentPosition>10</CurrentPosition>
+          <MaxImpulseAxis>50000</MaxImpulseAxis>
+          <MaxImpulseNonAxis>50000</MaxImpulseNonAxis>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+      <ConveyorLines>
+        <MyObjectBuilder_ConveyorLine>
+          <StartPosition x="0" y="0" z="0" />
+          <StartDirection>Up</StartDirection>
+          <EndPosition x="0" y="1" z="0" />
+          <EndDirection>Down</EndDirection>
+          <Sections />
+          <ConveyorLineType>LARGE_LINE</ConveyorLineType>
+        </MyObjectBuilder_ConveyorLine>
+      </ConveyorLines>
+      <DisplayName>Subgrid</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>0</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>94790232951213036</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-5591.6437335467308" y="-85852.578880548419" z="-222630.76168644516" />
+        <Forward x="0.33479476" y="0.133093178" z="-0.9328444" />
+        <Up x="-0.373534173" y="0.927614868" z="-0.00171308219" />
+        <Orientation>
+          <X>0.03403331</X>
+          <Y>-0.180054262</Y>
+          <Z>0.187174544</Z>
+          <W>0.9650844</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_PistonTop">
+          <SubtypeName>LargePistonTop</SubtypeName>
+          <EntityId>120110662309846137</EntityId>
+<ParentEntityId>134692051191883219</ParentEntityId>
+          <YieldLastComponent>false</YieldLastComponent>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_ExtendedPistonBase">
+          <SubtypeName>LargePistonBase</SubtypeName>
+          <EntityId>119053408865644576</EntityId>
+<Min x="0" y="1" z="0" />
+          <BlockOrientation Forward="Left" Up="Up" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>1</NumberInGrid>
+          <Enabled>true</Enabled>
+          <TopBlockId>93370369800579056</TopBlockId>
+          <ShareInertiaTensor>false</ShareInertiaTensor>
+          <SafetyDetach>5</SafetyDetach>
+          <Velocity>0.08</Velocity>
+          <MaxLimit>1</MaxLimit>
+          <MinLimit>0</MinLimit>
+          <Reverse>false</Reverse>
+          <CurrentPosition>10</CurrentPosition>
+          <MaxImpulseAxis>50000</MaxImpulseAxis>
+          <MaxImpulseNonAxis>50000</MaxImpulseNonAxis>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+      <ConveyorLines>
+        <MyObjectBuilder_ConveyorLine>
+          <StartPosition x="0" y="0" z="0" />
+          <StartDirection>Up</StartDirection>
+          <EndPosition x="0" y="1" z="0" />
+          <EndDirection>Down</EndDirection>
+          <Sections />
+          <ConveyorLineType>LARGE_LINE</ConveyorLineType>
+        </MyObjectBuilder_ConveyorLine>
+      </ConveyorLines>
+      <DisplayName>Subgrid</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>0</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>80550757348876317</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-5597.306337878701" y="-85838.516315698565" z="-222630.78760445205" />
+        <Forward x="-0.8650682" y="-0.3490826" z="-0.3602754" />
+        <Up x="-0.373589933" y="0.927592337" z="-0.00173638761" />
+        <Orientation>
+          <X>-0.108313322</X>
+          <Y>0.5550951</Y>
+          <Z>0.15643546</Z>
+          <W>0.809731841</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_PistonTop">
+          <SubtypeName>LargePistonTop</SubtypeName>
+          <EntityId>93370369800579056</EntityId>
+<ParentEntityId>119053408865644576</ParentEntityId>
+          <YieldLastComponent>false</YieldLastComponent>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_ExtendedPistonBase">
+          <SubtypeName>LargePistonBase</SubtypeName>
+          <EntityId>101468304786604260</EntityId>
+<Min x="0" y="1" z="0" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>1</NumberInGrid>
+          <Enabled>true</Enabled>
+          <TopBlockId>139909321014653461</TopBlockId>
+          <ShareInertiaTensor>false</ShareInertiaTensor>
+          <SafetyDetach>5</SafetyDetach>
+          <Velocity>0.08</Velocity>
+          <MaxLimit>1</MaxLimit>
+          <MinLimit>0</MinLimit>
+          <Reverse>false</Reverse>
+          <CurrentPosition>10</CurrentPosition>
+          <MaxImpulseAxis>50000</MaxImpulseAxis>
+          <MaxImpulseNonAxis>50000</MaxImpulseNonAxis>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+      <ConveyorLines>
+        <MyObjectBuilder_ConveyorLine>
+          <StartPosition x="0" y="0" z="0" />
+          <StartDirection>Up</StartDirection>
+          <EndPosition x="0" y="1" z="0" />
+          <EndDirection>Down</EndDirection>
+          <Sections />
+          <ConveyorLineType>LARGE_LINE</ConveyorLineType>
+        </MyObjectBuilder_ConveyorLine>
+      </ConveyorLines>
+      <DisplayName>Subgrid</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>0</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>89611530644950389</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-5602.9702935671776" y="-85824.454273462237" z="-222630.81408321945" />
+        <Forward x="-0.865031958" y="-0.349172562" z="-0.360275269" />
+        <Up x="-0.373673856" y="0.9275585" z="-0.00177136064" />
+        <Orientation>
+          <X>-0.108352594</X>
+          <Y>0.555087447</Y>
+          <Z>0.156462371</Z>
+          <W>0.8097266</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_PistonTop">
+          <SubtypeName>LargePistonTop</SubtypeName>
+          <EntityId>139909321014653461</EntityId>
+<ParentEntityId>101468304786604260</ParentEntityId>
+          <YieldLastComponent>false</YieldLastComponent>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_ExtendedPistonBase">
+          <SubtypeName>LargePistonBase</SubtypeName>
+          <EntityId>120650064117271167</EntityId>
+<Min x="0" y="1" z="0" />
+          <BlockOrientation Forward="Left" Up="Up" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>1</NumberInGrid>
+          <Enabled>true</Enabled>
+          <TopBlockId>128335212779898450</TopBlockId>
+          <ShareInertiaTensor>false</ShareInertiaTensor>
+          <SafetyDetach>5</SafetyDetach>
+          <Velocity>0.08</Velocity>
+          <MaxLimit>1</MaxLimit>
+          <MinLimit>0</MinLimit>
+          <Reverse>false</Reverse>
+          <CurrentPosition>10</CurrentPosition>
+          <MaxImpulseAxis>50000</MaxImpulseAxis>
+          <MaxImpulseNonAxis>50000</MaxImpulseNonAxis>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+      <ConveyorLines>
+        <MyObjectBuilder_ConveyorLine>
+          <StartPosition x="0" y="0" z="0" />
+          <StartDirection>Up</StartDirection>
+          <EndPosition x="0" y="1" z="0" />
+          <EndDirection>Down</EndDirection>
+          <Sections />
+          <ConveyorLineType>LARGE_LINE</ConveyorLineType>
+        </MyObjectBuilder_ConveyorLine>
+      </ConveyorLines>
+      <DisplayName>Subgrid</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>0</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>137086970839396927</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-5608.63513426542" y="-85810.392605066241" z="-222630.84093391983" />
+        <Forward x="-0.334794581" y="-0.133093029" z="0.93284446" />
+        <Up x="-0.373696238" y="0.9275494" z="-0.00178071111" />
+        <Orientation>
+          <X>-0.187264979</X>
+          <Y>0.96506685</Y>
+          <Z>0.0340163819</Z>
+          <W>0.180057347</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_PistonTop">
+          <SubtypeName>LargePistonTop</SubtypeName>
+          <EntityId>128335212779898450</EntityId>
+<ParentEntityId>120650064117271167</ParentEntityId>
+          <YieldLastComponent>false</YieldLastComponent>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_ExtendedPistonBase">
+          <SubtypeName>LargePistonBase</SubtypeName>
+          <EntityId>144047346638432303</EntityId>
+<Min x="0" y="1" z="0" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>1</NumberInGrid>
+          <Enabled>true</Enabled>
+          <TopBlockId>105362511376060161</TopBlockId>
+          <ShareInertiaTensor>false</ShareInertiaTensor>
+          <SafetyDetach>5</SafetyDetach>
+          <Velocity>0.08</Velocity>
+          <MaxLimit>1</MaxLimit>
+          <MinLimit>0</MinLimit>
+          <Reverse>false</Reverse>
+          <CurrentPosition>10</CurrentPosition>
+          <MaxImpulseAxis>50000</MaxImpulseAxis>
+          <MaxImpulseNonAxis>50000</MaxImpulseNonAxis>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+      <ConveyorLines>
+        <MyObjectBuilder_ConveyorLine>
+          <StartPosition x="0" y="0" z="0" />
+          <StartDirection>Up</StartDirection>
+          <EndPosition x="0" y="1" z="0" />
+          <EndDirection>Down</EndDirection>
+          <Sections />
+          <ConveyorLineType>LARGE_LINE</ConveyorLineType>
+        </MyObjectBuilder_ConveyorLine>
+      </ConveyorLines>
+      <DisplayName>Subgrid</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>0</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>94785746047722629</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-5614.3003373599022" y="-85796.33109688753" z="-222630.8679372081" />
+        <Forward x="-0.3347946" y="-0.133093029" z="0.9328448" />
+        <Up x="-0.3737017" y="0.9275472" z="-0.00178294629" />
+        <Orientation>
+          <X>-0.187268019</X>
+          <Y>0.9650663</Y>
+          <Z>0.0340158</Z>
+          <W>0.180057392</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_PistonTop">
+          <SubtypeName>LargePistonTop</SubtypeName>
+          <EntityId>105362511376060161</EntityId>
+<ParentEntityId>144047346638432303</ParentEntityId>
+          <YieldLastComponent>false</YieldLastComponent>
+        </MyObjectBuilder_CubeBlock>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_ExtendedPistonBase">
+          <SubtypeName>LargePistonBase</SubtypeName>
+          <EntityId>96148055989709637</EntityId>
+<Min x="0" y="1" z="0" />
+<ShareMode>Faction</ShareMode>
+          <ShowOnHUD>false</ShowOnHUD>
+          <ShowInTerminal>true</ShowInTerminal>
+          <ShowInToolbarConfig>true</ShowInToolbarConfig>
+          <ShowInInventory>true</ShowInInventory>
+          <NumberInGrid>1</NumberInGrid>
+          <Enabled>true</Enabled>
+          <TopBlockId>119131440371058595</TopBlockId>
+          <ShareInertiaTensor>false</ShareInertiaTensor>
+          <SafetyDetach>5</SafetyDetach>
+          <Velocity>0.08</Velocity>
+          <MaxLimit>1</MaxLimit>
+          <MinLimit>0</MinLimit>
+          <Reverse>false</Reverse>
+          <CurrentPosition>10</CurrentPosition>
+          <MaxImpulseAxis>50000</MaxImpulseAxis>
+          <MaxImpulseNonAxis>50000</MaxImpulseNonAxis>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+      <ConveyorLines>
+        <MyObjectBuilder_ConveyorLine>
+          <StartPosition x="0" y="0" z="0" />
+          <StartDirection>Up</StartDirection>
+          <EndPosition x="0" y="1" z="0" />
+          <EndDirection>Down</EndDirection>
+          <Sections />
+          <ConveyorLineType>LARGE_LINE</ConveyorLineType>
+        </MyObjectBuilder_ConveyorLine>
+      </ConveyorLines>
+      <DisplayName>Subgrid</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>0</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+<CubeGrid>
+      <SubtypeName />
+      <EntityId>130164282321036422</EntityId>
+      <PersistentFlags>CastShadows InScene</PersistentFlags>
+<PositionAndOrientation>
+        <Position x="-5619.9655976748436" y="-85782.2696192264" z="-222630.89496243087" />
+        <Forward x="-0.334794551" y="-0.133093044" z="0.932844341" />
+        <Up x="-0.373700619" y="0.9275477" z="-0.0017825067" />
+        <Orientation>
+          <X>-0.187267408</X>
+          <Y>0.9650664</Y>
+          <Z>0.0340159424</Z>
+          <W>0.180057436</W>
+        </Orientation>
+      </PositionAndOrientation>
+      <LocalPositionAndOrientation xsi:nil="true" />
+      <GridSizeEnum>Large</GridSizeEnum>
+      <CubeBlocks>
+        <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_PistonTop">
+          <SubtypeName>LargePistonTop</SubtypeName>
+          <EntityId>119131440371058595</EntityId>
+<ParentEntityId>96148055989709637</ParentEntityId>
+          <YieldLastComponent>false</YieldLastComponent>
+        </MyObjectBuilder_CubeBlock>
+      </CubeBlocks>
+      <DisplayName>Subgrid</DisplayName>
+      <DestructibleBlocks>true</DestructibleBlocks>
+      <IsRespawnGrid>false</IsRespawnGrid>
+      <LocalCoordSys>0</LocalCoordSys>
+      <TargetingTargets />
+      <NPCGridClaimElapsed xsi:nil="true" />
+    </CubeGrid>
+      </CubeGrids>
+    </ShipBlueprint>
+  </ShipBlueprints>
+</Definitions>
