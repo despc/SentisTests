@@ -16,14 +16,15 @@ def test_perf_resources_exist_and_are_embedded():
     assert '<Volume>10000</Volume>' in ship
 
 
-def test_perf_scenario_preserves_projector_fixture_and_uses_large_live_radius():
+def test_perf_scenario_projects_the_world_ship_and_uses_large_live_radius():
     source = SCENARIO.read_text(encoding="utf-8")
     assert 'LoadAuthoredGrid(ProjectionResource' in source
-    assert '.ProjectionOffset =' not in source
-    assert '.ProjectionRotation =' not in source
-    assert '.ProjectedGrids =' not in source
+    assert 'BlueprintName = "Spitfire Evolution (Vanilla)"' in source
+    assert 'UseAsBlueprint(platformOb, source)' in source
+    assert 'projectorOb.ProjectedGrids =' in source
+    assert 'projectorOb.ProjectionOffset = offset' in source
     assert 'RadiusMultiplier = 100f' in source
-    assert 'WelderCount = 3' in source
+    assert 'WelderCount = 6' in source
     assert 'SetWelderRadiusMultiplier(RadiusMultiplier)' in source
     assert 'authoredPose.Position.X + 12000.0' in source
 
@@ -37,7 +38,7 @@ def test_perf_scenario_stocks_container_and_runs_real_welder():
     assert 'foreach (var welder in welders)' in source
     assert 'welders.Sum(WorldApi.ProbeProjectedBlocks)' in source
     assert 'projector.ProjectedGrid == null' in source
-    assert 'ExpectedRuntimeBlocks = 1000' in source
+    assert 'built >= expected' in source
     assert 'PhysicalFixtureGrids' in source
     assert 'finalFinished == built' in source
 

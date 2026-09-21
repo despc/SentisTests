@@ -514,6 +514,70 @@ namespace SentisTests.Scenarios
                 serpRow = serpForward ? bj : colCount - 1 - bj;
                 serpArrivedAt = DateTime.UtcNow;
             }
+            // IDLE -> GO TO THE WORK. A second without a single point of integrity added anywhere
+            // on the platform means the tools are over nothing: the ship flies to the nearest
+            // block that still needs work - a built block short of full integrity first, else a
+            // projected block the projector would build now - and stays over it until it is done.
+            // Without this the walk carried on column after column once the projection was all
+            // built, and the last half-welded blocks waited a whole lap of the plate for it.
+            const double idleSeconds = 1.0;
+            double lastIntegrity = -1;
+            var lastWeldAt = DateTime.UtcNow;
+            Sandbox.Game.Entities.Cube.MySlimBlock chase = null;
+            Vector3D? chaseAt = null;
+            double PlatformIntegrity()
+            {
+                double sum = 0;
+                foreach (var b in platform.CubeBlocks) sum += b.Integrity;
+                return sum;
+            }
+            Vector3D? NearestWork(Vector3D from)
+            {
+                Vector3D? best = null;
+                var bestD = double.MaxValue;
+                chase = null;
+                foreach (var b in platform.CubeBlocks)
+                {
+                    if (b.IsFullIntegrity) continue;
+                    var c = b.WorldAABB.Center;
+                    var d = Vector3D.DistanceSquared(from, c);
+                    if (d < bestD) { bestD = d; best = c; chase = b; }
+                }
+                if (best.HasValue) return best;
+                var pg = projector.ProjectedGrid;
+                if (pg == null) return null;
+                foreach (var slimObj in pg.CubeBlocks)
+                {
+                    var slim = (Sandbox.Game.Entities.Cube.MySlimBlock)slimObj;
+                    try { if (projector.CanBuild(slim, true) != BuildCheckResult.OK) continue; }
+                    catch { continue; }
+                    var c = slim.WorldAABB.Center;
+                    var d = Vector3D.DistanceSquared(from, c);
+                    if (d < bestD) { bestD = d; best = c; }
+                }
+                return best;
+            }
+            void GoOver(Vector3D work)
+            {
+                // the walk cell right over it: same X and Z, the nearest height breaks ties
+                int bi = -1, bj = -1;
+                var bestD = double.MaxValue;
+                for (int i = 0; i < serpColumns.Count; i++)
+                    for (int j = 0; j < serpColumns[i].Count; j++)
+                    {
+                        var c = serpColumns[i][j];
+                        var d = (c.X - work.X) * (c.X - work.X) + (c.Z - work.Z) * (c.Z - work.Z) +
+                                0.01 * (c.Y - work.Y) * (c.Y - work.Y);
+                        if (d < bestD) { bestD = d; bi = i; bj = j; }
+                    }
+                if (bi < 0) return;
+                serpCol = bi;
+                var count = serpColumns[bi].Count;
+                serpForward = bj * 2 < count;
+                serpRow = serpForward ? bj : count - 1 - bj;
+                serpArrivedAt = DateTime.UtcNow;
+            }
+
             var homeMatrix = ship.WorldMatrix;   // calibrated identity pose
             void HoldAt(Vector3D desired, Vector3D feedForward = default(Vector3D))
             {
@@ -555,13 +619,28 @@ namespace SentisTests.Scenarios
                 // 79/80 pattern. No dynamic target picking: it was what made the boat oscillate.
                 if (serpColumns.Count > 0)
                 {
+                    var integrity = PlatformIntegrity();
+                    if (integrity > lastIntegrity + 0.001) lastWeldAt = DateTime.UtcNow;
+                    lastIntegrity = integrity;
+                    // the block being chased is done or gone: let the walk (or the next idle second) decide
+                    if (chase != null && (chase.IsFullIntegrity || chase.CubeGrid != platform)) { chase = null; chaseAt = null; }
+                    if ((DateTime.UtcNow - lastWeldAt).TotalSeconds > idleSeconds)
+                    {
+                        lastWeldAt = DateTime.UtcNow;
+                        // from the work it was on, else from the cell the walk is over
+                        chaseAt = NearestWork(chaseAt ??
+                            serpColumns[serpCol][serpForward ? serpRow : serpColumns[serpCol].Count - 1 - serpRow]);
+                        if (chaseAt.HasValue) GoOver(chaseAt.Value);
+                    }
+
                     var want = SerpTarget();
                     var arrivedD = Vector3D.Distance(want, WorldApi.PositionOf(ship));
-                    if (arrivedD < 0.6 && (DateTime.UtcNow - serpArrivedAt).TotalSeconds > serpDwellSeconds)
+                    // over a block that is being chased the walk holds still until it is welded
+                    if (chaseAt == null && arrivedD < 0.6 && (DateTime.UtcNow - serpArrivedAt).TotalSeconds > serpDwellSeconds)
                         SerpAdvance();
                     // the last blocks wait in columns the walk has not reached yet: if the game
                     // says buildable work is within reach but the walk is elsewhere, jump the walk
-                    if ((DateTime.UtcNow - serpJumpCheckAt).TotalSeconds > 5)
+                    if (chaseAt == null && (DateTime.UtcNow - serpJumpCheckAt).TotalSeconds > 5)
                     {
                         serpJumpCheckAt = DateTime.UtcNow;
                         JumpToNearestBuildable();
@@ -768,7 +847,7 @@ namespace SentisTests.Scenarios
         // pass, and under which rejection reason the rest fail. Turns a silent stall into a name.
 
         /// <summary>The plugin's own welder counters, read by name so the test does not link it.</summary>
-        private static string PluginCounters()
+        internal static string PluginCounters()
         {
             try
             {

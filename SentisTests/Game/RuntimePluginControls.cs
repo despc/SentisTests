@@ -36,11 +36,10 @@ namespace SentisTests.Game
                 "SentisOptimisationsPlugin.SentisOptimisationsPlugin");
             if (type == null) return; // plugin not loaded (isolation runs)
             var config = Config(type);
+            // In memory only, like every setting a scenario touches: a run that is cut short - the
+            // server killed or restarted mid-scenario - must leave the stand's config files as the
+            // operator set them. Saving here once left the freezer off and the welders at x100.
             config.GetType().GetProperty("FreezerEnabled").SetValue(config, enabled);
-            var save = type.GetMethod("SaveConfig", BindingFlags.Public | BindingFlags.Static);
-            if (save == null)
-                throw new InvalidOperationException(type.FullName + ".SaveConfig() is unavailable");
-            save.Invoke(null, null);
         }
 
         public static string AntifreezeBlocksSubtypes
@@ -56,8 +55,7 @@ namespace SentisTests.Game
         {
             var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.SentisOptimisationsPlugin");
             var config = Config(type);
-            config.GetType().GetProperty("AntifreezeBlocksSubtypes").SetValue(config, subtypes);
-            type.GetMethod("SaveConfig", BindingFlags.Public | BindingFlags.Static)?.Invoke(null, null);
+            config.GetType().GetProperty("AntifreezeBlocksSubtypes").SetValue(config, subtypes);   // in memory only
         }
 
         /// <summary>Public static field or property of the SentisOptimisations FrozenGridSaveCache.</summary>
@@ -338,8 +336,7 @@ namespace SentisTests.Game
             var type = PluginType("SentisGameplayImprovements",
                 "SentisGameplayImprovements.SentisGameplayImprovementsPlugin");
             var config = Config(type);
-            config.GetType().GetProperty("WelderRadiusMultiplier").SetValue(config, multiplier);
-            type.GetMethod("SaveConfig", BindingFlags.Public | BindingFlags.Static)?.Invoke(null, null);
+            config.GetType().GetProperty("WelderRadiusMultiplier").SetValue(config, multiplier);   // in memory only
         }
     }
 }
