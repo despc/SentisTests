@@ -92,6 +92,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(SafeZoneBorderScenario.ScenarioName, () => new SafeZoneBorderScenario());
                 ScenarioRegistry.Register(SafeZoneRamScenario.ScenarioName, () => new SafeZoneRamScenario());
                 ScenarioRegistry.Register(PvEZoneScenario.ScenarioName, () => new PvEZoneScenario());
+                ScenarioRegistry.Register(ContractPricesScenario.ScenarioName, () => new ContractPricesScenario());
                 ScenarioRegistry.Register(SafeZoneRamScenario.GameScenarioName,
                     () => new SafeZoneRamScenario(SafeZoneRamScenario.GameScenarioName, gameTracking: true));
                 ScenarioRegistry.Register(SafeZoneBorderScenario.GameScenarioName,
