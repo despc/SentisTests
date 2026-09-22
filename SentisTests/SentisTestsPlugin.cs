@@ -91,6 +91,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(NpcSpawnScenario.ScenarioName, () => new NpcSpawnScenario());
                 ScenarioRegistry.Register(SafeZoneBorderScenario.ScenarioName, () => new SafeZoneBorderScenario());
                 ScenarioRegistry.Register(SafeZoneRamScenario.ScenarioName, () => new SafeZoneRamScenario());
+                ScenarioRegistry.Register(PvEZoneScenario.ScenarioName, () => new PvEZoneScenario());
                 ScenarioRegistry.Register(SafeZoneRamScenario.GameScenarioName,
                     () => new SafeZoneRamScenario(SafeZoneRamScenario.GameScenarioName, gameTracking: true));
                 ScenarioRegistry.Register(SafeZoneBorderScenario.GameScenarioName,
