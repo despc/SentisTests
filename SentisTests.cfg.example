@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Пример настроек SentisTests со значениями по умолчанию.
+  Файл сервера: Instance\SentisTests.cfg (Torch создаёт его при первом запуске).
+  Этот файл можно скопировать туда как есть: комментарии при чтении пропускаются.
+  Параметр, которого нет в файле, берёт значение по умолчанию.
+  Ставить только на тестовый сервер: сценарии меняют мир. Подробности: README.md.
+-->
+<MainConfig xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+  <!-- Запускать сценарии самостоятельно после загрузки мира. -->
+  <AutoRun>false</AutoRun>
+
+  <!-- Какие сценарии запускать при AutoRun, по порядку. Пустой список (<AutoScenarios />) - все
+       зарегистрированные. Имена - как в !test list. -->
+  <AutoScenarios>
+    <string>smoke</string>
+    <string>projector_weld</string>
+  </AutoScenarios>
+
+  <!-- Пауза после загрузки мира перед автозапуском, с. -->
+  <AutoRunDelaySeconds>20</AutoRunDelaySeconds>
+
+  <!-- Таймаут сценария, который не задал свой, с. -->
+  <DefaultTimeoutSeconds>300</DefaultTimeoutSeconds>
+
+  <!-- Удалять всё, что сценарий создал, после его окончания (успешного или нет). -->
+  <CleanupAfterTests>true</CleanupAfterTests>
+
+  <!-- Сколько секунд созданное сценарием остаётся в мире после окончания, чтобы админ успел зайти
+       и посмотреть. 0 - удалять сразу. При автоматическом прогоне удаляется сразу. -->
+  <CleanupDelaySeconds>60</CleanupDelaySeconds>
+
+  <!-- Папка отчётов (markdown/json). Относительный путь - от папки Instance. -->
+  <ReportDirectory>SentisTests</ReportDirectory>
+
+  <!-- Включить DebugBridge: HTTP и MCP только на 127.0.0.1 для осмотра мира, управления гридами и
+       запуска сценариев. Может двигать и удалять гриды и читать лог, поэтому по умолчанию выключен. -->
+  <EnableDebugBridge>false</EnableDebugBridge>
+
+  <!-- Токен (Bearer) для каждого запроса к DebugBridge, не короче 32 символов; иначе мост не
+       запускается. Задаётся только в конфиге сервера и никуда не публикуется. -->
+  <DebugBridgeToken></DebugBridgeToken>
+
+  <!-- Имя игрока, которому принадлежат и которым построены тестовые корабли (сварщики передают
+       проектору своего владельца, это должен быть реальный игрок из сейва). Пусто или неизвестное
+       имя - любой игрок из сейва. -->
+  <OwnerPlayerName></OwnerPlayerName>
+
+</MainConfig>

@@ -487,7 +487,7 @@ namespace SentisTests.Game
             return ob;
         }
 
-        private static MyObjectBuilder_CubeGrid LoadTemplateXml(string resourceName)
+        public static MyObjectBuilder_CubeGrid LoadTemplateXml(string resourceName)
         {
             string xml;
             using (var stream = typeof(WorldApi).Assembly.GetManifestResourceStream(resourceName))

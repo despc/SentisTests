@@ -77,7 +77,6 @@ namespace SentisTests.Scenarios
             Check(MySession.Static.EnableIngameScripts, "in-game scripts are disabled in this world");
 
             _config.Set("EnableScriptsPunish", false); // measure and report, do not destroy the blocks
-            _config.Set("SlowdownEnabled", false);     // nothing may be skipped while we measure
             _config.Set("ScriptsMaxExecTime", MaxRunMs);
             _config.Set("ScriptsMaxMsPerFrame", MaxMsPerFrame);
             _config.Set("ScriptOvertimeExecTimesBeforePunish", OverrunsBeforePunish);

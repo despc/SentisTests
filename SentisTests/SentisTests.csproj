@@ -78,6 +78,7 @@
     <EmbeddedResource Include="Resources\ProductionGrid.xml" />
     <EmbeddedResource Include="Resources\ProductionStressGrid.xml" />
     <EmbeddedResource Include="Resources\PerfProjection.xml" />
+    <EmbeddedResource Include="Resources\Spitfire.xml" />
     <EmbeddedResource Include="Resources\PerfWelderShip.xml" />
     <EmbeddedResource Include="Resources\PistonStack.xml" />
     <EmbeddedResource Include="Resources\RefineryTest.xml" />

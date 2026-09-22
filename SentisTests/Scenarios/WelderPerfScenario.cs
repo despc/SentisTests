@@ -1,4 +1,6 @@
 using System;
+using Sandbox.Common.ObjectBuilders;
+using VRage.Game.ObjectBuilders.Components;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,6 +12,7 @@ using SentisTests.Core;
 using SentisTests.Game;
 using VRage;
 using VRage.Game;
+using VRage.Game.Entity;
 using VRageMath;
 using BuildCheckResult = Sandbox.ModAPI.BuildCheckResult;
 using SpaceWelder = SpaceEngineers.Game.Entities.Blocks.MyShipWelder;
@@ -19,12 +22,17 @@ namespace SentisTests.Scenarios
     /// <summary>
     /// A real ship welded from a projection by six welder ships at once, one on each side.
     ///
-    /// The blueprint is the grid called <see cref="BlueprintName"/> that the operator placed in the
-    /// world - a full warship with thrusters, turrets, reactors and conveyors, not a solid cube. It
-    /// is copied into the projector of the reactor-backed platform from the save, in place of the
+    /// The blueprint is <see cref="BlueprintName"/> - a full warship of 2757 blocks with thrusters,
+    /// turrets, reactors and conveyors, not a solid cube - shipped with the plugin as
+    /// <see cref="BlueprintResource"/> (extracted from a save with tools/extract_grid.py), so the world
+    /// needs no copy of it. It is put into the projector of the reactor-backed platform in place of the
     /// blueprint that platform was authored with, and aligned so one of its armor blocks sits right
     /// against one of the platform's: that is the block the welders start from, and everything else
-    /// grows out of it. The ship in the world is only read, never touched.
+    /// grows out of it.
+    ///
+    /// Variants: the platform dynamic out in open space, and the site inside a safe zone with damage off
+    /// (static or dynamic platform, with or without the zone probe, with SentisOptimisations' safe zone
+    /// grid tracking on or off).
     ///
     /// The fixture is moved away from the operator's originals; the welder ships are parked outside
     /// the hologram with one deliberately huge detector sphere, so every projection scan stresses the
@@ -33,9 +41,22 @@ namespace SentisTests.Scenarios
     public sealed class WelderPerfScenario : TestScenario
     {
         public const string ScenarioName = "welder_perf";
+        /// <summary>The same inside a safe zone (damage off) that covers the whole site (the platform stays static).</summary>
+        public const string ZoneScenarioName = "welder_perf_sz";
+        /// <summary>Inside the zone, with the platform - and so the ship growing on it - dynamic, out in open space.</summary>
+        public const string ZoneDynamicScenarioName = "welder_perf_sz_dynamic";
+        /// <summary>The dynamic one without the safe zone probe, whose hooks cost time themselves: frame times only.</summary>
+        public const string ZoneDynamicUnprobedScenarioName = "welder_perf_sz_dynamic_noprobe";
+        /// <summary>The same with SentisOptimisations' safe zone grid tracking off: the zone as the game has it.</summary>
+        public const string ZoneDynamicGameScenarioName = "welder_perf_sz_dynamic_vanilla";
+        /// <summary>The dynamic platform without a zone: what the zone adds to the dynamic runs.</summary>
+        public const string DynamicScenarioName = "welder_perf_dynamic";
+        private const float ZoneRadius = 300f;
         private const string ProjectionResource = "SentisTests.Resources.PerfProjection.xml";
         private const string WelderResource = "SentisTests.Resources.PerfWelderShip.xml";
         private const string BlueprintName = "Spitfire Evolution (Vanilla)";
+        /// <summary>The ship welded from the projection, shipped with the plugin (tools/extract_grid.py).</summary>
+        private const string BlueprintResource = "SentisTests.Resources.Spitfire.xml";
         private const float RadiusMultiplier = 100f;
         private const int WelderCount = 6;
         private const int MaxWeldSeconds = 1200;
@@ -45,8 +66,28 @@ namespace SentisTests.Scenarios
         private float _initialWelderMultiplier;
         private bool _initialOwnAllDlcs;
         private Vector3D? _fixturePosition;
+        private readonly string _name;
+        private readonly bool _inZone;
+        private readonly bool _dynamicPlatform;
+        private readonly bool _probe;
+        private readonly bool _gameTracking;
+        private readonly ConfigOverride _soConfig = new ConfigOverride();
+        private MyEntity _zone;
 
-        public override string Name => ScenarioName;
+        public WelderPerfScenario() : this(ScenarioName, false, false)
+        {
+        }
+
+        public WelderPerfScenario(string name, bool inZone, bool dynamicPlatform, bool probe = true, bool gameTracking = false)
+        {
+            _probe = probe;
+            _gameTracking = gameTracking;
+            _name = name;
+            _inZone = inZone;
+            _dynamicPlatform = dynamicPlatform;
+        }
+
+        public override string Name => _name;
         public override int TimeoutSeconds => MaxWeldSeconds + 300;
 
         public override IEnumerator Run()
@@ -76,17 +117,44 @@ namespace SentisTests.Scenarios
             // replication do not contaminate the simulation-thread welding measurements.
             var fixtureOrigin = TestRunner.RunOrigin ??
                 new Vector3D(authoredPose.Position.X + 12000.0, authoredPose.Position.Y, authoredPose.Position.Z);
+            if (_dynamicPlatform)
+            {
+                // a dynamic platform must not fall: out along the planet's up until there is no gravity
+                var planet = MyGamePruningStructure.GetClosestPlanet(fixtureOrigin);
+                if (planet != null)
+                {
+                    var away = Vector3D.Normalize(fixtureOrigin - planet.PositionComp.GetPosition());
+                    for (var d = 0.0; d <= 1000000 &&
+                         Sandbox.Game.GameSystems.MyGravityProviderSystem.CalculateNaturalGravityInPoint(fixtureOrigin).Length() > 0.001f; d += 20000)
+                        fixtureOrigin += away * 20000;
+                }
+            }
             platformOb.PositionAndOrientation = new MyPositionAndOrientation(
                 fixtureOrigin, authoredPose.Forward, authoredPose.Up);
-            platformOb.IsStatic = true;
+            platformOb.IsStatic = !_dynamicPlatform;
 
-            var source = MyEntities.GetEntities().OfType<MyCubeGrid>()
-                .FirstOrDefault(g => !g.MarkedForClose &&
-                                     string.Equals(g.DisplayName, BlueprintName, StringComparison.OrdinalIgnoreCase));
-            Check(source != null, "there is no grid called " + BlueprintName + " in the world");
+            var source = WorldApi.LoadTemplateXml(BlueprintResource);
             Check(source.GridSizeEnum == MyCubeSize.Large, BlueprintName + " is not a large grid, the platform is");
             Note(UseAsBlueprint(platformOb, source));
 
+            if (_inZone)
+            {
+                // the zone is there first, as on a server: the grids come into it
+                _soConfig.Set("SafeZoneGridTracking", !_gameTracking);
+                // a zone over the whole site that lets every grid and every action in
+                _zone = (MyEntity)MySessionComponentSafeZones.CrateSafeZone(MatrixD.CreateWorld(fixtureOrigin),
+                    MySafeZoneShape.Sphere, MySafeZoneAccess.Blacklist, null, null, ZoneRadius, enable: true, isVisible: true);
+                Check(_zone != null, "no safe zone");
+                var zone = (MySafeZone)_zone;
+                zone.AccessTypeGrids = MySafeZoneAccess.Blacklist;
+                zone.AccessTypeFactions = MySafeZoneAccess.Blacklist;
+                zone.AccessTypeFloatingObjects = MySafeZoneAccess.Blacklist;
+                // a zone as players have them: no damage, everything else (welding, building projections...) allowed
+                zone.AllowedActions = MySafeZoneAction.All & ~MySafeZoneAction.Damage;
+                Note("safe zone of radius " + ZoneRadius + " m over the site, every grid welcome, damage off; platform " +
+                     (_dynamicPlatform ? "DYNAMIC" : "static") + "; the zone's phantom on layer " +
+                     (_zone.Physics?.RigidBody?.Layer.ToString() ?? "?") + (_gameTracking ? " (the game's tracking)" : " (the plugin's tracking)"));
+            }
             var platform = WorldApi.SpawnGrid(platformOb);
             Track(platform);
             _fixturePosition = WorldApi.PositionOf(platform);
@@ -211,6 +279,7 @@ namespace SentisTests.Scenarios
                  welders.Sum(WorldApi.ProbeProjectedBlocks));
             TickMetrics.Take(); // the start probe is a full vanilla scan; keep it out of the window
             FrameProbe.Take();
+            if (_inZone && _probe) Note("safe zone probe: " + SafeZoneProbe.Start());
 
             var built = 0;
             var harnessFrame = 0;
@@ -246,6 +315,18 @@ namespace SentisTests.Scenarios
 
             var weldingMetrics = TickMetrics.Take();
             var simWork = FrameProbe.Take();
+            if (_inZone)
+            {
+                var contained = typeof(MySafeZone)
+                    .GetField("m_containedEntities", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)?.GetValue(_zone);
+                var count = contained?.GetType().GetProperty("Count")?.GetValue(contained);
+                Check(((MySafeZone)_zone).GetGridsInside().Contains(platform), "the zone does not hold the platform after the weld");
+                Note("SAFE ZONE while welding: " + (_probe ? SafeZoneProbe.Format() : "probe off") + "; the zone holds " + (count?.ToString() ?? "?") +
+                     " entities, platform " + (platform.IsStatic ? "static" : "dynamic") + " " +
+                     Vector3D.Distance(platform.PositionComp.GetPosition(), _zone.PositionComp.GetPosition()).ToString("F0") +
+                     " m from the zone's centre at " + (platform.Physics?.LinearVelocity.Length() ?? 0).ToString("F1") + " m/s");
+                SafeZoneProbe.Stop();
+            }
             var finalPhysical = PhysicalFixtureGrids(fixtureCenter, fixtureRadius, projector.ProjectedGrid);
             built = finalPhysical.Sum(WorldApi.CountBlocks) - basePhysicalBlocks;
             var finalFinished = finalPhysical.Sum(WorldApi.CountFinished) - baseFinishedBlocks;
@@ -269,7 +350,7 @@ namespace SentisTests.Scenarios
         /// is chosen to put it next to an armor block of the platform - on a face of the ship open to
         /// the outside, and with no block of the platform ending up inside the ship.
         /// </summary>
-        private string UseAsBlueprint(MyObjectBuilder_CubeGrid platformOb, MyCubeGrid source)
+        private string UseAsBlueprint(MyObjectBuilder_CubeGrid platformOb, MyObjectBuilder_CubeGrid source)
         {
             var projectorOb = platformOb.CubeBlocks.OfType<MyObjectBuilder_ProjectorBase>().FirstOrDefault();
             Check(projectorOb != null, "the authored platform has no projector");
@@ -297,20 +378,35 @@ namespace SentisTests.Scenarios
             }
             Check(platformArmor.Count > 0, "the authored platform has no armor block to weld from");
 
+            // the ship's cells, from its blocks and their definitions
             var shipCells = new HashSet<Vector3I>();
+            var shipBlocks = new List<(MyObjectBuilder_CubeBlock Block, Vector3I Min, Vector3I Max, MyCubeBlockDefinition Definition)>();
+            var shipMin = new Vector3I(int.MaxValue);
+            var shipMax = new Vector3I(int.MinValue);
             foreach (var block in source.CubeBlocks)
-                foreach (var cell in Cells(block.Min, block.Max))
+            {
+                var definition = MyDefinitionManager.Static.GetCubeBlockDefinition(block.GetId());
+                if (definition == null) continue;
+                var min = (Vector3I)block.Min;
+                Vector3I max;
+                MySlimBlock.ComputeMax(definition,
+                    new MyBlockOrientation(block.BlockOrientation.Forward, block.BlockOrientation.Up), ref min, out max);
+                shipBlocks.Add((block, min, max, definition));
+                shipMin = Vector3I.Min(shipMin, min);
+                shipMax = Vector3I.Max(shipMax, max);
+                foreach (var cell in Cells(min, max))
                     shipCells.Add(cell);
+            }
 
             // seed: an armor block of the ship, first in the blueprint; offset: where that puts it
             Vector3I? seed = null;
             var offset = Vector3I.Zero;
-            foreach (var block in source.CubeBlocks.Where(b => b.Min == b.Max && IsArmorCube(b.BlockDefinition))
+            foreach (var block in shipBlocks.Where(b => b.Min == b.Max && IsArmorCube(b.Definition))
                          .OrderBy(b => b.Min.X).ThenBy(b => b.Min.Y).ThenBy(b => b.Min.Z))
             {
                 foreach (var outward in Base6Directions.IntDirections)
                 {
-                    if (!OpenToOutside(block.Min, outward, shipCells, source.Min, source.Max)) continue;
+                    if (!OpenToOutside(block.Min, outward, shipCells, shipMin, shipMax)) continue;
                     foreach (var armor in platformArmor)
                     {
                         // the platform shifted so that this armor block of it lands next to the seed
@@ -328,7 +424,7 @@ namespace SentisTests.Scenarios
             Check(Math.Abs(offset.X) <= 50 && Math.Abs(offset.Y) <= 50 && Math.Abs(offset.Z) <= 50,
                 "the projection offset " + offset + " is beyond what a projector takes");
 
-            var blueprint = (MyObjectBuilder_CubeGrid)source.GetObjectBuilder(true).Clone();
+            var blueprint = (MyObjectBuilder_CubeGrid)source.Clone();
             var first = blueprint.CubeBlocks.First(b => (Vector3I)b.Min == seed.Value);
             blueprint.CubeBlocks.Remove(first);
             blueprint.CubeBlocks.Insert(0, first);
@@ -349,7 +445,7 @@ namespace SentisTests.Scenarios
             projectorOb.ProjectedGrids = new List<MyObjectBuilder_CubeGrid> { blueprint };
             projectorOb.ProjectionOffset = offset;
             projectorOb.ProjectionRotation = Vector3I.Zero;
-            return BlueprintName + " (" + source.BlocksCount + " blocks) goes into the projector, starting from the armor block at " +
+            return BlueprintName + " (" + source.CubeBlocks.Count + " blocks, from the plugin) goes into the projector, starting from the armor block at " +
                    seed.Value + ", projection offset " + offset;
         }
 
@@ -417,7 +513,13 @@ namespace SentisTests.Scenarios
 
         public override void Cleanup()
         {
-            try { RestoreRuntimeConfig(); }
+            try
+            {
+                RestoreRuntimeConfig();
+                _soConfig.Restore();
+                SafeZoneProbe.Stop();
+                if (_zone != null && !_zone.Closed) _zone.Close();
+            }
             finally { base.Cleanup(); }
         }
 

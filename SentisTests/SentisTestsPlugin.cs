@@ -41,6 +41,16 @@ namespace SentisTests
                 ScenarioRegistry.Register(ProjectorWeldScenario.ScenarioName, () => new ProjectorWeldScenario());
                 ScenarioRegistry.Register(FrozenRadiusWeldScenario.ScenarioName, () => new FrozenRadiusWeldScenario());
                 ScenarioRegistry.Register(WelderPerfScenario.ScenarioName, () => new WelderPerfScenario());
+                ScenarioRegistry.Register(WelderPerfScenario.ZoneScenarioName,
+                    () => new WelderPerfScenario(WelderPerfScenario.ZoneScenarioName, inZone: true, dynamicPlatform: false));
+                ScenarioRegistry.Register(WelderPerfScenario.ZoneDynamicScenarioName,
+                    () => new WelderPerfScenario(WelderPerfScenario.ZoneDynamicScenarioName, inZone: true, dynamicPlatform: true));
+                ScenarioRegistry.Register(WelderPerfScenario.ZoneDynamicUnprobedScenarioName,
+                    () => new WelderPerfScenario(WelderPerfScenario.ZoneDynamicUnprobedScenarioName, inZone: true, dynamicPlatform: true, probe: false));
+                ScenarioRegistry.Register(WelderPerfScenario.DynamicScenarioName,
+                    () => new WelderPerfScenario(WelderPerfScenario.DynamicScenarioName, inZone: false, dynamicPlatform: true));
+                ScenarioRegistry.Register(WelderPerfScenario.ZoneDynamicGameScenarioName,
+                    () => new WelderPerfScenario(WelderPerfScenario.ZoneDynamicGameScenarioName, inZone: true, dynamicPlatform: true, probe: false, gameTracking: true));
                 ScenarioRegistry.Register(RefineryPerfScenario.ScenarioName, () => new RefineryPerfScenario());
                 ScenarioRegistry.Register(DrillPerfScenario.ScenarioName, () => new DrillPerfScenario());
                 ScenarioRegistry.Register(WheelPerfScenario.ScenarioName, () => new WheelPerfScenario());
@@ -79,6 +89,12 @@ namespace SentisTests
                 ScenarioRegistry.Register(GravityDriveScenario.ScenarioName, () => new GravityDriveScenario());
                 ScenarioRegistry.Register(GarageRoundtripScenario.ScenarioName, () => new GarageRoundtripScenario());
                 ScenarioRegistry.Register(NpcSpawnScenario.ScenarioName, () => new NpcSpawnScenario());
+                ScenarioRegistry.Register(SafeZoneBorderScenario.ScenarioName, () => new SafeZoneBorderScenario());
+                ScenarioRegistry.Register(SafeZoneRamScenario.ScenarioName, () => new SafeZoneRamScenario());
+                ScenarioRegistry.Register(SafeZoneRamScenario.GameScenarioName,
+                    () => new SafeZoneRamScenario(SafeZoneRamScenario.GameScenarioName, gameTracking: true));
+                ScenarioRegistry.Register(SafeZoneBorderScenario.GameScenarioName,
+                    () => new SafeZoneBorderScenario(SafeZoneBorderScenario.GameScenarioName, gameTracking: true));
                 ScenarioRegistry.Register(WarheadMassScenario.ChainScenarioName, () => new WarheadMassScenario(all: false));
                 ScenarioRegistry.Register(WarheadMassScenario.AllScenarioName, () => new WarheadMassScenario(all: true));
                 ScenarioRegistry.Register(FreezeProductionScenario.ScenarioName, () => new FreezeProductionScenario());
@@ -102,6 +118,7 @@ namespace SentisTests
                 {
                     FrameProbe.Install(torch.Managers.GetManager<PatchManager>());
                     AllocProbe.Init(torch.Managers.GetManager<PatchManager>());
+                    SafeZoneProbe.Init(torch.Managers.GetManager<PatchManager>());
                 }
                 catch (Exception e)
                 {
