@@ -381,6 +381,14 @@ namespace SentisTests.Core
                     scenario.Name, delay, _cleanupQueue.Count);
             }
 
+            // The scenario's own Cleanup: fake players, event handlers, world settings, files. The
+            // runner never called it, so what scenarios put back there stayed changed - the
+            // friendly-fire bench left EnableTurretsFriendlyFire on and it went into the world save.
+            // Its tracked entities were taken above (removed, queued or kept for inspection), so the
+            // base Cleanup has none left to remove.
+            try { scenario.Cleanup(); }
+            catch (Exception e) { Log.Warn("cleanup of {0} failed: {1}", scenario.Name, e.Message); }
+
             foreach (var progress in scenario.ProgressLog)
                 result.Notes.Add(progress);
 

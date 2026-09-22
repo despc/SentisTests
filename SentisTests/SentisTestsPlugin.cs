@@ -77,6 +77,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(CockpitEjectScenario.ScenarioName, () => new CockpitEjectScenario());
                 ScenarioRegistry.Register(LootJumpDriveScenario.ScenarioName, () => new LootJumpDriveScenario());
                 ScenarioRegistry.Register(GravityDriveScenario.ScenarioName, () => new GravityDriveScenario());
+                ScenarioRegistry.Register(GarageRoundtripScenario.ScenarioName, () => new GarageRoundtripScenario());
                 ScenarioRegistry.Register(WarheadMassScenario.ChainScenarioName, () => new WarheadMassScenario(all: false));
                 ScenarioRegistry.Register(WarheadMassScenario.AllScenarioName, () => new WarheadMassScenario(all: true));
                 ScenarioRegistry.Register(FreezeProductionScenario.ScenarioName, () => new FreezeProductionScenario());
