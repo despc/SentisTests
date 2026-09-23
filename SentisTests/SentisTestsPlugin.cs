@@ -86,6 +86,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(VoxelStuckScenario.ScenarioName, () => new VoxelStuckScenario());
                 ScenarioRegistry.Register(WatcherRecordScenario.ScenarioName, () => new WatcherRecordScenario());
                 ScenarioRegistry.Register(WatcherLoadScenario.ScenarioName, () => new WatcherLoadScenario());
+                ScenarioRegistry.Register(WatcherLedgerScenario.ScenarioName, () => new WatcherLedgerScenario());
                 ScenarioRegistry.Register(ThrustFlameScenario.ScenarioName, () => new ThrustFlameScenario());
                 ScenarioRegistry.Register(TurretTargetScenario.ScenarioName, () => new TurretTargetScenario());
                 ScenarioRegistry.Register(ExplosionFriendlyFireScenario.ScenarioName, () => new ExplosionFriendlyFireScenario());

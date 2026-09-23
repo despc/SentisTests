@@ -16,6 +16,8 @@ namespace SentisTests.Scenarios
     /// End-to-end vanilla production test. The fixture owns all initial state: ore is serialized in
     /// cargo, uranium fuel is serialized in the reactor, and the assembler queue is serialized in
     /// the grid blueprint. Runtime code only observes vanilla refinery/conveyor/assembler behavior.
+    /// A fake player stands by the grid: the freezer (on, as on a live server) leaves a grid with a player
+    /// near it running.
     /// </summary>
     public sealed class ProductionScenario : TestScenario
     {
@@ -33,6 +35,8 @@ namespace SentisTests.Scenarios
         public override string Name { get { return ScenarioName; } }
         public override int TimeoutSeconds { get { return 240; } }
 
+        private static readonly FakeClients.NetworkProfile Network = new FakeClients.NetworkProfile { RttMs = 50 };
+
         public override IEnumerator Run()
         {
             Note("loading production fixture");
@@ -42,6 +46,11 @@ namespace SentisTests.Scenarios
             var grid = WorldApi.SpawnGrid(ob);
             Track(grid);
             WorldApi.EnsureDistributor(grid);
+
+            // someone by the grid, or the freezer stops it
+            var by = grid.PositionComp.WorldAABB.Center + grid.WorldMatrix.Up * (grid.PositionComp.LocalAABB.HalfExtents.Length() + 20);
+            FakeClients.RemoveAll();
+            FakeClients.Add(1, Network, i => (by, 0, 0), withCharacters: true);
 
             yield return WaitForTicks(30);
 
@@ -180,6 +189,12 @@ namespace SentisTests.Scenarios
                     total += (decimal)(double)item.Amount;
             }
             return (int)total;
+        }
+
+        public override void Cleanup()
+        {
+            try { FakeClients.RemoveAll(); }
+            finally { base.Cleanup(); }
         }
 
         public override void CleanupLeftovers()
