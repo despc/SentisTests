@@ -82,6 +82,9 @@ namespace SentisTests
                 ScenarioRegistry.Register(PistonExtendScenario.ScenarioName, () => new PistonExtendScenario());
                 ScenarioRegistry.Register(PistonStackScenario.ScenarioName, () => new PistonStackScenario());
                 ScenarioRegistry.Register(ExplosionScenario.ScenarioName, () => new ExplosionScenario());
+                ScenarioRegistry.Register(AsteroidFieldScenario.ScenarioName, () => new AsteroidFieldScenario());
+                ScenarioRegistry.Register(ThrustFlameScenario.ScenarioName, () => new ThrustFlameScenario());
+                ScenarioRegistry.Register(TurretTargetScenario.ScenarioName, () => new TurretTargetScenario());
                 ScenarioRegistry.Register(ExplosionFriendlyFireScenario.ScenarioName, () => new ExplosionFriendlyFireScenario());
                 ScenarioRegistry.Register(WarheadChainScenario.ScenarioName, () => new WarheadChainScenario());
                 ScenarioRegistry.Register(CockpitEjectScenario.ScenarioName, () => new CockpitEjectScenario());
@@ -93,6 +96,13 @@ namespace SentisTests
                 ScenarioRegistry.Register(SafeZoneRamScenario.ScenarioName, () => new SafeZoneRamScenario());
                 ScenarioRegistry.Register(PvEZoneScenario.ScenarioName, () => new PvEZoneScenario());
                 ScenarioRegistry.Register(ContractPricesScenario.ScenarioName, () => new ContractPricesScenario());
+                ScenarioRegistry.Register(PcuLimitScenario.ScenarioName, () => new PcuLimitScenario());
+                ScenarioRegistry.Register(PcuLimitCostScenario.ScenarioName, () => new PcuLimitCostScenario());
+                ScenarioRegistry.Register(WorldSweepsScenario.ScenarioName, () => new WorldSweepsScenario());
+                ScenarioRegistry.Register("load_test_40", () => new LoadTestScenario("load_test_40", 40));
+                ScenarioRegistry.Register("load_test_128", () => new LoadTestScenario("load_test_128", 128));
+                ScenarioRegistry.Register("load_test_300", () => new LoadTestScenario("load_test_300", 300));
+                ScenarioRegistry.Register("load_test_500", () => new LoadTestScenario("load_test_500", 500));
                 ScenarioRegistry.Register(SafeZoneRamScenario.GameScenarioName,
                     () => new SafeZoneRamScenario(SafeZoneRamScenario.GameScenarioName, gameTracking: true));
                 ScenarioRegistry.Register(SafeZoneBorderScenario.GameScenarioName,
@@ -121,6 +131,7 @@ namespace SentisTests
                     FrameProbe.Install(torch.Managers.GetManager<PatchManager>());
                     AllocProbe.Init(torch.Managers.GetManager<PatchManager>());
                     SafeZoneProbe.Init(torch.Managers.GetManager<PatchManager>());
+                    MethodTimerProbe.Init(torch.Managers.GetManager<PatchManager>());
                 }
                 catch (Exception e)
                 {

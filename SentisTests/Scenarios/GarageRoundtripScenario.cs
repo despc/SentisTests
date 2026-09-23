@@ -77,6 +77,12 @@ namespace SentisTests.Scenarios
             while (topped.MoveNext()) yield return topped.Current;
             ((Sandbox.ModAPI.Ingame.IMyMotorStator)stator).RotorLock = true;
             var head = stator.TopGrid;
+            // the head is the test's from the start: a run that fails halfway left it in the world, and with the
+            // game's name the cleanup of leftovers by the test prefix did not know it (heads piled up at the site
+            // and took the place of the next one)
+            head.DisplayName = WorldApi.EntityPrefix + Prefix + "head";
+            head.Name = head.DisplayName;
+            Track(head);
             foreach (var y in new[] { 1, 2 })
             {
                 var armor = WorldApi.MakeBlockOb("LargeBlockArmorBlock");
