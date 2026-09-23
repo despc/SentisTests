@@ -180,12 +180,23 @@ namespace SentisTests.Scenarios
             TickMetrics.Take();
             FrameProbe.Take();
             FakeClients.Take(1);
+            var watcher = Watcher();
+            if (watcher != null)
+            {
+                // the heaviest part of its work goes into the window: a pass over every inventory
+                Invoke(watcher.GetType().GetProperty("Cost").GetValue(watcher), "Reset");
+                Invoke(watcher.GetType().GetProperty("Sweep").GetValue(watcher), "StartNow");
+            }
             var clean = Stopwatch.StartNew();
             var window = WaitForSeconds(CleanSeconds, "the clean window");
             while (window.MoveNext()) yield return window.Current;
             var cleanResult = "LOAD CLEAN WINDOW (" + CleanSeconds + " s) | " + TickMetrics.Take().Format() + " | " + FrameProbe.Take() +
                               " | net " + FakeClients.Take(clean.Elapsed.TotalSeconds);
             Note(cleanResult);
+            if (watcher != null)
+                Note("WATCHER (clean window): " + watcher.GetType().GetProperty("Cost").GetValue(watcher).GetType().GetMethod("Describe")
+                         .Invoke(watcher.GetType().GetProperty("Cost").GetValue(watcher), null) + "; " +
+                     watcher.GetType().GetMethod("Describe").Invoke(watcher, null));
 
             // ------------------------------------------------------------- the profiled window
             var profile = Profile();
@@ -350,6 +361,17 @@ namespace SentisTests.Scenarios
                 return double.MaxValue;
             }
         }
+
+        /// <summary>The SentisWatcher plugin, when it is loaded and recording.</summary>
+        private static object Watcher()
+        {
+            var type = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "SentisWatcher")
+                ?.GetType("SentisWatcher.SentisWatcherPlugin");
+            var plugin = type?.GetProperty("Instance")?.GetValue(null);
+            return plugin != null && type.GetProperty("Store")?.GetValue(plugin) != null ? plugin : null;
+        }
+
+        private static void Invoke(object target, string method) => target?.GetType().GetMethod(method)?.Invoke(target, null);
 
         public override void Cleanup()
         {
