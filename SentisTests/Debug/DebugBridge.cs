@@ -329,6 +329,13 @@ namespace SentisTests.Debug
                     case "/move":
                         SendJson(ctx, 200, RunGameThread(() => Move(id, body.Value<double>("x"), body.Value<double>("y"), body.Value<double>("z"))));
                         break;
+                    case "/save":
+                    {
+                        // the world saved through Torch, as before a planned restart
+                        var result = SentisTestsPlugin.TorchInstance.Save().Result;
+                        SendJson(ctx, 200, JObject.FromObject(new { saved = result.ToString() }));
+                        break;
+                    }
                     case "/orient":
                         SendJson(ctx, 200, RunGameThread(() => Orient(id, Vec(body["fwd"]), Vec(body["up"]))));
                         break;
