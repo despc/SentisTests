@@ -29,6 +29,10 @@
   <ItemGroup>
     <!-- Torch -->
     <Reference Include="Microsoft.CSharp" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="WindowsBase" />
     <Reference Include="Torch"><HintPath>$(SeRoot)\Torch.dll</HintPath><Private>False</Private></Reference>
     <Reference Include="Torch.API"><HintPath>$(SeRoot)\Torch.API.dll</HintPath><Private>False</Private></Reference>
     <Reference Include="NLog"><HintPath>$(SeRoot)\NLog.dll</HintPath><Private>False</Private></Reference>

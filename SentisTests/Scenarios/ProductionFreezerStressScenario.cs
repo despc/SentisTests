@@ -114,7 +114,7 @@ namespace SentisTests.Scenarios
         }
 
         public override string Name { get { return ScenarioName; } }
-        public override int TimeoutSeconds { get { return 900; } }
+        public override int TimeoutSeconds { get { return 1380; } }     // a frozen group wakes 600-1200 s after it froze
 
         public override IEnumerator Run()
         {
@@ -253,7 +253,7 @@ namespace SentisTests.Scenarios
                     yield break;
                 }
 
-                if ((DateTime.UtcNow - started).TotalSeconds > 840)
+                if ((DateTime.UtcNow - started).TotalSeconds > 1320)
                     throw new ScenarioFailedException("stress timed out: complete=" + complete + "/" + GridCount +
                         ", frozen=" + frozen + ", woke=" + unfrozenAfterFreeze +
                         ", pending refinery/assembler=" + refineryPending + "/" + assemblerPending +

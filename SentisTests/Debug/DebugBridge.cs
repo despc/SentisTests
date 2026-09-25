@@ -265,6 +265,35 @@ namespace SentisTests.Debug
                     SendJson(ctx, 200, RunGameThread(() => Near(new Vector3D(double.Parse(qkey("x")), double.Parse(qkey("y")), double.Parse(qkey("z"))),
                         double.TryParse(qkey("r"), out var r) ? r : 50)));
                     break;
+                case "/production":
+                    // the production blocks of a grid: state, queue, every inventory
+                    SendJson(ctx, 200, RunGameThread(() =>
+                    {
+                        if (!MyEntities.TryGetEntityById(long.Parse(qkey("id")), out MyCubeGrid grid)) return JObject.FromObject(new { error = "no grid" });
+                        var blocks = new JArray();
+                        foreach (var block in grid.GetFatBlocks().OfType<Sandbox.Game.Entities.Cube.MyProductionBlock>())
+                        {
+                            var inventories = new JArray();
+                            for (var i = 0; i < block.InventoryCount; i++)
+                                inventories.Add(new JArray(((Sandbox.Game.MyInventory)block.GetInventory(i)).GetItems()
+                                    .Select(it => it.Content.TypeId.ToString().Replace("MyObjectBuilder_", "") + "/" + it.Content.SubtypeName + " " + ((double)it.Amount).ToString("0.##"))));
+                            blocks.Add(JObject.FromObject(new
+                            {
+                                block = block.DisplayNameText, working = block.IsWorking, producing = block.IsProducing, enabled = block.Enabled,
+                                conveyor = block.UseConveyorSystem,
+                                queue = block.Queue.Select(q => q.Blueprint.Id.SubtypeName + " x" + q.Amount).ToList(),
+                                rebuild = block.GetType().GetField("m_queueNeedsRebuild", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(block),
+                                progress = (block as Sandbox.Game.Entities.Cube.MyAssembler)?.CurrentProgress,
+                                state = (block as Sandbox.Game.Entities.Cube.MyAssembler)?.CurrentState.ToString(),
+                                inventories,
+                            }));
+                        }
+                        foreach (var block in grid.GetFatBlocks().Where(b => b.HasInventory && !(b is Sandbox.Game.Entities.Cube.MyProductionBlock)))
+                            blocks.Add(JObject.FromObject(new { block = block.DisplayNameText, items = ((Sandbox.Game.MyInventory)block.GetInventory(0)).GetItems()
+                                .Select(it => it.Content.SubtypeName + " " + ((double)it.Amount).ToString("0.##")).ToList() }));
+                        return blocks;
+                    }));
+                    break;
                 case "/probe":
                     SendJson(ctx, 200, RunGameThread(Probe));
                     break;
@@ -345,6 +374,43 @@ namespace SentisTests.Debug
                     case "/delete":
                         SendJson(ctx, 200, RunGameThread(() => Delete(id)));
                         break;
+                    case "/wake-soon":
+                    {
+                        // the next wake-up of the frozen grids whose name holds "filter", "seconds" from now, in the
+                        // freezer's own schedule (what a long wait would come to, without the wait)
+                        var filter = body.Value<string>("filter") ?? "";
+                        var seconds = body.Value<double?>("seconds") ?? 30;
+                        SendJson(ctx, 200, RunGameThread(() =>
+                        {
+                            var logic = AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("SentisOptimisationsPlugin.Freezer.FreezeLogic", false)).FirstOrDefault(t => t != null);
+                            var wakeUps = logic?.GetField("WakeUpDatas", BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null) as IDictionary<long, DateTime>;
+                            var gate = logic?.GetField("_wakeUpLock", BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null);
+                            if (wakeUps == null || gate == null) return JObject.FromObject(new { error = "no freezer schedule" });
+                            var count = 0;
+                            lock (gate)
+                                foreach (var grid in MyEntities.GetEntities().OfType<MyCubeGrid>().Where(g => g.DisplayName != null && g.DisplayName.Contains(filter)).ToList())
+                                {
+                                    wakeUps[grid.EntityId] = DateTime.Now.AddSeconds(seconds);
+                                    count++;
+                                }
+                            return JObject.FromObject(new { rescheduled = count });
+                        }));
+                        break;
+                    }
+                    case "/command":
+                    {
+                        // a chat command as the server console runs it (!watch load burst30 ...); the answers go to the log
+                        var command = body.Value<string>("text") ?? "";
+                        SendJson(ctx, 200, RunGameThread(() =>
+                        {
+                            var commands = SentisTestsPlugin.TorchInstance.CurrentSession?.Managers.GetManager(typeof(Torch.Commands.CommandManager)) as Torch.Commands.CommandManager;
+                            if (commands == null) return JObject.FromObject(new { error = "no command manager" });
+                            var answers = commands.HandleCommandFromServer(command);    // with its prefix, as typed
+                            if (answers == null) return JObject.FromObject(new { error = "no such command: " + command });
+                            return JObject.FromObject(new { ran = command, answers = answers.ConvertAll(m => m.Message) });
+                        }));
+                        break;
+                    }
                     case "/park":
                         _parked[id] = new Vector3D(body.Value<double>("x"), body.Value<double>("y"), body.Value<double>("z"));
                         SendJson(ctx, 200, JObject.FromObject(new { parked = id, at = _parked[id].ToString("F1") }));

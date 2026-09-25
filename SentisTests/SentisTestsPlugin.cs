@@ -6,6 +6,7 @@ using SentisTests.Scenarios;
 using Torch;
 using Torch.API;
 using Torch.API.Managers;
+using Torch.API.Plugins;
 using Torch.API.Session;
 using Torch.Managers.PatchManager;
 using Torch.Session;
@@ -17,8 +18,13 @@ namespace SentisTests
     /// server, driving real game systems (spawning, projectors, welders, physics) and asserting
     /// outcomes. Control: /test list|run|stop|status|results  or AutoRun in SentisTests.cfg.
     /// </summary>
-    public class SentisTestsPlugin : TorchPluginBase
+    public class SentisTestsPlugin : TorchPluginBase, IWpfPlugin
     {
+        private System.Windows.Controls.UserControl _control;
+
+        /// <summary>The plugin's tab in Torch (Debug/CrashControl).</summary>
+        public System.Windows.Controls.UserControl GetControl() => _control ?? (_control = new Debug.CrashControl());
+
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         private static Persistent<MainConfig> _config;
@@ -114,6 +120,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(WarheadMassScenario.ChainScenarioName, () => new WarheadMassScenario(all: false));
                 ScenarioRegistry.Register(WarheadMassScenario.AllScenarioName, () => new WarheadMassScenario(all: true));
                 ScenarioRegistry.Register(FreezeProductionScenario.ScenarioName, () => new FreezeProductionScenario());
+                ScenarioRegistry.Register(LongFreezeProductionScenario.ScenarioName, () => new LongFreezeProductionScenario());
                 ScenarioRegistry.Register(FreezePowerScenario.ScenarioName, () => new FreezePowerScenario());
                 ScenarioRegistry.Register(ProjectionStreamScenario.ScenarioName, () => new ProjectionStreamScenario());
                 ScenarioRegistry.Register(WheelPerfScenario.RestoreCostScenarioName, () => new WheelPerfScenario(100, restore: true, sink: false));
