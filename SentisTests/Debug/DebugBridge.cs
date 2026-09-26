@@ -325,6 +325,9 @@ namespace SentisTests.Debug
                 case "/physics":
                     SendJson(ctx, 200, PhysicsStep());
                     break;
+                case "/bodies":
+                    SendJson(ctx, 200, RunGameThread(Bodies));
+                    break;
                 case "/status":
                     SendJson(ctx, 200, RunGameThread(() =>
                     {
@@ -1154,6 +1157,39 @@ namespace SentisTests.Debug
         }
 
         /// <summary>What the plugin's physics load monitor sees right now; no game thread needed.</summary>
+        /// <summary>What the physics steps now: each Havok world (cluster) with its active bodies by kind of entity and its characters.</summary>
+        private static JObject Bodies()
+        {
+            var list = new JArray();
+            int active = 0, characters = 0;
+            foreach (var cluster in Sandbox.Engine.Physics.MyPhysics.Clusters.GetList())
+            {
+                if (!(cluster is Havok.HkWorld world)) continue;
+                var kinds = new SortedDictionary<string, int>();
+                var whose = new SortedDictionary<string, int>();
+                foreach (var body in world.ActiveRigidBodies)
+                {
+                    var entity = (body.UserObject as Sandbox.Engine.Physics.MyPhysicsBody)?.Entity as VRage.Game.Entity.MyEntity;
+                    var kind = entity == null ? "(no entity)" : entity is MyCubeGrid grid ? (grid.IsStatic ? "static grid" : "grid") : entity.GetType().Name;
+                    kinds[kind] = kinds.TryGetValue(kind, out var n) ? n + 1 : 1;
+                    // a part of a block: which block on which grid
+                    var owner = entity?.Parent;
+                    while (owner != null && !(owner is Sandbox.Game.Entities.MyCubeBlock)) owner = owner.Parent;
+                    if (entity != null && !(entity is MyCubeGrid) && (owner is Sandbox.Game.Entities.MyCubeBlock || entity is Sandbox.Game.Entities.MyCubeBlock))
+                    {
+                        var block = owner as Sandbox.Game.Entities.MyCubeBlock ?? (Sandbox.Game.Entities.MyCubeBlock)entity;
+                        var key = kind + ": " + block.BlockDefinition.Id.SubtypeName + " on " + block.CubeGrid.DisplayName;
+                        whose[key] = whose.TryGetValue(key, out var m) ? m + 1 : 1;
+                    }
+                    active++;
+                }
+                var chars = world.CharacterRigidBodies.Count;
+                characters += chars;
+                list.Add(Obj("active", world.ActiveRigidBodies.Count, "characters", chars, "kinds", JObject.FromObject(kinds), "whose", JObject.FromObject(whose)));
+            }
+            return Obj("clusters", list.Count, "active", active, "characters", characters, "list", list);
+        }
+
         private static JObject PhysicsStep()
         {
             var step = Game.RuntimePluginControls.PhysicsStep;
