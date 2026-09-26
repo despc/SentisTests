@@ -81,6 +81,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(VoxelStreamScenario.ScenarioName, () => new VoxelStreamScenario());
                 ScenarioRegistry.Register(GridStreamScenario.ScenarioName, () => new GridStreamScenario());
                 ScenarioRegistry.Register(CharacterPerfScenario.ScenarioName, () => new CharacterPerfScenario());
+                ScenarioRegistry.Register(ProceduralJumpScenario.ScenarioName, () => new ProceduralJumpScenario());
                 ScenarioRegistry.Register(RemoteControlAnchorScenario.ScenarioName, () => new RemoteControlAnchorScenario());
                 ScenarioRegistry.Register(LaserAntennaControlScenario.ScenarioName, () => new LaserAntennaControlScenario());
                 ScenarioRegistry.Register(LaserLinkAwakeScenario.ScenarioName, () => new LaserLinkAwakeScenario());

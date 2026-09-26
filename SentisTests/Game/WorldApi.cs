@@ -183,6 +183,9 @@ namespace SentisTests.Game
                 var isPlayer = players.TryGetPlayer(identity.IdentityId) != null;
                 seen.Add(identity.DisplayName + "=" + identity.IdentityId + (isPlayer ? "" : "(no player)"));
                 if (!isPlayer) continue;
+                // not a SentisAi bot (they are players too, with the "[BOT] " prefix): the test grids would be
+                // theirs, and everything the records say of them would be put on the bot
+                if (identity.DisplayName != null && identity.DisplayName.StartsWith("[BOT]")) continue;
                 if (!string.IsNullOrEmpty(wanted) &&
                     string.Equals(identity.DisplayName, wanted, System.StringComparison.OrdinalIgnoreCase))
                 {
