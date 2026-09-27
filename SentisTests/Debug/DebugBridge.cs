@@ -328,6 +328,9 @@ namespace SentisTests.Debug
                 case "/bodies":
                     SendJson(ctx, 200, RunGameThread(Bodies));
                     break;
+                case "/client-repl":
+                    SendJson(ctx, 200, RunGameThread(ClientReplication));
+                    break;
                 case "/status":
                     SendJson(ctx, 200, RunGameThread(() =>
                     {
@@ -1158,6 +1161,100 @@ namespace SentisTests.Debug
 
         /// <summary>What the plugin's physics load monitor sees right now; no game thread needed.</summary>
         /// <summary>What the physics steps now: each Havok world (cluster) with its active bodies by kind of entity and its characters.</summary>
+        /// <summary>
+        /// What the replication server holds for each client: ready or not, the replicables it sent and the client has not
+        /// confirmed yet (pending or streaming), and whether the client waits for the batch confirmation (the respawn screen
+        /// closes on it).
+        /// </summary>
+        private static JObject ClientReplication()
+        {
+            const BindingFlags any = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            var server = Sandbox.Engine.Multiplayer.MyMultiplayer.Static?.ReplicationLayer;
+            if (server == null) return Err("no replication layer");
+            var states = server.GetType().GetField("m_clientStates", any)?.GetValue(server) as System.Collections.IEnumerable;
+            if (states == null) return Err("no client states");
+            var clients = new JArray();
+            foreach (var pair in states)
+            {
+                var key = pair.GetType().GetProperty("Key").GetValue(pair);
+                var client = pair.GetType().GetProperty("Value").GetValue(pair);
+                object Get(string name) => client.GetType().GetField(name, any)?.GetValue(client) ?? client.GetType().GetProperty(name, any)?.GetValue(client);
+                var steam = key.ToString();
+                var replicables = Get("Replicables") as System.Collections.IEnumerable;
+                var waiting = new JArray();
+                var total = 0;
+                if (replicables != null)
+                    foreach (var entry in replicables)
+                    {
+                        total++;
+                        var replicable = entry.GetType().GetProperty("Key").GetValue(entry);
+                        var data = entry.GetType().GetProperty("Value").GetValue(entry);
+                        bool Flag(string name) => (data.GetType().GetProperty(name, any)?.GetValue(data) ?? data.GetType().GetField(name, any)?.GetValue(data)) is bool b && b;
+                        var pending = Flag("IsPending");
+                        var streaming = Flag("IsStreaming");
+                        if (!pending && !streaming) continue;
+                        if (waiting.Count >= 30) continue;
+                        var instance = replicable.GetType().GetProperty("Instance", any)?.GetValue(replicable) as VRage.Game.Entity.MyEntity;
+                        var item = new JObject
+                        {
+                            ["type"] = replicable.GetType().Name,
+                            ["entity"] = instance?.EntityId ?? 0,
+                            ["name"] = instance?.DisplayName ?? "",
+                            ["pending"] = pending,
+                            ["streaming"] = streaming,
+                        };
+                        // the streaming state group's data for each client: where the stream stands
+                        if (streaming)
+                        {
+                            var groupsType = typeof(List<>).MakeGenericType(typeof(VRage.Network.IMyStateGroup));
+                            var groups = (System.Collections.IList)Activator.CreateInstance(groupsType);
+                            replicable.GetType().GetMethod("GetStateGroups", any)?.Invoke(replicable, new object[] { groups });
+                            var streams = new JArray();
+                            foreach (var group in groups)
+                            {
+                                var streamData = group.GetType().GetField("m_clientStreamData", any)?.GetValue(group) as System.Collections.IDictionary;
+                                if (streamData == null) continue;
+                                foreach (System.Collections.DictionaryEntry sd in streamData)
+                                {
+                                    var v = sd.Value;
+                                    object F(string n) => v.GetType().GetField(n, any)?.GetValue(v);
+                                    streams.Add(new JObject
+                                    {
+                                        ["group"] = group.GetType().Name,
+                                        ["client"] = sd.Key.ToString(),
+                                        ["creatingData"] = F("CreatingData") is bool c && c,
+                                        ["objectBytes"] = (F("ObjectData") as byte[])?.Length ?? -1,
+                                        ["currentPart"] = Convert.ToInt32(F("CurrentPart") ?? -1),
+                                        ["numParts"] = Convert.ToInt32(F("NumParts") ?? -1),
+                                        ["remainingBits"] = Convert.ToInt64(F("RemainingBits") ?? -1),
+                                        ["dirty"] = F("Dirty") is bool dd && dd,
+                                        ["forceSend"] = F("ForceSend") is bool fs && fs,
+                                        ["incomplete"] = F("Incomplete") is bool ic && ic,
+                                        ["lastSent"] = F("LastSent")?.ToString() ?? "null",
+                                        ["sendPackets"] = (F("SendPackets") as System.Collections.ICollection)?.Count ?? -1,
+                                        ["failedPackets"] = (F("FailedIncompletePackets") as System.Collections.ICollection)?.Count ?? -1,
+                                    });
+                                }
+                            }
+                            item["streams"] = streams;
+                        }
+                        waiting.Add(item);
+                    }
+                clients.Add(new JObject
+                {
+                    ["endpoint"] = steam,
+                    ["ready"] = Get("IsReady") is bool r && r,
+                    ["pendingReplicables"] = Get("PendingReplicables") is int n ? n : -1,
+                    ["wantsBatchConfirmation"] = Get("WantsBatchCompleteConfirmation") is bool w && w,
+                    ["replicables"] = total,
+                    ["blocked"] = (Get("BlockedReplicables") as System.Collections.ICollection)?.Count ?? -1,
+                    ["dirtyQueue"] = Get("DirtyQueue")?.GetType().GetProperty("Count")?.GetValue(Get("DirtyQueue")) is int d ? d : -1,
+                    ["waiting"] = waiting,
+                });
+            }
+            return new JObject { ["clients"] = clients };
+        }
+
         private static JObject Bodies()
         {
             var list = new JArray();

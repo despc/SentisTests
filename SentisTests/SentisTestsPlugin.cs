@@ -79,6 +79,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(GasPerfScenario.ScenarioName, () => new GasPerfScenario());
                 ScenarioRegistry.Register(PbPerfScenario.ScenarioName, () => new PbPerfScenario());
                 ScenarioRegistry.Register(VoxelStreamScenario.ScenarioName, () => new VoxelStreamScenario());
+                ScenarioRegistry.Register(VoxelCacheResendScenario.ScenarioName, () => new VoxelCacheResendScenario());
                 ScenarioRegistry.Register(GridStreamScenario.ScenarioName, () => new GridStreamScenario());
                 ScenarioRegistry.Register(CharacterPerfScenario.ScenarioName, () => new CharacterPerfScenario());
                 ScenarioRegistry.Register(ProceduralJumpScenario.ScenarioName, () => new ProceduralJumpScenario());
@@ -144,6 +145,7 @@ namespace SentisTests
                     AllocProbe.Init(torch.Managers.GetManager<PatchManager>());
                     SafeZoneProbe.Init(torch.Managers.GetManager<PatchManager>());
                     MethodTimerProbe.Init(torch.Managers.GetManager<PatchManager>());
+                    EventTimer.Install(torch.Managers.GetManager<PatchManager>());
                 }
                 catch (Exception e)
                 {
