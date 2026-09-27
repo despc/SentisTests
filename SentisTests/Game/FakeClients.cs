@@ -241,6 +241,25 @@ namespace SentisTests.Game
 
         public static void SetProfile(NetworkProfile profile) => _profile = profile;
 
+        /// <summary>The player of a fake client.</summary>
+        public static Sandbox.Game.World.MyPlayer PlayerOf(int index) => _clients[index].Player;
+
+        /// <summary>Runs a request on the game thread as if it came from the fake client (the event context a client's request has).</summary>
+        public static void AsClient(int index, Action request)
+        {
+            var client = _clients[index];
+            var set = typeof(VRage.Network.MyEventContext).GetMethod("Set", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            var context = set.Invoke(null, new object[] { client.Id, client.State, false });
+            try
+            {
+                request();
+            }
+            finally
+            {
+                (context as IDisposable)?.Dispose();
+            }
+        }
+
         /// <summary>
         /// Moves a fake client to a new spot at once: its replication position and its character
         /// (teleported, then held there). Game thread.

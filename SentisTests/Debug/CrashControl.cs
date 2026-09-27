@@ -22,6 +22,15 @@ namespace SentisTests.Debug
         public CrashControl()
         {
             var panel = new StackPanel { Margin = new Thickness(10) };
+            var eventTimer = new CheckBox
+            {
+                Content = "Диагностика EventTimer в лог: деревья вызовов медленных событий (включение ставит патчи сразу, выключение убирает строки)",
+                IsChecked = SentisTestsPlugin.Config?.EventTimerLogs == true,
+                Margin = new Thickness(0, 0, 0, 12),
+            };
+            eventTimer.Checked += (s, e) => SentisTestsPlugin.SetEventTimerLogs(true);
+            eventTimer.Unchecked += (s, e) => SentisTestsPlugin.SetEventTimerLogs(false);
+            panel.Children.Add(eventTimer);
             panel.Children.Add(new TextBlock
             {
                 Text = "Проверка дампов при падении: кнопки роняют сервер нативной ошибкой, которую .NET не ловит и " +

@@ -12,6 +12,8 @@ SentisGameplayImprovements, SentisAdventures, VirtualGarage) на живом с�
 Пример файла со всеми параметрами и комментарием к каждому: [`SentisTests.cfg.example`](SentisTests.cfg.example).
 
 - Плагин кладётся в `Plugins\SentisTests`.
+- `EventTimerLogs` (по умолчанию `false`, галочка на странице плагина): деревья вызовов медленных событий игры в логе.
+  Выключено при старте — патчи EventTimer не ставятся вовсе; включение на ходу ставит их сразу.
 - Настройки хранятся в `Instance\SentisTests.cfg`.
 - Ставить только на тестовый сервер: сценарии меняют мир.
 

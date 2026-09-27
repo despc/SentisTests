@@ -28,6 +28,34 @@ namespace SentisTests
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
         private static Persistent<MainConfig> _config;
+        private static PatchManager _patchManager;
+
+        /// <summary>The EventTimer switch from the plugin's page: on puts its patches in now (once), off stops its lines.</summary>
+        public static void SetEventTimerLogs(bool on)
+        {
+            if (Config == null) return;
+            Config.EventTimerLogs = on;
+            _config.Save();
+            if (on && !EventTimer.Installed && _patchManager != null)
+            {
+                EventTimer.Install(_patchManager);
+                TimeFactionHandlers();
+            }
+        }
+
+        private static void TimeFactionHandlers()
+        {
+            if (!EventTimer.Installed || Sandbox.Game.World.MySession.Static == null) return;
+            // who handles a faction change (a wolf joining its faction took 30 ms of a frame)
+            try
+            {
+                var factions = Sandbox.Game.World.MySession.Static.Factions;
+                var field = typeof(Sandbox.Game.Multiplayer.MyFactionCollection).GetField("FactionStateChanged",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+                EventTimer.TimeHandlers(field?.GetValue(factions) as Delegate);
+            }
+            catch (Exception e) { Log.Warn(e, "timing the faction change handlers failed"); }
+        }
         public static MainConfig Config => _config?.Data;
         public static ITorchBase TorchInstance { get; private set; }
 
@@ -80,6 +108,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(PbPerfScenario.ScenarioName, () => new PbPerfScenario());
                 ScenarioRegistry.Register(VoxelStreamScenario.ScenarioName, () => new VoxelStreamScenario());
                 ScenarioRegistry.Register(VoxelCacheResendScenario.ScenarioName, () => new VoxelCacheResendScenario());
+                ScenarioRegistry.Register(PeakEventsScenario.ScenarioName, () => new PeakEventsScenario());
                 ScenarioRegistry.Register(GridStreamScenario.ScenarioName, () => new GridStreamScenario());
                 ScenarioRegistry.Register(CharacterPerfScenario.ScenarioName, () => new CharacterPerfScenario());
                 ScenarioRegistry.Register(ProceduralJumpScenario.ScenarioName, () => new ProceduralJumpScenario());
@@ -145,7 +174,8 @@ namespace SentisTests
                     AllocProbe.Init(torch.Managers.GetManager<PatchManager>());
                     SafeZoneProbe.Init(torch.Managers.GetManager<PatchManager>());
                     MethodTimerProbe.Init(torch.Managers.GetManager<PatchManager>());
-                    EventTimer.Install(torch.Managers.GetManager<PatchManager>());
+                    if (Config?.EventTimerLogs == true) EventTimer.Install(torch.Managers.GetManager<PatchManager>());
+                    _patchManager = torch.Managers.GetManager<PatchManager>();
                 }
                 catch (Exception e)
                 {
@@ -200,6 +230,7 @@ namespace SentisTests
                 {
                     try { Scenarios.ConfigOverride.RestoreLeftovers(); }
                     catch (Exception e) { Log.Warn(e, "putting back config left by an interrupted test failed"); }
+                    TimeFactionHandlers();
                 }
 
                 if (state == TorchSessionState.Loaded && Config != null && Config.AutoRun)

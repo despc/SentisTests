@@ -4,6 +4,12 @@ namespace SentisTests
 {
     public class MainConfig
     {
+        /// <summary>
+        /// The call trees of slow game events (EventTimer) in the log; off by default. Off at the start: its patches are
+        /// not put in at all.
+        /// </summary>
+        public bool EventTimerLogs { get; set; } = false;
+
         /// <summary>Run the configured scenarios automatically once the world is loaded.</summary>
         public bool AutoRun { get; set; } = false;
 

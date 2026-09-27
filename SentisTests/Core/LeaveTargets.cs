@@ -91,6 +91,19 @@ namespace SentisTests.Core
             return found;
         }
 
+        /// <summary>Every patch the patch manager holds for the method: "prefix Type.Method", "suffix ...", "transpiler ...".</summary>
+        public static List<string> PatchesOf(MethodBase target)
+        {
+            var result = new List<string>();
+            var patterns = typeof(PatchManager).GetField("_rewritePatterns", BindingFlags.Static | BindingFlags.NonPublic)?.GetValue(null) as IDictionary;
+            var pattern = patterns?[target];
+            if (pattern == null) return result;
+            foreach (var kind in new[] { "Prefixes", "Suffixes", "Transpilers", "PostTranspilers" })
+                if (pattern.GetType().GetProperty(kind)?.GetValue(pattern) is IEnumerable<MethodInfo> list)
+                    foreach (var m in list) result.Add(kind + " " + m.DeclaringType?.FullName + "." + m.Name);
+            return result;
+        }
+
         /// <summary>The leaves of one method that the re-emit would send somewhere else; empty when none.</summary>
         public static IEnumerable<string> Redirected(MethodBase method)
         {
