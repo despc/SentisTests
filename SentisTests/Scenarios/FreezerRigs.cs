@@ -32,6 +32,25 @@ namespace SentisTests.Scenarios
             return _probe.Content(0);
         }
 
+        /// <summary>
+        /// The rock content at the point itself, between the eight voxels around it: where the game puts the surface
+        /// (128). A voxel is a metre, and one read whole says little about a point near the surface.
+        /// </summary>
+        public double SmoothContentAt(Vector3D point)
+        {
+            // voxel values stand at the corners of the voxel grid (a plate lying on the ground reads 60-90 so)
+            var p = point - Planet.PositionLeftBottomCorner;
+            var cell = Vector3I.Floor(p);
+            var f = p - new Vector3D(cell.X, cell.Y, cell.Z);
+            var min = cell + Planet.StorageMin;
+            _probe.Resize(new Vector3I(2));
+            Planet.Storage.ReadRange(_probe, VRage.Voxels.MyStorageDataTypeFlags.Content, 0, min, min + 1);
+            double C(int x, int y, int z) { var v = new Vector3I(x, y, z); return _probe.Content(ref v); }
+            double L(double a, double b, double t) => a + (b - a) * t;
+            return L(L(L(C(0, 0, 0), C(1, 0, 0), f.X), L(C(0, 1, 0), C(1, 1, 0), f.X), f.Y),
+                     L(L(C(0, 0, 1), C(1, 0, 1), f.X), L(C(0, 1, 1), C(1, 1, 1), f.X), f.Y), f.Z);
+        }
+
         /// <summary>The top of the rock under (or over) the point, searched 40 m either side of the generated surface.</summary>
         public Vector3D Ground(Vector3D point)
         {

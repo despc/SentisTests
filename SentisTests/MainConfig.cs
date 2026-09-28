@@ -46,6 +46,9 @@ namespace SentisTests
         /// <summary>Bearer token required by every DebugBridge REST/MCP request (minimum 32 characters).</summary>
         public string DebugBridgeToken { get; set; } = "";
 
+        /// <summary>Local port of the DebugBridge; another server on the same machine needs another one.</summary>
+        public int DebugBridgePort { get; set; } = 18899;
+
         /// <summary>
         /// Display name of the player that owns and built the spawned test ships.
         /// welder passes its OWN OwnerId to the projector as the owner of the block it starts, so

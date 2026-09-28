@@ -100,6 +100,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(GearProbeScenario.ScenarioName, () => new GearProbeScenario());
                 ScenarioRegistry.Register(FreezerPhysicsScenario.ScenarioName, () => new FreezerPhysicsScenario());
                 ScenarioRegistry.Register(PhysicsResumeScenario.ScenarioName, () => new PhysicsResumeScenario());
+                ScenarioRegistry.Register(FallThroughTunnelScenario.ScenarioName, () => new FallThroughTunnelScenario());
                 ScenarioRegistry.Register(FreezerStressScenario.ScenarioName, () => new FreezerStressScenario());
                 ScenarioRegistry.Register(FreezerStressScenario.ProfileScenarioName, () => new FreezerStressScenario(profile: true));
                 ScenarioRegistry.Register(GrinderPerfScenario.ScenarioName, () => new GrinderPerfScenario());
@@ -197,7 +198,7 @@ namespace SentisTests
                     _sessionManager.SessionStateChanged += OnSessionStateChanged;
 
                 if (Config != null && Config.EnableDebugBridge)
-                    Debug.DebugBridge.Start(Config.DebugBridgeToken);
+                    Debug.DebugBridge.Start(Config.DebugBridgeToken, Config.DebugBridgePort);
                 Log.Info("SentisTests ready; scenarios: {0}", string.Join(", ", ScenarioRegistry.Names));
             }
             catch (Exception e)

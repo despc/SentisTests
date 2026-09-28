@@ -56,7 +56,8 @@ namespace SentisTests.Debug
     /// </summary>
     public static class DebugBridge
     {
-        private const int Port = 18899;
+        public const int DefaultPort = 18899;
+        private static int Port = DefaultPort;
         private static readonly Logger Log = NLog.LogManager.GetCurrentClassLogger();
 
         private static HttpListener _listener;
@@ -83,8 +84,10 @@ namespace SentisTests.Debug
         private static StreamWriter _sse;
         private static DateTime _sseLastSent;
 
-        public static void Start(string token)
+        public static void Start(string token, int port = DefaultPort)
         {
+            // two servers on one machine (the stand and another) each need their own port
+            Port = port > 0 ? port : DefaultPort;
             if (string.IsNullOrWhiteSpace(token) || token.Length < 32)
             {
                 Log.Error("debug bridge not started: DebugBridgeToken must contain at least 32 characters");
