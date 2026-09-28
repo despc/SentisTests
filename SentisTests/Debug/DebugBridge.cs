@@ -1257,11 +1257,21 @@ namespace SentisTests.Debug
 
         private static JObject Bodies()
         {
+            const BindingFlags any = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
             var list = new JArray();
-            int active = 0, characters = 0;
-            foreach (var cluster in Sandbox.Engine.Physics.MyPhysics.Clusters.GetList())
+            int active = 0, characters = 0, stepped = 0;
+            // whether the game steps the cluster: with selective physics updates, only a cluster with a character or with
+            // an entity replicated to a client
+            var physics0 = Sandbox.Game.World.MySession.Static.GetComponent<Sandbox.Engine.Physics.MyPhysics>();
+            var isActive = typeof(Sandbox.Engine.Physics.MyPhysics).GetMethod("IsClusterActive", any, null, new[] { typeof(int), typeof(int) }, null);
+            var observer = typeof(Sandbox.Engine.Physics.MyPhysics).GetField("m_worldObserver", any)?.GetValue(physics0);
+            var replicatedByCluster = observer?.GetType().GetField("m_clusterReplicablesCount", any)?.GetValue(observer) as System.Collections.IDictionary;
+            foreach (var myCluster in Sandbox.Engine.Physics.MyPhysics.Clusters.GetClusters())
             {
-                if (!(cluster is Havok.HkWorld world)) continue;
+                if (!(myCluster.UserData is Havok.HkWorld world)) continue;
+                var step = isActive == null || (bool)isActive.Invoke(physics0, new object[] { myCluster.ClusterId, world.CharacterRigidBodies.Count });
+                if (step) stepped++;
+                var replicated = (replicatedByCluster?[myCluster.ClusterId] as System.Collections.ICollection)?.Count ?? 0;
                 var kinds = new SortedDictionary<string, int>();
                 var whose = new SortedDictionary<string, int>();
                 foreach (var body in world.ActiveRigidBodies)
@@ -1280,11 +1290,26 @@ namespace SentisTests.Debug
                     }
                     active++;
                 }
+                // the grids among them, the heaviest first: why each one keeps the physics busy
+                var grids = new JArray();
+                foreach (var body in world.ActiveRigidBodies)
+                {
+                    if (!((body.UserObject as Sandbox.Engine.Physics.MyPhysicsBody)?.Entity is MyCubeGrid grid)) continue;
+                    var physics = grid.Physics;
+                    grids.Add(Obj("name", grid.DisplayName, "id", grid.EntityId, "static", grid.IsStatic, "blocks", grid.BlocksCount,
+                        "speed", Math.Round(physics?.LinearVelocity.Length() ?? 0, 3), "spin", Math.Round(physics?.AngularVelocity.Length() ?? 0, 3),
+                        "thrusters", grid.GetFatBlocks().Count(b => b is Sandbox.Game.Entities.MyThrust t && t.IsWorking && t.CurrentStrength > 0.001f),
+                        "wheels", grid.GetFatBlocks().Count(b => b is Sandbox.Game.Entities.Cube.MyMotorSuspension),
+                        "gears", grid.GetFatBlocks().Count(b => b is SpaceEngineers.Game.Entities.Blocks.MyLandingGear g && g.LockMode == SpaceEngineers.Game.ModAPI.Ingame.LandingGearMode.Locked),
+                        "players", Sandbox.Game.World.MySession.Static.Players.GetOnlinePlayers().Any(p => p.Character != null &&
+                            Vector3D.Distance(p.Character.PositionComp.GetPosition(), grid.PositionComp.GetPosition()) < 3000)));
+                }
                 var chars = world.CharacterRigidBodies.Count;
                 characters += chars;
-                list.Add(Obj("active", world.ActiveRigidBodies.Count, "characters", chars, "kinds", JObject.FromObject(kinds), "whose", JObject.FromObject(whose)));
+                list.Add(Obj("id", myCluster.ClusterId, "stepped", step, "replicated", replicated, "active", world.ActiveRigidBodies.Count, "characters", chars, "kinds", JObject.FromObject(kinds), "whose", JObject.FromObject(whose),
+                    "grids", new JArray(grids.OrderByDescending(g => (int)g["blocks"]).Take(60))));
             }
-            return Obj("clusters", list.Count, "active", active, "characters", characters, "list", list);
+            return Obj("clusters", list.Count, "stepped", stepped, "observer", observer != null, "active", active, "characters", characters, "list", list);
         }
 
         private static JObject PhysicsStep()

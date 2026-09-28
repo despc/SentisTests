@@ -99,6 +99,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(WheelPerfScenario.ParkedScenarioName, () => new WheelPerfScenario(64, parked: true));
                 ScenarioRegistry.Register(GearProbeScenario.ScenarioName, () => new GearProbeScenario());
                 ScenarioRegistry.Register(FreezerPhysicsScenario.ScenarioName, () => new FreezerPhysicsScenario());
+                ScenarioRegistry.Register(PhysicsResumeScenario.ScenarioName, () => new PhysicsResumeScenario());
                 ScenarioRegistry.Register(FreezerStressScenario.ScenarioName, () => new FreezerStressScenario());
                 ScenarioRegistry.Register(FreezerStressScenario.ProfileScenarioName, () => new FreezerStressScenario(profile: true));
                 ScenarioRegistry.Register(GrinderPerfScenario.ScenarioName, () => new GrinderPerfScenario());
