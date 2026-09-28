@@ -101,6 +101,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(FreezerPhysicsScenario.ScenarioName, () => new FreezerPhysicsScenario());
                 ScenarioRegistry.Register(PhysicsResumeScenario.ScenarioName, () => new PhysicsResumeScenario());
                 ScenarioRegistry.Register(FallThroughTunnelScenario.ScenarioName, () => new FallThroughTunnelScenario());
+                ScenarioRegistry.Register(OfflineCharacterScenario.ScenarioName, () => new OfflineCharacterScenario());
                 ScenarioRegistry.Register(FreezerStressScenario.ScenarioName, () => new FreezerStressScenario());
                 ScenarioRegistry.Register(FreezerStressScenario.ProfileScenarioName, () => new FreezerStressScenario(profile: true));
                 ScenarioRegistry.Register(GrinderPerfScenario.ScenarioName, () => new GrinderPerfScenario());

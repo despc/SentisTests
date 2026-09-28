@@ -235,6 +235,21 @@ namespace SentisTests.Game
              ?? throw new InvalidOperationException("FrozenGridSaveCache.VerifyPreparedBuilders is unavailable")).SetValue(null, verify);
         }
 
+        /// <summary>
+        /// Forgets the freezer's queue: a group queued while DelayBeforeFreezeSec was long waits that long however the
+        /// setting changes after (FreezeLogic.InFreezeQueue lets a queued group in only once), so a scenario that
+        /// shortens the delay clears it and the freezer queues everything again with the new delay.
+        /// </summary>
+        public static void ForgetFreezeQueue()
+        {
+            var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.Freezer.FreezeLogic");
+            var queue = type.GetField("InFreezeQueue", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
+            var clear = queue?.GetType().GetMethod("Clear", Type.EmptyTypes);
+            if (clear == null)
+                throw new InvalidOperationException("FreezeLogic.InFreezeQueue is unavailable");
+            clear.Invoke(queue, null);
+        }
+
         public static bool IsGridFrozen(long gridId)
         {
             var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.Freezer.FreezeLogic");

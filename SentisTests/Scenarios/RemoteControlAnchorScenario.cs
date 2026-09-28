@@ -146,6 +146,17 @@ namespace SentisTests.Scenarios
             Check(!besideFrozen,
                 "the grid beside the player's own body was frozen: only the ship they steer counts as their position");
             Check(!shipFrozen, "the ship the player is flying was frozen");
+            if (!farFrozen)
+            {
+                // who kept it awake: the players nearest to it (on the stand the SentisAi bots are players too)
+                var at = _farFromBoth.PositionComp.GetPosition();
+                var nearest = Sandbox.Game.World.MySession.Static.Players.GetOnlinePlayers()
+                    .Where(p => p.Character != null || p.Controller?.ControlledEntity != null)
+                    .Select(p => (p.DisplayName, Distance: Vector3D.Distance(at, p.Controller?.ControlledEntity?.Entity?.PositionComp.GetPosition() ?? p.Character.PositionComp.GetPosition())))
+                    .OrderBy(x => x.Distance).Take(3);
+                Note("far from both, not frozen: nearest players " + string.Join(", ", nearest.Select(x => x.DisplayName + " " + x.Distance.ToString("F0") + " m")) +
+                     "; the grid's physics " + (_farFromBoth.Physics == null ? "none" : "static " + _farFromBoth.Physics.IsStatic + ", speed " + _farFromBoth.Physics.LinearVelocity.Length().ToString("F2")));
+            }
             Check(farFrozen, "the grid far from both was not frozen either, so the test proves nothing");
         }
 

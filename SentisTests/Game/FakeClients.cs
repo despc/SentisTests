@@ -353,6 +353,37 @@ namespace SentisTests.Game
             _frames = 0;
         }
 
+        /// <summary>
+        /// All fake clients quit the way a real player does: the game keeps the character standing where it was
+        /// (<c>MyPlayerCollection.Multiplayer_ClientRemoved</c>: <c>RemovePlayer(removeCharacter: false)</c>). The
+        /// characters left behind are returned; the caller closes them when done. Game thread.
+        /// </summary>
+        public static List<Sandbox.Game.Entities.Character.MyCharacter> QuitKeepingCharacters()
+        {
+            var left = new List<Sandbox.Game.Entities.Character.MyCharacter>();
+            var clients = _clients;
+            var count = _clientCount;
+            _clientCount = 0;
+            _clients = new FakeClient[0];
+            if (_server == null) return left;
+            for (var i = 0; i < count; i++)
+            {
+                try
+                {
+                    _server.OnClientLeft(clients[i].Id);
+                    var player = clients[i].Player;
+                    var character = player?.Character;
+                    if (character != null && !character.MarkedForClose) left.Add(character);
+                    if (player != null) Sync.Players.RemovePlayer(player, false);
+                    if (Sync.Clients.HasClient(clients[i].Id.Value)) Sync.Clients.RemoveClient(clients[i].Id.Value);
+                }
+                catch (Exception e) { SentisTestsPlugin.Log.Error(e, "FakeClients: client " + i + " quitting failed"); }
+                foreach (var message in clients[i].Uplink) message.Packet.Return();
+            }
+            _frames = 0;
+            return left;
+        }
+
         public const string NamePrefix = "FakeClient ";
 
         /// <summary>

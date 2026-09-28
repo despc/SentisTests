@@ -106,6 +106,8 @@ namespace SentisTests.Scenarios
 
             Note("near " + _near.Describe() + " | far " + _far.Describe());
             _config.Set("DelayBeforeFreezeSec", 5);
+            // the far site was most likely queued with the long delay already; queued anew it freezes in seconds
+            RuntimePluginControls.ForgetFreezeQueue();
             var freezing = TendUntil(() => _far.Frozen, FreezeWaitSeconds, "the far site freezes");
             while (freezing.MoveNext()) yield return freezing.Current;
 
