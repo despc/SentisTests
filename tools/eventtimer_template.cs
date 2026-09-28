@@ -122,15 +122,35 @@ namespace SentisTests.Core
             }
             if (Open.Count > 0) return;
             var ms = Done[Done.Count - 1].Ticks * 1000.0 / Stopwatch.Frequency;
-            // the whole game frame is a root too: only its long ones
-            var slow = Names[Done[Done.Count - 1].Slot] == "MySandboxGame.Update" ? 15 : SlowMs;
+            // the whole game frame is a root too: only the ones well over the usual frame - on a big world most
+            // frames are over 15 ms, and a tree a frame hung Torch's log window
+            var frame = Names[Done[Done.Count - 1].Slot] == "MySandboxGame.Update";
+            var slow = frame ? Math.Max(15, _frameAvgMs * FrameOverAverage) : SlowMs;
+            if (frame) _frameAvgMs = _frameAvgMs <= 0 ? ms : _frameAvgMs + (Math.Min(ms, 1000) - _frameAvgMs) / 300;
             if (ms >= slow && SentisTestsPlugin.Config?.EventTimerLogs == true)
             {
-                var gc = (GC.CollectionCount(0) - _gc0) + "/" + (GC.CollectionCount(1) - _gc1) + "/" + (GC.CollectionCount(2) - _gc2);
-                SentisTestsPlugin.Log.Info("EventTimer: " + Tree() + (gc == "0/0/0" ? "" : " gc " + gc));
+                // and never more than a few lines a second, whatever happens
+                var second = Stopwatch.GetTimestamp() / Stopwatch.Frequency;
+                if (second != _second) { _second = second; _written = 0; }
+                if (_written++ < LinesPerSecond)
+                {
+                    var gc = (GC.CollectionCount(0) - _gc0) + "/" + (GC.CollectionCount(1) - _gc1) + "/" + (GC.CollectionCount(2) - _gc2);
+                    SentisTestsPlugin.Log.Info("EventTimer: " + Tree() + (gc == "0/0/0" ? "" : " gc " + gc) +
+                                               (_dropped > 0 ? " (" + _dropped + " slow calls not written before this one)" : ""));
+                    _dropped = 0;
+                }
+                else _dropped++;
             }
             Done.Clear();
         }
+
+        /// <summary>A whole frame is written when it is this many times the average frame (and over 15 ms).</summary>
+        private const double FrameOverAverage = 3;
+        /// <summary>Trees written a second at most.</summary>
+        private const int LinesPerSecond = 2;
+        private static double _frameAvgMs;
+        private static long _second;
+        private static int _written, _dropped;
 
         private static string Ms(long ticks) =>
             (ticks * 1000.0 / Stopwatch.Frequency).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " ms";

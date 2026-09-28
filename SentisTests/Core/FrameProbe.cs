@@ -274,8 +274,21 @@ namespace SentisTests.Core
             pattern.Suffixes.Add(typeof(FrameProbe).GetMethod(suffix, BindingFlags.Static | BindingFlags.NonPublic));
         }
 
+        /// <summary>
+        /// Measuring only while a scenario runs, decided at the start of each frame. Otherwise every hook returns
+        /// at once: on a server with no scenario the per-frame records grew without end (nothing took them) and the
+        /// timestamps cost ~0.2 ms a frame of a big world.
+        /// </summary>
+        private static bool _on;
+
         private static void FramePrefix()
         {
+            _on = TestRunner.Active != null;
+            if (!_on)
+            {
+                _frameStart = 0;
+                return;
+            }
             _gameThreadId = Thread.CurrentThread.ManagedThreadId;
             Array.Clear(_sectionTicks, 0, _sectionTicks.Length);
             for (var g = 0; g < 3; g++) _gcAtFrameStart[g] = GC.CollectionCount(g);
@@ -286,7 +299,7 @@ namespace SentisTests.Core
 
         private static void FrameSuffix()
         {
-            if (_frameStart == 0) return;
+            if (!_on || _frameStart == 0) return;
             var ms = (Stopwatch.GetTimestamp() - _frameStart) * 1000.0 / Stopwatch.Frequency;
             _frameStart = 0;
             var frameAlloc = GC.GetAllocatedBytesForCurrentThread() - _frameAllocStart;
@@ -334,7 +347,7 @@ namespace SentisTests.Core
 
         private static void Begin(Section s)
         {
-            if (Thread.CurrentThread.ManagedThreadId != _gameThreadId) return;
+            if (!_on || Thread.CurrentThread.ManagedThreadId != _gameThreadId) return;
             if (_sectionDepth[(int)s]++ == 0)
             {
                 _sectionAllocStart[(int)s] = GC.GetAllocatedBytesForCurrentThread();
@@ -344,7 +357,7 @@ namespace SentisTests.Core
 
         private static void End(Section s)
         {
-            if (Thread.CurrentThread.ManagedThreadId != _gameThreadId) return;
+            if (!_on || Thread.CurrentThread.ManagedThreadId != _gameThreadId) return;
             if (_sectionDepth[(int)s] == 0) return;
             if (--_sectionDepth[(int)s] == 0)
             {
@@ -361,13 +374,13 @@ namespace SentisTests.Core
         private static void BuildPrefix(MySlimBlock cubeBlock)
         {
             Begin(Section.ProjectorBuild);
-            _buildStart = Stopwatch.GetTimestamp();
+            if (_on) _buildStart = Stopwatch.GetTimestamp();
         }
 
         private static void BuildSuffix(MySlimBlock cubeBlock)
         {
             End(Section.ProjectorBuild);
-            if (Thread.CurrentThread.ManagedThreadId != _gameThreadId || _buildStart == 0) return;
+            if (!_on || Thread.CurrentThread.ManagedThreadId != _gameThreadId || _buildStart == 0) return;
             var ms = (Stopwatch.GetTimestamp() - _buildStart) * 1000.0 / Stopwatch.Frequency;
             _buildStart = 0;
             _buildMs.Add(ms);
@@ -568,14 +581,14 @@ namespace SentisTests.Core
         private static void GridUpdateVisualPrefix()
         {
             Begin(Section.GridUpdateVisual);
-            _visualStart = Stopwatch.GetTimestamp();
+            if (_on) _visualStart = Stopwatch.GetTimestamp();
         }
 
         /// <summary>A slow block visual update, logged with the block (the first 40 per session).</summary>
         private static void GridUpdateVisualSuffix(Sandbox.Game.Entities.Cube.MySlimBlock __instance)
         {
             End(Section.GridUpdateVisual);
-            if (Thread.CurrentThread.ManagedThreadId != _gameThreadId || _slowVisualLogged >= 40) return;
+            if (!_on || Thread.CurrentThread.ManagedThreadId != _gameThreadId || _slowVisualLogged >= 40) return;
             var ms = (Stopwatch.GetTimestamp() - _visualStart) * 1000.0 / Stopwatch.Frequency;
             if (ms < 5) return;
             _slowVisualLogged++;
