@@ -87,6 +87,9 @@ namespace SentisTests.Scenarios
             Check(planet != null, "no planet");
             var up = Vector3D.Normalize(anchorM.Translation - planet.PositionComp.GetPosition());
             _station = BuildStation(anchorM.Translation + up * OffsetM, up);
+            // a player beside the station, or the freezer takes it and no script runs (the scenario measured nothing
+            // from 25.09.2026 on)
+            FakeClients.Add(1, new FakeClients.NetworkProfile { RttMs = 50 }, i => (anchorM.Translation + up * (OffsetM + 20), 0, 0), withCharacters: true);
 
             var settle = WaitForSeconds(SettleSeconds, "station settles");
             while (settle.MoveNext()) yield return settle.Current;
@@ -137,6 +140,7 @@ namespace SentisTests.Scenarios
                  " | plugin top: " + top +
                  " | " + metrics.Format() + " | " + probe);
 
+            Note("frame clock: " + FrameClockStats());
             Check(loads.Values.Any(load => load > 0), "the plugin measured no load at all");
             foreach (var pb in blocks.Where(b => b.CustomName.ToString().Contains("frequent")))
             {
@@ -337,7 +341,11 @@ namespace SentisTests.Scenarios
 
         public override void Cleanup()
         {
-            try { _config.Restore(); }
+            try
+            {
+                FakeClients.RemoveAll();
+                _config.Restore();
+            }
             finally { base.Cleanup(); }
         }
 
@@ -354,6 +362,19 @@ namespace SentisTests.Scenarios
                 }
             }
             finally { base.CleanupLeftovers(); }
+        }
+
+        private static string FrameClockStats()
+        {
+            try
+            {
+                var type = System.AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("Optimizer.Optimizations.FrameClock", false)).FirstOrDefault(t => t != null);
+                if (type == null) return "none";
+                string F(string n) => type.GetField(n)?.GetValue(null)?.ToString() ?? "-";
+                return "frames " + F("Frames") + ", spikes " + F("SpikeFrames") + ", with GC " + F("GcFrames") + ", saving " + F("SaveFrames") +
+                       ", active " + type.GetProperty("Active")?.GetValue(null);
+            }
+            catch (System.Exception e) { return e.Message; }
         }
     }
 }

@@ -27,6 +27,9 @@ namespace SentisTests.Scenarios
     public sealed class RefineryPerfScenario : TestScenario
     {
         public const string ScenarioName = "refinery_perf";
+        /// <summary>The same with every frame made heavy (<see cref="FrameLoad"/>): the refineries see frames that have already done <see cref="BusySpinMs"/>.</summary>
+        public const string BusyScenarioName = "refinery_perf_busy";
+        private const double BusySpinMs = 13;
         internal const string ResourceName = "SentisTests.Resources.RefineryTest.xml";
         private const string GridPrefix = "refinery-perf-";
         private const int GridCount = 64;
@@ -45,8 +48,11 @@ namespace SentisTests.Scenarios
 
         private bool _captured;
         private bool _initialFreezerEnabled;
+        private readonly bool _busy;
 
-        public override string Name => ScenarioName;
+        public RefineryPerfScenario(bool busy = false) { _busy = busy; }
+
+        public override string Name => _busy ? BusyScenarioName : ScenarioName;
         public override int TimeoutSeconds => MaxProcessingSeconds + 300;
 
         public override IEnumerator Run()
@@ -124,6 +130,9 @@ namespace SentisTests.Scenarios
             TickMetrics.Take();
             FrameProbe.Take();
             var started = DateTime.UtcNow;
+            var startFrame = Sandbox.Game.World.MySession.Static.GameplayFrameCounter;
+            var waitedBefore = ProductionRoundsWaited();
+            if (_busy) FrameLoad.SpinMs = BusySpinMs;
             Note("PROFILE WINDOW START: " + refineries + " refineries refining " + (initialOre / 1000).ToString("F0") +
                  " t of ore (expected ~" + ProcessingSeconds + "s)");
 
@@ -160,9 +169,13 @@ namespace SentisTests.Scenarios
                 yield return null;
             }
 
+            FrameLoad.SpinMs = 0;
             var metrics = TickMetrics.Take();
             var simWork = FrameProbe.Take();
             var seconds = (DateTime.UtcNow - started).TotalSeconds;
+            var frames = Sandbox.Game.World.MySession.Static.GameplayFrameCounter - startFrame;
+            Note("game frames to refine everything: " + frames + " (" + (frames / 60.0).ToString("F1") + " game s)" +
+                 (_busy ? ", busy " + BusySpinMs + " ms a frame" : "") + ", production rounds waited: " + (ProductionRoundsWaited() - waitedBefore));
             var ingots = inventories.Sum(inv => CountItems(inv, "MyObjectBuilder_Ingot", null));
             Check(ingots > 0, "no ingots produced");
             Note("PROFILE WINDOW END: refined " + (initialOre / 1000).ToString("F0") + " t in " + seconds.ToString("F1") +
@@ -242,8 +255,20 @@ namespace SentisTests.Scenarios
             return total;
         }
 
+        /// <summary>SentisOptimisations ProductionFrameBudget.Waited, or -1 without it.</summary>
+        private static long ProductionRoundsWaited()
+        {
+            try
+            {
+                var type = AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("Optimizer.Optimizations.ProductionFrameBudget", false)).FirstOrDefault(t => t != null);
+                return type == null ? -1 : (long)type.GetField("Waited").GetValue(null);
+            }
+            catch { return -1; }
+        }
+
         public override void Cleanup()
         {
+            FrameLoad.SpinMs = 0;
             try { RestoreRuntimeConfig(); }
             finally { base.Cleanup(); }
         }

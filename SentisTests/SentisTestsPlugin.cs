@@ -86,6 +86,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(WelderPerfScenario.ZoneDynamicGameScenarioName,
                     () => new WelderPerfScenario(WelderPerfScenario.ZoneDynamicGameScenarioName, inZone: true, dynamicPlatform: true, probe: false, gameTracking: true));
                 ScenarioRegistry.Register(RefineryPerfScenario.ScenarioName, () => new RefineryPerfScenario());
+                ScenarioRegistry.Register(RefineryPerfScenario.BusyScenarioName, () => new RefineryPerfScenario(busy: true));
                 ScenarioRegistry.Register(DrillPerfScenario.ScenarioName, () => new DrillPerfScenario());
                 ScenarioRegistry.Register(WheelPerfScenario.ScenarioName, () => new WheelPerfScenario());
                 ScenarioRegistry.Register(WheelPerfScenario.ScenarioName64, () => new WheelPerfScenario(64));
@@ -100,6 +101,10 @@ namespace SentisTests
                 ScenarioRegistry.Register(GearProbeScenario.ScenarioName, () => new GearProbeScenario());
                 ScenarioRegistry.Register(FreezerPhysicsScenario.ScenarioName, () => new FreezerPhysicsScenario());
                 ScenarioRegistry.Register(PhysicsResumeScenario.ScenarioName, () => new PhysicsResumeScenario());
+                ScenarioRegistry.Register(UnsteppedBlocksScenario.ScenarioName, () => new UnsteppedBlocksScenario());
+                ScenarioRegistry.Register(PowerSwitchScenario.ScenarioName, () => new PowerSwitchScenario());
+                ScenarioRegistry.Register(PanelServerScenario.ScenarioName, () => new PanelServerScenario());
+                ScenarioRegistry.Register(PbSaveThreadScenario.ScenarioName, () => new PbSaveThreadScenario());
                 ScenarioRegistry.Register(FallThroughTunnelScenario.ScenarioName, () => new FallThroughTunnelScenario());
                 ScenarioRegistry.Register(OfflineCharacterScenario.ScenarioName, () => new OfflineCharacterScenario());
                 ScenarioRegistry.Register(FreezerStressScenario.ScenarioName, () => new FreezerStressScenario());
@@ -165,6 +170,10 @@ namespace SentisTests
                 ScenarioRegistry.Register(ReplicationPerfScenario.ScenarioName, () => new ReplicationPerfScenario());
                 ScenarioRegistry.Register(ReplicationPerfScenario.AllocScenarioName, () => new ReplicationPerfScenario(allocProbe: true));
                 ScenarioRegistry.Register(PatchAuditScenario.ScenarioName, () => new PatchAuditScenario());
+                ScenarioRegistry.Register(PatchRetBufScenario.ScenarioName, () => new PatchRetBufScenario());
+                ScenarioRegistry.Register(PatchJumpsScenario.ScenarioName, () => new PatchJumpsScenario());
+                ScenarioRegistry.Register(PatchParamsScenario.ScenarioName, () => new PatchParamsScenario());
+                ScenarioRegistry.Register(StructThisGcScenario.ScenarioName, () => new StructThisGcScenario());
                 ScenarioRegistry.Register(MixedWeldScenario.ScenarioName, () => new MixedWeldScenario());
                 ScenarioRegistry.Register(HandWeldScenario.ScenarioName, () => new HandWeldScenario());
                 ScenarioRegistry.Register(ProductionScenario.ScenarioName, () => new ProductionScenario());
@@ -188,6 +197,7 @@ namespace SentisTests
                 try
                 {
                     Game.FakeClients.Install(torch.Managers.GetManager<PatchManager>());
+                    Game.FrameLoad.Install(torch.Managers.GetManager<PatchManager>());
                 }
                 catch (Exception e)
                 {
