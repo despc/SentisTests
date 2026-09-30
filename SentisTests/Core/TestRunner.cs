@@ -436,8 +436,42 @@ namespace SentisTests.Core
             }
             catch (Exception e) { Log.Warn("leftover purge before {0} failed: {1}", name, e.Message); }
 
-            _stack.Push(scenario.Run());
+            _stack.Push(SettleThenRun(scenario, name));
             Log.Info("[TEST] started: " + name);
+        }
+
+        /// <summary>Longest wait for the entities earlier runs closed to be deleted.</summary>
+        private const double SettleMaxSeconds = 180;
+
+        private static readonly System.Reflection.FieldInfo ToDelete = typeof(Sandbox.Game.Entities.MyEntities).GetField("m_entitiesToDelete",
+            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+        private static readonly System.Reflection.FieldInfo ToDeleteNextFrame = typeof(Sandbox.Game.Entities.MyEntities).GetField("m_entitiesToDeleteNextFrame",
+            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+
+        /// <summary>Entities closed but not deleted yet: SentisOptimisations' EntityDeleteBudget deletes a few milliseconds of them a frame.</summary>
+        private static int PendingDeletes() =>
+            ((ToDelete?.GetValue(null) as ICollection)?.Count ?? 0) + ((ToDeleteNextFrame?.GetValue(null) as ICollection)?.Count ?? 0);
+
+        /// <summary>
+        /// The scenario runs once what earlier runs closed is deleted: SentisOptimisations' EntityDeleteBudget deletes a
+        /// few milliseconds of closed entities a frame, and the tail of a heavy run (load_test_500's 500 ships) would
+        /// otherwise fall into the next scenario's frames and measurements. The wait does not count toward the
+        /// scenario's time.
+        /// </summary>
+        private static IEnumerator SettleThenRun(TestScenario scenario, string name)
+        {
+            var first = PendingDeletes();
+            if (first > 0)
+            {
+                var waited = Stopwatch.StartNew();
+                while (PendingDeletes() > 0 && waited.Elapsed.TotalSeconds < SettleMaxSeconds) yield return null;
+                var left = PendingDeletes();
+                Log.Info("[TEST] {0} waited {1:F1} s for {2} closed entities to be deleted{3}", name, waited.Elapsed.TotalSeconds, first,
+                    left > 0 ? " (" + left + " still waiting)" : "");
+                _stopwatch = Stopwatch.StartNew();
+                BaselineMetrics = TickMetrics.Take();
+            }
+            yield return scenario.Run();
         }
 
 

@@ -168,8 +168,11 @@ namespace SentisTests.Game
 
         public static long PlayerIdentityId()
         {
-            if (_ownerIdentityId.HasValue)
+            // the owner found before, while it is still there: blocks given to an identity that is gone come out owned
+            // by nobody
+            if (_ownerIdentityId.HasValue && Sandbox.Game.World.MySession.Static.Players.TryGetIdentity(_ownerIdentityId.Value) != null)
                 return _ownerIdentityId.Value;
+            _ownerIdentityId = null;
 
             var players = Sandbox.Game.World.MySession.Static.Players;
             var wanted = SentisTestsPlugin.Config != null ? SentisTestsPlugin.Config.OwnerPlayerName : null;
@@ -180,7 +183,11 @@ namespace SentisTests.Game
             {
                 if (identity == null || identity.IdentityId == 0) continue;
                 // A saved player has a MyPlayer record, an NPC or a created test identity does not.
-                var isPlayer = players.TryGetPlayer(identity.IdentityId) != null;
+                var player = players.TryGetPlayer(identity.IdentityId);
+                // the game's own bots have a MyPlayer record too: a wolf was taken for the owner, and when it died the
+                // test blocks came out owned by nobody (mixed_weld, 30.09.2026); fake clients come and go with the runs
+                var isPlayer = player != null && !player.IsBot && !player.IsWildlifeAgent &&
+                               !(identity.DisplayName ?? "").StartsWith(FakeClients.NamePrefix);
                 seen.Add(identity.DisplayName + "=" + identity.IdentityId + (isPlayer ? "" : "(no player)"));
                 if (!isPlayer) continue;
                 // not a SentisAi bot (they are players too, with the "[BOT] " prefix): the test grids would be
@@ -525,6 +532,32 @@ namespace SentisTests.Game
         /// blueprint. Returned with fresh entity ids (links between the grids remapped too), every
         /// block handed to the player, saved transforms kept; the chassis comes first.
         /// </summary>
+        /// <summary>
+        /// The planet's ground in the box put back as generated: what players, drills or scenarios cut or filled there is
+        /// dropped (<c>Storage.DeleteRange</c>, as drill_perf does after itself). A scenario that digs puts the ground back
+        /// in its cleanup: craters left behind broke the wheel scenarios' "untouched ground" (30.09.2026).
+        /// </summary>
+        public static void RevertTerrain(MyPlanet planet, BoundingBoxD box)
+        {
+            if (planet?.Storage == null || !box.Valid) return;
+            var corner = planet.PositionLeftBottomCorner;
+            // out to whole leaves of the storage: a leaf the range only cuts through kept what was dug in it (the rim of
+            // a crater stayed 4-9 m deep)
+            const int leaf = 64;
+            var min = Vector3I.Floor(box.Min - corner) + planet.StorageMin;
+            var max = Vector3I.Ceiling(box.Max - corner) + planet.StorageMin;
+            min = new Vector3I(min.X / leaf * leaf, min.Y / leaf * leaf, min.Z / leaf * leaf);
+            max = new Vector3I((max.X / leaf + 1) * leaf - 1, (max.Y / leaf + 1) * leaf - 1, (max.Z / leaf + 1) * leaf - 1);
+            min = Vector3I.Max(min, Vector3I.Zero);
+            max = Vector3I.Min(max, planet.Storage.Size - 1);
+            if (min.X > max.X || min.Y > max.Y || min.Z > max.Z) return;
+            planet.Storage.DeleteRange(VRage.Voxels.MyStorageDataTypeFlags.ContentAndMaterial, min, max, true);
+        }
+
+        /// <summary><see cref="RevertTerrain(MyPlanet, BoundingBoxD)"/> for a sphere cut or filled at <paramref name="centre"/>.</summary>
+        public static void RevertTerrain(MyPlanet planet, Vector3D centre, double radius) =>
+            RevertTerrain(planet, new BoundingBoxD(centre - new Vector3D(radius + 2), centre + new Vector3D(radius + 2)));
+
         public static List<MyObjectBuilder_CubeGrid> LoadAuthoredGroup(string resourceName, string name)
         {
             string xml;

@@ -72,6 +72,11 @@ namespace SentisTests.Scenarios
 
             // Now let clients arrive: fresh endpoints stream the grid from scratch.
             var beforeBuilders = RuntimePluginControls.TakeGridStreamBuilderStats();
+            // Other grids of the world stream to the same clients (and change, so their builders are rebuilt): only
+            // this grid's builds are the ones the check is about.
+            FrameProbe.WatchedGrid = _grid;
+            FrameProbe.WatchedGridBuilds = 0;
+            FrameProbe.WatchedGridTicks = 0;
             FakeClients.Add(Players, Network, p => (_grid.PositionComp.GetPosition() + up * (80 + 10 * p), 0, 0), withCharacters: true);
 
             var streaming = WaitForSeconds(StreamSeconds, "clients stream the grid");
@@ -81,12 +86,14 @@ namespace SentisTests.Scenarios
             var probe = FrameProbe.Take();
             var builders = RuntimePluginControls.TakeGridStreamBuilderStats();
             var worst = WorstFrameMs(metrics.Format());
-            var builderMs = Ms(probe, "grid.getObjectBuilder");
-            var builderCalls = Calls(probe, "grid.getObjectBuilder");
+            var builderMs = (int)(FrameProbe.WatchedGridTicks * 1000 / System.Diagnostics.Stopwatch.Frequency);
+            var builderCalls = FrameProbe.WatchedGridBuilds;
+            FrameProbe.WatchedGrid = null;
 
             Note("GRID STREAM RESULT | " + blocks + " blocks | one builder costs " + build.ToString("F0") +
                  " ms | while " + Players + " clients streamed it: worst frame " + worst.ToString("F0") +
-                 " ms, grid.getObjectBuilder " + builderMs + " ms in " + builderCalls + " calls | " + builders +
+                 " ms, this grid's getObjectBuilder " + builderMs + " ms in " + builderCalls + " calls (all grids: " +
+                 Ms(probe, "grid.getObjectBuilder") + " ms in " + Calls(probe, "grid.getObjectBuilder") + ") | " + builders +
                  " | " + metrics.Format() + " | " + probe);
 
             Check(blocks >= TargetBlocks / 2, "the grid is far smaller than asked for: " + blocks + " blocks");
@@ -99,7 +106,7 @@ namespace SentisTests.Scenarios
                 "the object builder was built " + builderCalls + " times for " + Players +
                 " clients: the builder cache is not holding");
             Check(builderMs < 3 * build + 10,
-                "grid.getObjectBuilder took " + builderMs + " ms of frames while one build costs " +
+                "this grid's getObjectBuilder took " + builderMs + " ms of frames while one build costs " +
                 build.ToString("F0") + " ms: the grid is being rebuilt per client");
         }
 

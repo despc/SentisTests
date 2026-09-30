@@ -457,8 +457,28 @@ namespace SentisTests.Core
         private static void ReplAcksSuffix() => End(Section.ReplClientAcks);
         private static void ReplDirtyPrefix() => Begin(Section.ReplApplyDirty);
         private static void ReplDirtySuffix() => End(Section.ReplApplyDirty);
-        private static void GridBuilderPrefix() => Begin(Section.GridGetObjectBuilder);
-        private static void GridBuilderSuffix() => End(Section.GridGetObjectBuilder);
+        /// <summary>A grid whose builds on the game thread are counted apart from those of every other grid.</summary>
+        public static Sandbox.Game.Entities.MyCubeGrid WatchedGrid;
+        public static int WatchedGridBuilds;
+        public static long WatchedGridTicks;
+        private static int _watchedDepth;
+        private static long _watchedStart;
+
+        private static void GridBuilderPrefix(Sandbox.Game.Entities.MyCubeGrid __instance)
+        {
+            Begin(Section.GridGetObjectBuilder);
+            if (__instance == null || __instance != WatchedGrid || Thread.CurrentThread.ManagedThreadId != _gameThreadId) return;
+            if (_watchedDepth++ == 0) _watchedStart = Stopwatch.GetTimestamp();
+        }
+
+        private static void GridBuilderSuffix(Sandbox.Game.Entities.MyCubeGrid __instance)
+        {
+            End(Section.GridGetObjectBuilder);
+            if (__instance == null || __instance != WatchedGrid || Thread.CurrentThread.ManagedThreadId != _gameThreadId || _watchedDepth == 0) return;
+            if (--_watchedDepth > 0) return;
+            WatchedGridTicks += Stopwatch.GetTimestamp() - _watchedStart;
+            WatchedGridBuilds++;
+        }
         private static void InvRefreshPrefix() => Begin(Section.InvRefreshClientData);
         private static void InvRefreshSuffix() => End(Section.InvRefreshClientData);
         private static void ReplStreamPrefix() => Begin(Section.ReplStreamingEntry);

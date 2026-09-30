@@ -38,12 +38,17 @@ namespace SentisTests.Scenarios
         public override string Name => ScenarioName;
         public override int TimeoutSeconds => 180;
 
+        // The cave and the shelf filled into it are put back as generated in the cleanup.
+        private MyPlanet _planet;
+        private Vector3D? _caveCentre;
+
         public override IEnumerator Run()
         {
             WorldApi.EnsureUnpaused(Name);
             var anchorM = WorldApi.LoadAuthoredGroup(WheelPerfScenario.ResourceName, WorldApi.EntityPrefix + Prefix + "anchor")[0]
                 .PositionAndOrientation.Value.GetMatrix();
             var planet = MyGamePruningStructure.GetClosestPlanet(anchorM.Translation);
+            _planet = planet;
             Check(planet != null, "no planet");
             var ground = new PlanetGround(planet);
             var up0 = ground.Up(anchorM.Translation);
@@ -57,6 +62,7 @@ namespace SentisTests.Scenarios
 
             // the cave: cut deep in the rock; a shelf of rock is filled back in over the plate once it has come to rest
             var caveCentre = site - up * (CaveDepthM + CaveRadiusM);
+            _caveCentre = caveCentre;
             string Column(Vector3D at) => string.Join(" ", Enumerable.Range(0, 15).Select(k => 3 - k * 0.5).Select(h => h.ToString("F1") + ":" + ground.ContentAt(at + up * h)));
             MyVoxelGenerator.CutOutShapeWithProperties(planet, new MyShapeSphere { Center = caveCentre, Radius = (float)CaveRadiusM }, out var cut, out _, null, updateSync: true);
             var floor = caveCentre;
@@ -209,6 +215,7 @@ namespace SentisTests.Scenarios
             {
                 FakeClients.RemoveAll();
                 _gameplay.Restore();
+                if (_caveCentre.HasValue) WorldApi.RevertTerrain(_planet, _caveCentre.Value, CaveRadiusM + ShelfHalfWidthM + ShelfThickM);
             }
             finally { base.Cleanup(); }
         }

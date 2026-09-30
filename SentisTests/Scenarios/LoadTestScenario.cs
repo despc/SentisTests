@@ -187,6 +187,7 @@ namespace SentisTests.Scenarios
                 Invoke(watcher.GetType().GetProperty("Cost").GetValue(watcher), "Reset");
                 Invoke(watcher.GetType().GetProperty("Sweep").GetValue(watcher), "StartNow");
             }
+            Note(ShapeRefcounts.Top(8));
             var clean = Stopwatch.StartNew();
             var window = WaitForSeconds(CleanSeconds, "the clean window");
             while (window.MoveNext()) yield return window.Current;

@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using Sandbox.Engine.Voxels;
@@ -32,9 +33,9 @@ namespace SentisTests.Scenarios
     {
         public const string ScenarioName = "voxel_stream";
         private const string Prefix = "vox-";
-        private const int Holes = 120;
-        private const double HoleRadiusM = 14;
-        private const double HoleStepM = 45;
+        internal const int Holes = 120;
+        internal const double HoleRadiusM = 14;
+        internal const double HoleStepM = 45;
         private const double SettleSeconds = 5;
         private const double StreamSeconds = 25;
         private const int Players = 2;
@@ -44,6 +45,11 @@ namespace SentisTests.Scenarios
         public override string Name => ScenarioName;
         public override int TimeoutSeconds => 900;
 
+        // Where the craters were dug, filled back in the cleanup: left there, they lay across the wheel scenarios'
+        // ground (the same anchor) and a small rover without continuous collision went through a crater's floor.
+        private readonly List<Vector3D> _dug = new List<Vector3D>();
+        private MyPlanet _planet;
+
         public override IEnumerator Run()
         {
             WorldApi.EnsureUnpaused(Name);
@@ -52,6 +58,7 @@ namespace SentisTests.Scenarios
             var planet = MyGamePruningStructure.GetClosestPlanet(anchorM.Translation);
             Check(planet != null, "no planet");
             Check(planet.Storage != null, "the planet has no storage");
+            _planet = planet;
 
             var up = Vector3D.Normalize(anchorM.Translation - planet.PositionComp.GetPosition());
             var east = Vector3D.Normalize(Vector3D.CalculatePerpendicularVector(up));
@@ -149,7 +156,7 @@ namespace SentisTests.Scenarios
             return property != null && (bool)property.GetValue(planet.Storage);
         }
 
-        private static double SurfaceDistance(MyPlanet planet, Vector3D up, Vector3D east, int index)
+        internal static double SurfaceDistance(MyPlanet planet, Vector3D up, Vector3D east, int index)
         {
             var direction = Vector3D.Normalize(up + east * (index * HoleStepM / 6000.0));
             var surface = planet.GetClosestSurfacePointGlobal(planet.PositionComp.GetPosition() + direction * planet.AverageRadius);
@@ -161,6 +168,7 @@ namespace SentisTests.Scenarios
             try
             {
                 var shape = new MyShapeSphere { Center = at, Radius = (float)radius };
+                _dug.Add(at);
                 MyVoxelGenerator.CutOutShapeWithProperties(planet, shape, out var cut, out _, null, updateSync: true);
                 return cut > 0;
             }
@@ -207,7 +215,12 @@ namespace SentisTests.Scenarios
 
         public override void Cleanup()
         {
-            try { FakeClients.RemoveAll(); }
+            try
+            {
+                FakeClients.RemoveAll();
+                foreach (var at in _dug) WorldApi.RevertTerrain(_planet, at, HoleRadiusM);
+                _dug.Clear();
+            }
             finally { base.Cleanup(); }
         }
     }

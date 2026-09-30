@@ -71,6 +71,7 @@ namespace SentisTests.Scenarios
         private readonly bool _dynamicPlatform;
         private readonly bool _probe;
         private readonly bool _gameTracking;
+        private static readonly FakeClients.NetworkProfile ZoneNetwork = new FakeClients.NetworkProfile { RttMs = 50 };
         private readonly ConfigOverride _soConfig = new ConfigOverride();
         private MyEntity _zone;
 
@@ -156,6 +157,15 @@ namespace SentisTests.Scenarios
                      (_zone.Physics?.RigidBody?.Layer.ToString() ?? "?") + (_gameTracking ? " (the game's tracking)" : " (the plugin's tracking)"));
             }
             var platform = WorldApi.SpawnGrid(platformOb);
+            if (_inZone)
+            {
+                // A player by the site keeps its physics cluster stepped (EnableSelectivePhysicsUpdates): the game's
+                // own zone tracking learns of a grid only from its phantom's contacts in the step, and with nobody
+                // there it never saw the platform ("the zone does not hold the platform after the weld", 30.09.2026;
+                // on 22.09 some character left on the site had kept the cluster stepped). Both trackings get the same.
+                var upAtSite = platformOb.PositionAndOrientation.Value.Up;
+                FakeClients.Add(1, ZoneNetwork, i => (fixtureOrigin + (Vector3D)(Vector3)upAtSite * 60, 0, 0), withCharacters: true);
+            }
             Track(platform);
             _fixturePosition = WorldApi.PositionOf(platform);
             yield return WaitForTicks(60);
@@ -518,6 +528,7 @@ namespace SentisTests.Scenarios
                 RestoreRuntimeConfig();
                 _soConfig.Restore();
                 SafeZoneProbe.Stop();
+                if (_inZone) FakeClients.RemoveAll();
                 if (_zone != null && !_zone.Closed) _zone.Close();
             }
             finally { base.Cleanup(); }

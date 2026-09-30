@@ -35,6 +35,10 @@ namespace SentisTests.Scenarios
         public override string Name => ScenarioName;
         public override int TimeoutSeconds => 300;
 
+        // The pits dug, filled back in the cleanup (a dug planet is what the scenario needs only while it runs).
+        private readonly List<Vector3D> _dug = new List<Vector3D>();
+        private MyPlanet _planet;
+
         public override IEnumerator Run()
         {
             WorldApi.EnsureUnpaused(Name);
@@ -57,6 +61,8 @@ namespace SentisTests.Scenarios
                 var direction = Vector3D.Normalize(up + east * (i * 5000.0 / planet.AverageRadius));
                 surface = planet.GetClosestSurfacePointGlobal(center + direction * planet.AverageRadius);
                 var shape = new MyShapeSphere { Center = surface - direction * 2, Radius = 8 };
+                _planet = planet;
+                _dug.Add(shape.Center);
                 MyVoxelGenerator.CutOutShapeWithProperties(planet, shape, out cut, out _, null, updateSync: true);
             }
             Note("planet " + planet.StorageName + ", surface " + (surface - center).Length().ToString("F0") + " m from its centre");
@@ -93,6 +99,16 @@ namespace SentisTests.Scenarios
             Check(contentChanged, "the stream says the planet is unchanged");
             Check(sendContent && bytes > 0,
                 "a changed planet went without its data to a client said to cache it: a client without that cache hangs in the respawn screen");
+        }
+
+        public override void Cleanup()
+        {
+            try
+            {
+                foreach (var at in _dug) WorldApi.RevertTerrain(_planet, at, 8);
+                _dug.Clear();
+            }
+            finally { base.Cleanup(); }
         }
     }
 }

@@ -65,6 +65,8 @@ namespace SentisTests
         public override void Init(ITorchBase torch)
         {
             TorchInstance = torch;
+            // first: a fatal exception from here on leaves a full dump
+            CrashDump.Install();
             try
             {
                 _config = Persistent<MainConfig>.Load(Path.Combine(StoragePath, "SentisTests.cfg"));
@@ -72,6 +74,10 @@ namespace SentisTests
                 ResolveReportDirectory();
 
                 ScenarioRegistry.Register(SmokeScenario.ScenarioName, () => new SmokeScenario());
+                ScenarioRegistry.Register(FatalExceptionScenario.ScenarioName, () => new FatalExceptionScenario());
+                ScenarioRegistry.Register(WreckRestoreScenario.ScenarioName, () => new WreckRestoreScenario());
+                ScenarioRegistry.Register(GroundProbeScenario.ScenarioName, () => new GroundProbeScenario());
+                ScenarioRegistry.Register(TerrainRestoreScenario.ScenarioName, () => new TerrainRestoreScenario());
                 ScenarioRegistry.Register(ProjectorWeldScenario.ScenarioName, () => new ProjectorWeldScenario());
                 ScenarioRegistry.Register(FrozenRadiusWeldScenario.ScenarioName, () => new FrozenRadiusWeldScenario());
                 ScenarioRegistry.Register(WelderPerfScenario.ScenarioName, () => new WelderPerfScenario());
