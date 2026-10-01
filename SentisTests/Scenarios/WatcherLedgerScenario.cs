@@ -12,6 +12,7 @@ using SentisTests.Core;
 using SentisTests.Game;
 using VRage;
 using VRage.Game;
+using VRage.Game.Entity;
 using VRage.ObjectBuilders;
 using VRageMath;
 
@@ -20,7 +21,8 @@ namespace SentisTests.Scenarios
     /// <summary>
     /// SentisWatcher's inventory ledger books where every item came from, and tells the honest from the rest.
     /// A player owns two containers, two assemblers and a refinery. Honest: ore moved between the containers,
-    /// a steel plate assembled from its ingots, ingots refined from ore - no alert. Not honest:
+    /// a steel plate assembled from its ingots, ingots refined from ore, the bags a dead character and a destroyed
+    /// container leave - no alert. Not honest:
     ///
     ///  - an assembler finishing a steel plate with no ingots in it (production_without_input);
     ///  - an assembler taking apart a steel plate it does not have (production_without_input, disassemble);
@@ -128,6 +130,41 @@ namespace SentisTests.Scenarios
             items[0] = stack;
             Note("container b holds " + b.GetItemAmount(IronOre) + " ore after the edit");
 
+            // ------------------------------------------------------------- honest: bags
+            // What comes into a bag came from what left it, past the ledger's hooks: no alert. Two kinds:
+            //  - a dead character's backpack (MyInventoryBagEntity): a copy of the body's inventory;
+            //  - a destroyed block's cargo bag (MyCargoContainerInventoryBagEntity, "Cargo Bag (N)", with
+            //    TemporaryContainers on): the block's own inventory moved into it.
+            var pocket = (MyInventory)character.GetInventory(0);
+            pocket.AddItems(20, new MyObjectBuilder_Ingot { SubtypeName = "Iron" });                 // from this plugin
+            var loot = Spawn("loot", centre + side * 130, up, side, identity, "LargeBlockSmallContainer").GetFatBlocks().First();
+            ((MyInventory)loot.GetInventory(0)).AddItems(30, new MyObjectBuilder_Ingot { SubtypeName = "Iron" });
+            pass = Pass(sweep);
+            while (pass.MoveNext()) yield return pass.Current;
+            var before = new HashSet<long>(MyEntities.GetEntities().Where(IsBag).Select(x => x.EntityId));
+            MyEntity NewBag(int ingots) => MyEntities.GetEntities()
+                .FirstOrDefault(x => IsBag(x) && !before.Contains(x.EntityId) && x.GetInventory(0)?.GetItemAmount(IronIngot) == ingots);
+
+            character.Kill(true, new VRage.Game.ModAPI.MyDamageInformation(false, 1000f, MyDamageType.Suicide, character.EntityId));
+            var temporary = MySession.Static.Settings.TemporaryContainers;
+            MySession.Static.Settings.TemporaryContainers = true;
+            try { loot.ReleaseInventory((MyInventory)loot.GetInventory(0)); }
+            finally { MySession.Static.Settings.TemporaryContainers = temporary; }
+            MyEntity backpack = null, cargoBag = null;
+            for (var tick = 0; tick < 600 && (backpack == null || cargoBag == null); tick++)
+            {
+                backpack = backpack ?? NewBag(20);
+                cargoBag = cargoBag ?? NewBag(30);
+                if (backpack == null || cargoBag == null) yield return null;
+            }
+            foreach (var x in MyEntities.GetEntities().Where(x => IsBag(x) && !before.Contains(x.EntityId)))
+                Note($"new bag: {x.DisplayName} ({x.GetType().Name}), {x.GetInventory(0)?.GetItemAmount(IronIngot)} ingots");
+            Check(character.IsDead, "the character did not die");
+            Check(backpack != null, "the dead character left no bag with its ingots");
+            Check(cargoBag is MyCargoContainerInventoryBagEntity, "the destroyed container left no cargo bag with its ingots");
+            Track(backpack);
+            Track(cargoBag);
+
             pass = Pass(sweep);
             while (pass.MoveNext()) yield return pass.Current;
             var flush = WaitForSeconds(3, "the records are written");
@@ -149,6 +186,11 @@ namespace SentisTests.Scenarios
             Check(!alerts.Any(x => (string)x["kind"] == "dupe_transfer"), "an honest transfer raised a dupe alert");
             Check(!alerts.Any(x => (string)x["kind"] == "unknown_source"), "an item came from a path the ledger does not know");
             Check(alerts.Count(x => (string)x["kind"] == "production_without_input") == 3, "honest production raised an alert");
+            // a bag has no owner of its own: its alerts are found by the entity
+            var bags = new[] { backpack.EntityId.ToString(), cargoBag.EntityId.ToString() };
+            var bagAlerts = ((List<Dictionary<string, object>>)anomalies["alerts"]).Where(x => bags.Contains(x["entity"] as string)).ToList();
+            foreach (var alert in bagAlerts) Note($"bag alert {alert["kind"]}: {alert["detail"]}");
+            Check(bagAlerts.Count == 0, "a bag raised an alert");
 
             var ledger = (Dictionary<string, object>)data.GetType().GetMethod("Ledger").Invoke(data, new object[] { "player", identity, from, to });
             var sources = (Dictionary<string, Dictionary<string, double>>)ledger["sources"];
@@ -163,6 +205,8 @@ namespace SentisTests.Scenarios
             Check(Source("Ore/Iron", "refine") == -10, "the refinery's ore is not booked to it");
             Check(Source("Ore/Iron", "move") == 0, "a move within the grid does not cancel out");
         }
+
+        private static bool IsBag(MyEntity entity) => entity is MyCargoContainerInventoryBagEntity || entity is MyInventoryBagEntity;
 
         private static void Invoke(object target, string method, params object[] args)
         {
