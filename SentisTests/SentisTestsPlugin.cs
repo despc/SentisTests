@@ -75,6 +75,7 @@ namespace SentisTests
 
                 ScenarioRegistry.Register(SmokeScenario.ScenarioName, () => new SmokeScenario());
                 ScenarioRegistry.Register(FatalExceptionScenario.ScenarioName, () => new FatalExceptionScenario());
+                ScenarioRegistry.Register(BotRadiationScenario.ScenarioName, () => new BotRadiationScenario());
                 ScenarioRegistry.Register(WreckRestoreScenario.ScenarioName, () => new WreckRestoreScenario());
                 ScenarioRegistry.Register(GroundProbeScenario.ScenarioName, () => new GroundProbeScenario());
                 ScenarioRegistry.Register(TerrainRestoreScenario.ScenarioName, () => new TerrainRestoreScenario());
