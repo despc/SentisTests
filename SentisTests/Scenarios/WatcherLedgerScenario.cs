@@ -22,7 +22,7 @@ namespace SentisTests.Scenarios
     /// SentisWatcher's inventory ledger books where every item came from, and tells the honest from the rest.
     /// A player owns two containers, two assemblers and a refinery. Honest: ore moved between the containers,
     /// a steel plate assembled from its ingots, ingots refined from ore, the bags a dead character and a destroyed
-    /// container leave - no alert. Not honest:
+    /// container leave, a suit refilled from a bottle (an item changed in place) - no alert. Not honest:
     ///
     ///  - an assembler finishing a steel plate with no ingots in it (production_without_input);
     ///  - an assembler taking apart a steel plate it does not have (production_without_input, disassemble);
@@ -137,6 +137,19 @@ namespace SentisTests.Scenarios
             //    TemporaryContainers on): the block's own inventory moved into it.
             var pocket = (MyInventory)character.GetInventory(0);
             pocket.AddItems(20, new MyObjectBuilder_Ingot { SubtypeName = "Iron" });                 // from this plugin
+
+            // ------------------------------------------------------------- honest: the suit refills from a bottle
+            // The game changes an item in place (a bottle's gas, a datapad's text) by taking it out and putting it
+            // back (MyInventory.ModifyContent): nothing is made, no alert. The game itself must do it - a call
+            // from here would be booked to this plugin - so the suit is left low on hydrogen with a full bottle.
+            pocket.AddItems(1, new Sandbox.Common.ObjectBuilders.Definitions.MyObjectBuilder_GasContainerObject { SubtypeName = "HydrogenBottle", GasLevel = 1f });
+            var hydrogen = Sandbox.Game.Entities.Character.Components.MyCharacterOxygenComponent.HydrogenId;
+            character.OxygenComponent.UpdateStoredGasLevel(ref hydrogen, 0.05f);
+            float BottleLevel() => pocket.GetItems().Select(x => x.Content).OfType<Sandbox.Common.ObjectBuilders.Definitions.MyObjectBuilder_GasContainerObject>()
+                .Where(x => x.SubtypeName == "HydrogenBottle").Select(x => x.GasLevel).DefaultIfEmpty(-1f).First();
+            for (var tick = 0; tick < 1200 && BottleLevel() >= 1f; tick++) yield return null;
+            Note($"the bottle after the suit refilled: {BottleLevel():0.###}, the suit {character.OxygenComponent.GetGasFillLevel(hydrogen):0.###}");
+            Check(BottleLevel() >= 0 && BottleLevel() < 1f, "the suit did not refill from the bottle");
             var loot = Spawn("loot", centre + side * 130, up, side, identity, "LargeBlockSmallContainer").GetFatBlocks().First();
             ((MyInventory)loot.GetInventory(0)).AddItems(30, new MyObjectBuilder_Ingot { SubtypeName = "Iron" });
             pass = Pass(sweep);
