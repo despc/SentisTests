@@ -568,10 +568,22 @@ namespace SentisTests.Game
                 using (var reader = new System.IO.StreamReader(stream))
                     xml = reader.ReadToEnd();
             }
+            return GroupFromXml(xml, resourceName, name);
+        }
+
+        /// <summary>A player's blueprint file (bp.sbc) readied for spawn as <see cref="LoadAuthoredGroup"/> does an embedded one.</summary>
+        public static List<MyObjectBuilder_CubeGrid> LoadBlueprintFile(string path, string name)
+        {
+            if (!System.IO.File.Exists(path)) throw new Core.ScenarioFailedException("blueprint not found: " + path);
+            return GroupFromXml(System.IO.File.ReadAllText(path), path, name);
+        }
+
+        private static List<MyObjectBuilder_CubeGrid> GroupFromXml(string xml, string source, string name)
+        {
             var definitions = MyAPIGateway.Utilities.SerializeFromXML<MyObjectBuilder_Definitions>(xml);
             var grids = definitions?.ShipBlueprints?.FirstOrDefault()?.CubeGrids?.ToList();
             if (grids == null || grids.Count == 0)
-                throw new Core.ScenarioFailedException(resourceName + " holds no grids");
+                throw new Core.ScenarioFailedException(source + " holds no grids");
             // Landing gears keep the id of the grid they are locked to, and their object builder has
             // no Remap: without this a copy would reach for the original station.
             var oldIds = grids.Select(g => g.EntityId).ToList();

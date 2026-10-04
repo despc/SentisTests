@@ -82,6 +82,9 @@ namespace SentisTests
                 ScenarioRegistry.Register(TurretWolfScenario.ScenarioName, () => new TurretWolfScenario());
                 ScenarioRegistry.Register(TurretWolfScenario.IdleName, () => new TurretWolfScenario(true));
                 ScenarioRegistry.Register(TurretWolvesScenario.ScenarioName, () => new TurretWolvesScenario());
+                ScenarioRegistry.Register(PbScriptLoadScenario.IimName, PbScriptLoadScenario.Iim);
+                ScenarioRegistry.Register(PbScriptLoadScenario.IimWatchName, PbScriptLoadScenario.IimWatch);
+                ScenarioRegistry.Register(PbSaveOffThreadScenario.ScenarioName, () => new PbSaveOffThreadScenario());
                 ScenarioRegistry.Register(WreckRestoreScenario.ScenarioName, () => new WreckRestoreScenario());
                 ScenarioRegistry.Register(GroundProbeScenario.ScenarioName, () => new GroundProbeScenario());
                 ScenarioRegistry.Register(TerrainRestoreScenario.ScenarioName, () => new TerrainRestoreScenario());
