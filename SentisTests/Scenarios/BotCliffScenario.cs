@@ -96,6 +96,7 @@ namespace SentisTests.Scenarios
 
             var homeAt = -1;
             var fastest = 0.0;
+            var lowest = 0.0;       // how far under the crater's rim it got
             var deaths = 0;
             for (var tick = 0; tick < WatchSeconds * 60 && homeAt < 0; tick++)
             {
@@ -103,6 +104,7 @@ namespace SentisTests.Scenarios
                 if (body == null || body.IsDead || body.EntityId != body0) { deaths++; Note($"{name}: a new body after {tick / 60} s"); break; }
                 // (not the first second: the move into place shows as a speed)
                 if (tick > 60) fastest = Math.Max(fastest, body.Physics?.LinearVelocity.Length() ?? 0);
+                lowest = Math.Min(lowest, Vector3D.Dot(body.PositionComp.GetPosition() - craterTop, up));
                 if (tick % 60 == 0)
                 {
                     if (Home() < 20) homeAt = tick / 60;
@@ -119,6 +121,8 @@ namespace SentisTests.Scenarios
             Note($"{name}: {(homeAt >= 0 ? $"at the base after {homeAt} s" : $"{Home():0} m from the base after {WatchSeconds} s")}, fastest {fastest:0.0} m/s, health {health0:0} -> {health:0}");
             Check(deaths == 0, $"{name} died or respawned");
             Check(fastest < 12, $"{name} fell: {fastest:0.0} m/s");
+            // (down the crater's side at under 12 m/s is still down it: a real cliff is higher)
+            if (!_withHydrogen) Check(lowest > -5, $"{name} went down into the crater, {-lowest:0.0} m under its rim");
             Check(health >= health0 - 1, $"{name} got hurt: health {health0:0} -> {health:0}");
             Check(homeAt >= 0, $"{name} did not get home round the crater in {WatchSeconds} s");
         }
