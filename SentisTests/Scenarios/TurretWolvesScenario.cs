@@ -62,6 +62,9 @@ namespace SentisTests.Scenarios
             var grid = SpawnTurret(spot + up * 1.25, up, side);
             var turret = grid.GetFatBlocks().OfType<MyLargeTurretBase>().FirstOrDefault();
             Check(turret != null, "the grid has no turret");
+            // characters only (the wolves): left to choose, with no wolf in sight it shot a bot's base 150 m off - 8900
+            // damage to its panels, turbines and generator in one run (05.10.2026)
+            turret.TargetStations = turret.TargetLargeGrids = turret.TargetSmallGrids = turret.TargetMeteors = turret.TargetMissiles = false;
             var magazine = turret.GunBase.CurrentAmmoMagazineId;
             turret.GetInventory(0).AddItems((MyFixedPoint)20, (MyObjectBuilder_PhysicalObject)MyObjectBuilderSerializer.CreateNewObject(magazine));
             var api = (Sandbox.ModAPI.Ingame.IMyLargeTurretBase)turret;

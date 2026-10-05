@@ -19,6 +19,9 @@ namespace SentisTests.Scenarios
     {
         public const string ScenarioName = "ai_status_ui";
 
+        /// <summary>Where the page's picture goes.</summary>
+        public static string PicturePath => System.IO.Path.Combine(System.IO.Path.GetTempPath(), "sentisai_page.png");
+
         public override string Name => ScenarioName;
         public override int TimeoutSeconds => 90;
 
@@ -49,6 +52,19 @@ namespace SentisTests.Scenarios
                         Dispatcher.PushFrame(frame);
                     }
                     text = ((TextBlock)status.GetValue(control)).Text;
+                    // the page as Torch would draw it, into a picture next to the logs: what the bots' table looks like
+                    var element = (System.Windows.FrameworkElement)control;
+                    element.Measure(new System.Windows.Size(1150, 700));
+                    element.Arrange(new System.Windows.Rect(0, 0, 1150, 700));
+                    element.UpdateLayout();
+                    var picture = new System.Windows.Media.Imaging.RenderTargetBitmap(1150, 700, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+                    var back = new System.Windows.Media.DrawingVisual();
+                    using (var g = back.RenderOpen()) g.DrawRectangle(System.Windows.Media.Brushes.White, null, new System.Windows.Rect(0, 0, 1150, 700));
+                    picture.Render(back);
+                    picture.Render(element);
+                    var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                    encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(picture));
+                    using (var file = System.IO.File.Create(PicturePath)) encoder.Save(file);
                 }
                 catch (Exception e) { error = e.InnerException ?? e; }
                 finally { done = true; }
@@ -59,7 +75,8 @@ namespace SentisTests.Scenarios
             Check(done, "the page did not answer in 30 s");
             Check(error == null, "the page threw: " + error);
             Note($"the page shows {text?.Length ?? 0} characters: {(text ?? "").Split('\n').FirstOrDefault()}");
-            Check(!string.IsNullOrEmpty(text) && text.StartsWith("Bots:"), "the page shows no statuses: " + text);
+            Check(!string.IsNullOrEmpty(text) && text.StartsWith("Ботов в игре"), "the page shows no statuses: " + text);
+            Note("the page's picture: " + PicturePath);
             yield return WaitForTicks(3 * 60);
             Note("the server still runs");
         }
