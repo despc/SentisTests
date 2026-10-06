@@ -128,6 +128,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(PowerSwitchScenario.ScenarioName, () => new PowerSwitchScenario());
                 ScenarioRegistry.Register(PanelServerScenario.ScenarioName, () => new PanelServerScenario());
                 ScenarioRegistry.Register(PbSaveThreadScenario.ScenarioName, () => new PbSaveThreadScenario());
+                ScenarioRegistry.Register(PbSaveFrozenScenario.ScenarioName, () => new PbSaveFrozenScenario());
                 ScenarioRegistry.Register(FallThroughTunnelScenario.ScenarioName, () => new FallThroughTunnelScenario());
                 ScenarioRegistry.Register(OfflineCharacterScenario.ScenarioName, () => new OfflineCharacterScenario());
                 ScenarioRegistry.Register(FreezerStressScenario.ScenarioName, () => new FreezerStressScenario());
