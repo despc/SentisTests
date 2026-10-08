@@ -189,6 +189,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(WarheadMassScenario.AllScenarioName, () => new WarheadMassScenario(all: true));
                 ScenarioRegistry.Register(FreezeProductionScenario.ScenarioName, () => new FreezeProductionScenario());
                 ScenarioRegistry.Register(LongFreezeProductionScenario.ScenarioName, () => new LongFreezeProductionScenario());
+                ScenarioRegistry.Register(FreezeDisassemblyScenario.ScenarioName, () => new FreezeDisassemblyScenario());
                 ScenarioRegistry.Register(FreezePowerScenario.ScenarioName, () => new FreezePowerScenario());
                 ScenarioRegistry.Register(ProjectionStreamScenario.ScenarioName, () => new ProjectionStreamScenario());
                 ScenarioRegistry.Register(WheelPerfScenario.RestoreCostScenarioName, () => new WheelPerfScenario(100, restore: true, sink: false));
