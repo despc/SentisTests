@@ -22,7 +22,9 @@ namespace SentisTests.Scenarios
     /// SentisWatcher's inventory ledger books where every item came from, and tells the honest from the rest.
     /// A player owns two containers, two assemblers and a refinery. Honest: ore moved between the containers,
     /// a steel plate assembled from its ingots, ingots refined from ore, the bags a dead character and a destroyed
-    /// container leave, a suit refilled from a bottle (an item changed in place) - no alert. Not honest:
+    /// container leave, a suit refilled from a bottle (an item changed in place), algae out of an algae farm (the
+    /// source "farm"), and SentisOptimisations taking apart for a frozen assembler no more plates than it holds
+    /// (it gave the ingots of six for three) - no alert. Not honest:
     ///
     ///  - an assembler finishing a steel plate with no ingots in it (production_without_input);
     ///  - an assembler taking apart a steel plate it does not have (production_without_input, disassemble);
@@ -87,6 +89,8 @@ namespace SentisTests.Scenarios
             var honest = (MyAssembler)Spawn("assembler-1", centre + side * 30, up, side, identity, "LargeAssembler").GetFatBlocks().First();
             var dishonest = (MyAssembler)Spawn("assembler-2", centre + side * 60, up, side, identity, "LargeAssembler").GetFatBlocks().First();
             var refinery = (MyRefinery)Spawn("refinery", centre + side * 100, up, side, identity, "LargeRefinery").GetFatBlocks().First();
+            var farm = Spawn("farm", centre + side * 160, up, side, identity, "LargeBlockAlgaeFarm").GetFatBlocks().First();
+            var third = (MyAssembler)Spawn("assembler-3", centre + side * 190, up, side, identity, "LargeAssembler").GetFatBlocks().First();
             var settle = WaitForSeconds(2, "the grids settle");
             while (settle.MoveNext()) yield return settle.Current;
 
@@ -112,6 +116,26 @@ namespace SentisTests.Scenarios
             Invoke(refinery, "ChangeRequirementsToResults", ironBlueprint, (MyFixedPoint)10);
             Note($"honest refinery: ore left {refinery.InputInventory.GetItemAmount(IronOre)}, ingots {refinery.OutputInventory.GetItemAmount(IronIngot)}");
             Check(refinery.InputInventory.GetItemAmount(IronOre) == 90, "the honest refinery did not take 10 ore");
+
+            // an algae farm makes algae out of light: the game's own source, "farm" (it was "unknown:MyItemProducerComponent.Produce")
+            var producerType = typeof(SpaceEngineers.Game.Entities.Blocks.MyGravityGenerator).Assembly.GetType("SpaceEngineers.Game.EntityComponents.Blocks.MyItemProducerComponent");
+            Check(producerType != null, "the game has no MyItemProducerComponent");
+            Check(farm.Components.TryGet(producerType, out var producer) && producer != null, "the algae farm has no item producer component");
+            var algae = new MyDefinitionId(typeof(MyObjectBuilder_PhysicalObject), "Algae");
+            producer.GetType().GetMethod("Produce").Invoke(producer, new object[] { algae, (MyFixedPoint)2 });
+            Check(farm.GetInventory(0).GetItemAmount(algae) == 2, "the algae farm made no algae");
+
+            // SentisOptimisations makes up for the time an assembler was frozen with batches of its own: six plates
+            // queued to take apart and three held are three taken apart (it gave the ingots of six)
+            var freezer = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(x => x.GetName().Name == "SentisOptimisations")
+                ?.GetType("SentisOptimisationsPlugin.Freezer.FreezerPatches");
+            Check(freezer != null, "SentisOptimisations is not loaded");
+            ((MyInventory)third.OutputInventory).AddItems(3, new MyObjectBuilder_Component { SubtypeName = "SteelPlate" });
+            var perPlate = (double)(plate.Prerequisites[0].Amount * (MyFixedPoint)(1f / third.GetEfficiencyMultiplierForBlueprint(plate)));
+            freezer.GetMethod("FinishDisassembling", Any).Invoke(null, new object[] { plate, 6, third });
+            Note($"frozen assembler: plates left {third.OutputInventory.GetItemAmount(SteelPlate)}, ingots {third.InputInventory.GetItemAmount(IronIngot)} ({perPlate} a plate)");
+            Check(third.OutputInventory.GetItemAmount(SteelPlate) == 0, "the three plates were not taken apart");
+            Check(Math.Abs((double)third.InputInventory.GetItemAmount(IronIngot) - 3 * perPlate) < 0.001, "three plates did not give the ingots of three");
 
             // ------------------------------------------------------------- not honest
             Invoke(dishonest, "FinishAssembling", plate);                // no ingots in it
@@ -212,9 +236,10 @@ namespace SentisTests.Scenarios
             Check(Source("Ore/Iron", "plugin:SentisTests") >= 1100, "the ore put in by this plugin is not booked to it");
             Check(Source("Ore/Iron", "unexplained") == 500, "the edited stack is not booked as unexplained");
             Check(Source("Component/SteelPlate", "assemble") == 2, "the two steel plates made are not booked to assembly");
-            Check(Source("Component/SteelPlate", "disassemble") == -1, "the plate taken apart is not booked to disassembly");
+            Check(Source("Component/SteelPlate", "disassemble") == -4, "the plates taken apart (one, and the frozen assembler's three) are not booked to disassembly");
             Check(Source("Ingot/Iron", "assemble") < 0, "the ingots the plate took are not booked to assembly");
             Check(Source("Ingot/Iron", "refine") > 0, "the refined ingots are not booked to the refinery");
+            Check(Source("PhysicalObject/Algae", "farm") == 2, "the algae are not booked to the farm");
             Check(Source("Ore/Iron", "refine") == -10, "the refinery's ore is not booked to it");
             Check(Source("Ore/Iron", "move") == 0, "a move within the grid does not cancel out");
         }

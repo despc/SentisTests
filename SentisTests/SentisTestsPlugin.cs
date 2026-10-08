@@ -83,6 +83,9 @@ namespace SentisTests
                 ScenarioRegistry.Register(BotCliffScenario.ScenarioName, () => new BotCliffScenario());
                 ScenarioRegistry.Register(BotCliffScenario.WithHydrogenName, () => new BotCliffScenario(withHydrogen: true));
                 ScenarioRegistry.Register(BotSeatFinishScenario.ScenarioName, () => new BotSeatFinishScenario());
+                ScenarioRegistry.Register(BotNoDuplicateScenario.ScenarioName, () => new BotNoDuplicateScenario());
+                ScenarioRegistry.Register(BotSpareBlockScenario.ScenarioName, () => new BotSpareBlockScenario());
+                ScenarioRegistry.Register(BotMoveApartScenario.ScenarioName, () => new BotMoveApartScenario());
                 ScenarioRegistry.Register(AiStatusUiScenario.ScenarioName, () => new AiStatusUiScenario());
                 ScenarioRegistry.Register(TurretProbeScenario.ScenarioName, () => new TurretProbeScenario());
                 ScenarioRegistry.Register(TurretWatchScenario.ScenarioName, () => new TurretWatchScenario());
