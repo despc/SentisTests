@@ -28,6 +28,14 @@ namespace SentisTests.Scenarios
     public sealed class GrinderPerfScenario : TestScenario
     {
         public const string ScenarioName = "grinder_perf";
+        /// <summary>
+        /// 16 pairs on a lattice 20 km apart, each with an invulnerable fake player of its own: with clusters of the physics
+        /// of 5 km each pair its own island, for SentisClusters.
+        /// </summary>
+        public const string SpreadScenarioName = "grinder_spread";
+        private const int SpreadPairs = 16;
+        private const int SpreadPerRow = 4;
+        private const double SpreadStep = 20000;
         private const string Prefix = "grind-";
         internal const string GrinderResource = "SentisTests.Resources.GrinderTest.xml";
         internal const string TargetResource = "SentisTests.Resources.ShipToGrind.xml";
@@ -47,7 +55,13 @@ namespace SentisTests.Scenarios
 
         private static readonly FakeClients.NetworkProfile Network = new FakeClients.NetworkProfile { RttMs = 50 };
 
-        public override string Name => ScenarioName;
+        private readonly bool _spread;
+        private readonly List<ulong> _protected = new List<ulong>();
+        private int PairCount => _spread ? SpreadPairs : Pairs;
+
+        public GrinderPerfScenario(bool spread = false) { _spread = spread; }
+
+        public override string Name => _spread ? SpreadScenarioName : ScenarioName;
         public override int TimeoutSeconds => (int)(GrindSeconds + 300);
 
         private sealed class Pair
@@ -66,9 +80,12 @@ namespace SentisTests.Scenarios
         {
             WorldApi.EnsureUnpaused(Name);
             var pairs = new List<Pair>();
-            for (var i = 0; i < Pairs; i++)
+            for (var i = 0; i < PairCount; i++)
             {
-                pairs.Add(SpawnPair(i, new Vector3D(PairSpacingM * i, OffsetM, 0)));
+                var offset = _spread
+                    ? new Vector3D(i % SpreadPerRow * SpreadStep, OffsetM, i / SpreadPerRow * SpreadStep)
+                    : new Vector3D(PairSpacingM * i, OffsetM, 0);
+                pairs.Add(SpawnPair(i, offset));
                 yield return null;
             }
 
@@ -76,7 +93,23 @@ namespace SentisTests.Scenarios
             var middle = pairs[pairs.Count / 2];
             var side = Vector3D.Normalize(Vector3D.CalculatePerpendicularVector(middle.Dir));
             var watch = middle.Grinder.PositionComp.WorldAABB.Center + side * PlayerDistanceM;
-            FakeClients.Add(Players, Network, p => (watch + side * (10 * p), 0, 0), withCharacters: true);
+            if (!_spread) FakeClients.Add(Players, Network, p => (watch + side * (10 * p), 0, 0), withCharacters: true);
+            else
+            {
+                // a player by every pair, out of harm's way: invulnerable and untargetable, the way the admin menu sets them
+                FakeClients.Add(pairs.Count, Network, p =>
+                {
+                    var away = Vector3D.Normalize(Vector3D.CalculatePerpendicularVector(pairs[p].Dir));
+                    return (pairs[p].Grinder.PositionComp.WorldAABB.Center + away * PlayerDistanceM, 0, 0);
+                }, withCharacters: true);
+                for (var p = 0; p < FakeClients.Count; p++)
+                {
+                    var steamId = FakeClients.PlayerOf(p).Id.SteamId;
+                    _protected.Add(steamId);
+                    Sandbox.Game.World.MySession.Static.RemoteAdminSettings[steamId] =
+                        Sandbox.Game.World.AdminSettingsEnum.Invulnerable | Sandbox.Game.World.AdminSettingsEnum.Untargetable;
+                }
+            }
 
             var settle = WaitForSeconds(SettleSeconds, "grids settle");
             while (settle.MoveNext()) yield return settle.Current;
@@ -87,7 +120,7 @@ namespace SentisTests.Scenarios
                 pair.StartItems = Items(pair.Grinder);
             }
             var gravity = Sandbox.Game.GameSystems.MyGravityProviderSystem.CalculateNaturalGravityInPoint(middle.Grinder.PositionComp.GetPosition()).Length();
-            Note(Pairs + " pairs, " + PairSpacingM + " m apart: grinder " + middle.Grinder.CubeBlocks.Count + " blocks (" + middle.Grinders.Count +
+            Note(PairCount + " pairs, " + (_spread ? SpreadStep : PairSpacingM) + " m apart: grinder " + middle.Grinder.CubeBlocks.Count + " blocks (" + middle.Grinders.Count +
                  " grinders), target " + middle.StartBlocks + " blocks, static " + pairs.All(p => p.Target.IsStatic) + ", all target blocks off; heads moved " +
                  string.Join("/", pairs.Select(p => (p.Gap - StartGapM).ToString("F1"))) + " m closer; gravity " + gravity.ToString("F2") + " m/s2");
 
@@ -143,7 +176,7 @@ namespace SentisTests.Scenarios
             foreach (var g in pairs.SelectMany(p => p.Grinders)) g.Enabled = false;
             var metrics = TickMetrics.Take();
             var probe = FrameProbe.Take();
-            Note("GRINDER RESULT | " + (DateTime.UtcNow - started).TotalSeconds.ToString("F0") + " s, " + Pairs + " pairs, " +
+            Note("GRINDER RESULT | " + (DateTime.UtcNow - started).TotalSeconds.ToString("F0") + " s, " + PairCount + " pairs, " +
                  pairs.Sum(p => p.Grinders.Count) + " grinders, ground off " + pairs.Sum(p => p.StartBlocks - p.Left) + " blocks (" +
                  string.Join("/", pairs.Select(p => p.StartBlocks - p.Left)) + "), items taken " +
                  pairs.Sum(p => Items(p.Grinder) - p.StartItems).ToString("F0") +
@@ -262,7 +295,12 @@ namespace SentisTests.Scenarios
 
         public override void Cleanup()
         {
-            try { FakeClients.RemoveAll(); }
+            try
+            {
+                FakeClients.RemoveAll();
+                foreach (var steamId in _protected) Sandbox.Game.World.MySession.Static?.RemoteAdminSettings.Remove(steamId);
+                _protected.Clear();
+            }
             finally { base.Cleanup(); }
         }
 

@@ -101,6 +101,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(ProjectorWeldScenario.ScenarioName, () => new ProjectorWeldScenario());
                 ScenarioRegistry.Register(FrozenRadiusWeldScenario.ScenarioName, () => new FrozenRadiusWeldScenario());
                 ScenarioRegistry.Register(WelderPerfScenario.ScenarioName, () => new WelderPerfScenario());
+                ScenarioRegistry.Register(WelderSpreadScenario.ScenarioName, () => new WelderSpreadScenario());
                 ScenarioRegistry.Register(WelderPerfScenario.ZoneScenarioName,
                     () => new WelderPerfScenario(WelderPerfScenario.ZoneScenarioName, inZone: true, dynamicPlatform: false));
                 ScenarioRegistry.Register(WelderPerfScenario.ZoneDynamicScenarioName,
@@ -113,7 +114,9 @@ namespace SentisTests
                     () => new WelderPerfScenario(WelderPerfScenario.ZoneDynamicGameScenarioName, inZone: true, dynamicPlatform: true, probe: false, gameTracking: true));
                 ScenarioRegistry.Register(RefineryPerfScenario.ScenarioName, () => new RefineryPerfScenario());
                 ScenarioRegistry.Register(RefineryPerfScenario.BusyScenarioName, () => new RefineryPerfScenario(busy: true));
+                ScenarioRegistry.Register(RefineryPerfScenario.SpreadScenarioName, () => new RefineryPerfScenario(spread: true));
                 ScenarioRegistry.Register(DrillPerfScenario.ScenarioName, () => new DrillPerfScenario());
+                ScenarioRegistry.Register(DrillPerfScenario.SpreadScenarioName, () => new DrillPerfScenario(spread: true));
                 ScenarioRegistry.Register(WheelPerfScenario.ScenarioName, () => new WheelPerfScenario());
                 ScenarioRegistry.Register(WheelPerfScenario.ScenarioName64, () => new WheelPerfScenario(64));
                 ScenarioRegistry.Register(WheelPerfScenario.FallScenarioName, () => new WheelPerfScenario(32, fast: true));
@@ -145,6 +148,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(FreezerStressScenario.ScenarioName, () => new FreezerStressScenario());
                 ScenarioRegistry.Register(FreezerStressScenario.ProfileScenarioName, () => new FreezerStressScenario(profile: true));
                 ScenarioRegistry.Register(GrinderPerfScenario.ScenarioName, () => new GrinderPerfScenario());
+                ScenarioRegistry.Register(GrinderPerfScenario.SpreadScenarioName, () => new GrinderPerfScenario(spread: true));
                 ScenarioRegistry.Register(ThrustPerfScenario.IonScenarioName, () => new ThrustPerfScenario(atmospheric: false));
                 ScenarioRegistry.Register(ThrustPerfScenario.AtmoScenarioName, () => new ThrustPerfScenario(atmospheric: true));
                 ScenarioRegistry.Register(GasPerfScenario.ScenarioName, () => new GasPerfScenario());

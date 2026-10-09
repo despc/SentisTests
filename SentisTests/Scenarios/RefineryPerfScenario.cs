@@ -29,6 +29,9 @@ namespace SentisTests.Scenarios
         public const string ScenarioName = "refinery_perf";
         /// <summary>The same with every frame made heavy (<see cref="FrameLoad"/>): the refineries see frames that have already done <see cref="BusySpinMs"/>.</summary>
         public const string BusyScenarioName = "refinery_perf_busy";
+        /// <summary>The copies 8 km apart (56 km a side): with clusters of the physics of 5 km each its own island, for SentisClusters.</summary>
+        public const string SpreadScenarioName = "refinery_perf_spread";
+        private const double SpreadStep = 8000.0;
         private const double BusySpinMs = 13;
         internal const string ResourceName = "SentisTests.Resources.RefineryTest.xml";
         private const string GridPrefix = "refinery-perf-";
@@ -49,10 +52,15 @@ namespace SentisTests.Scenarios
         private bool _captured;
         private bool _initialFreezerEnabled;
         private readonly bool _busy;
+        private readonly bool _spread;
 
-        public RefineryPerfScenario(bool busy = false) { _busy = busy; }
+        public RefineryPerfScenario(bool busy = false, bool spread = false)
+        {
+            _busy = busy;
+            _spread = spread;
+        }
 
-        public override string Name => _busy ? BusyScenarioName : ScenarioName;
+        public override string Name => _busy ? BusyScenarioName : _spread ? SpreadScenarioName : ScenarioName;
         public override int TimeoutSeconds => MaxProcessingSeconds + 300;
 
         public override IEnumerator Run()
@@ -73,7 +81,8 @@ namespace SentisTests.Scenarios
             for (var i = 0; i < GridCount; i++)
             {
                 var ob = WorldApi.LoadAuthoredGrid(ResourceName, WorldApi.EntityPrefix + GridPrefix + i.ToString("D2"));
-                var position = origin + new Vector3D((i % GridsPerRow) * LatticeStep, 0, (i / GridsPerRow) * LatticeStep);
+                var step = _spread ? SpreadStep : LatticeStep;
+                var position = origin + new Vector3D((i % GridsPerRow) * step, 0, (i / GridsPerRow) * step);
                 ob.PositionAndOrientation = new MyPositionAndOrientation(position, pose.Forward, pose.Up);
                 ob.IsStatic = true;
                 var grid = WorldApi.SpawnGrid(ob);

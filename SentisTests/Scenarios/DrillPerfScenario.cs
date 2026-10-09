@@ -28,6 +28,12 @@ namespace SentisTests.Scenarios
     public sealed class DrillPerfScenario : TestScenario
     {
         public const string ScenarioName = "drill_perf";
+        /// <summary>
+        /// 16 ships on a lattice 20 km apart over the planet, each with an invulnerable fake player of its own (with selective
+        /// physics updates a cluster with nobody in it is not stepped and the ship would not come down): with clusters of
+        /// the physics of 5 km each ship its own island, for SentisClusters.
+        /// </summary>
+        public const string SpreadScenarioName = "drill_spread";
         internal const string ResourceName = "SentisTests.Resources.DrillTest.xml";
         private const string GridPrefix = "drill-perf-";
         private const int GridCount = 32;
@@ -60,7 +66,22 @@ namespace SentisTests.Scenarios
         private bool _captured;
         private bool _initialFreezerEnabled;
 
-        public override string Name => ScenarioName;
+        private readonly bool _spread;
+        private readonly int _count;
+        private readonly int _perRow;
+        private readonly double _step;
+        private readonly List<ulong> _protected = new List<ulong>();
+        private static readonly FakeClients.NetworkProfile Network = new FakeClients.NetworkProfile { RttMs = 50 };
+
+        public DrillPerfScenario(bool spread = false)
+        {
+            _spread = spread;
+            _count = spread ? 16 : GridCount;
+            _perRow = spread ? 4 : GridsPerRow;
+            _step = spread ? 20000 : LatticeStep;
+        }
+
+        public override string Name => _spread ? SpreadScenarioName : ScenarioName;
         public override int TimeoutSeconds => (int)(ApproachSeconds + WindowSeconds) + 400;
 
         public override IEnumerator Run()
@@ -94,10 +115,10 @@ namespace SentisTests.Scenarios
                  " m from its centre, " + drillCells.Count + " drills, grid up · vertical = " +
                  Vector3D.Dot(gridUp0, up0).ToString("F3"));
 
-            for (var i = 0; i < GridCount; i++)
+            for (var i = 0; i < _count; i++)
             {
-                var guess = _center + east * ((i % GridsPerRow - (GridsPerRow - 1) / 2.0) * LatticeStep) +
-                            north * ((i / GridsPerRow - (GridCount / GridsPerRow - 1) / 2.0) * LatticeStep);
+                var guess = _center + east * ((i % _perRow - (_perRow - 1) / 2.0) * _step) +
+                            north * ((i / _perRow - (_count / _perRow - 1) / 2.0) * _step);
                 var surface = _planet.GetClosestSurfacePointGlobal(ref guess);
                 var up = Vector3D.Normalize(surface - planetCenter);
                 var forward = Rotate(forward0, up0, up);
@@ -105,6 +126,22 @@ namespace SentisTests.Scenarios
                 // Grid-local Y is gridUp; the drills point along grid Down and their lowest cell
                 // is the Min row, whose bottom face is half a cell below its centre.
                 var bottomAboveOrigin = (lowestDrillY - 0.5) * gridSize * Vector3D.Dot(gridUp, up);
+                if (_spread)
+                {
+                    // far apart the ground is not the flat patch next to the authored ship: the ship stands over the
+                    // highest point under it, or a slope touches it as it appears and it is made a station (4 of 16
+                    // were, 09.10.2026)
+                    var e = Vector3D.Normalize(forward - up * Vector3D.Dot(forward, up));
+                    var n = Vector3D.Cross(up, e);
+                    var highest = (surface - planetCenter).Length();
+                    for (var dx = -15.0; dx <= 15.0; dx += 7.5)
+                    for (var dz = -15.0; dz <= 15.0; dz += 7.5)
+                    {
+                        var probe = surface + e * dx + n * dz;
+                        highest = Math.Max(highest, (_planet.GetClosestSurfacePointGlobal(ref probe) - planetCenter).Length());
+                    }
+                    surface = planetCenter + up * highest;
+                }
                 var position = surface + up * (ClearanceM - bottomAboveOrigin);
                 _sites.Add(surface);
 
@@ -121,7 +158,24 @@ namespace SentisTests.Scenarios
                 yield return null;
             }
 
-            var drills = new List<List<MyShipDrill>>(GridCount);
+            if (_spread)
+            {
+                // a player by every ship, 40 m up and aside, invulnerable and untargetable the way the admin menu sets them
+                FakeClients.Add(_sites.Count, Network, i =>
+                {
+                    var upAt = Vector3D.Normalize(_sites[i] - planetCenter);
+                    var aside = Vector3D.Normalize(Vector3D.CalculatePerpendicularVector(upAt));
+                    return (_sites[i] + upAt * 40 + aside * 60, 0, 0);
+                }, withCharacters: true);
+                for (var p = 0; p < FakeClients.Count; p++)
+                {
+                    var steamId = FakeClients.PlayerOf(p).Id.SteamId;
+                    _protected.Add(steamId);
+                    Sandbox.Game.World.MySession.Static.RemoteAdminSettings[steamId] =
+                        Sandbox.Game.World.AdminSettingsEnum.Invulnerable | Sandbox.Game.World.AdminSettingsEnum.Untargetable;
+                }
+            }
+            var drills = new List<List<MyShipDrill>>(_count);
             foreach (var grid in _grids)
             {
                 WorldApi.EnsureDistributor(grid);
@@ -136,7 +190,15 @@ namespace SentisTests.Scenarios
                 HoldAll(0);
                 yield return settle.Current;
             }
-            Check(_grids.All(g => g.Physics != null && !g.IsStatic), "a drill ship lost its physics");
+            var lost = _grids.Where(g => g.Physics == null || g.IsStatic).ToList();
+            Check(lost.Count == 0, lost.Count + " drill ships lost their physics: " + string.Join("; ", lost.Take(6).Select(g =>
+            {
+                var at = g.PositionComp.GetPosition();
+                var ground = _planet.GetClosestSurfacePointGlobal(ref at);
+                var over = (at - _planet.PositionComp.GetPosition()).Length() - (ground - _planet.PositionComp.GetPosition()).Length();
+                return g.DisplayName + (g.Closed ? " closed" : g.MarkedForClose ? " closing" : "") + (g.IsStatic ? " static" : "") +
+                       (g.Physics == null ? " no physics" : "") + ", " + over.ToString("F1") + " m over the ground";
+            })));
             Check(drills.All(d => d.All(x => x.ResourceSink.IsPowered)), "not every drill is powered after spawn");
 
             var inventories = _grids.Select(InventoriesOf).ToList();
@@ -157,10 +219,10 @@ namespace SentisTests.Scenarios
             var started = DateTime.UtcNow;
             var windowStarted = DateTime.MinValue;
             var lastLog = DateTime.UtcNow;
-            Note("switching " + GridCount * drillCells.Count + " drills on over 90 frames and descending at " + DescendMps + " m/s");
+            Note("switching " + _count * drillCells.Count + " drills on over 90 frames and descending at " + DescendMps + " m/s");
             while (true)
             {
-                for (var g = 0; g < GridCount; g++)
+                for (var g = 0; g < _count; g++)
                 {
                     if (frame == startFrame[g])
                         foreach (var drill in drills[g]) ((Sandbox.ModAPI.IMyFunctionalBlock)drill).Enabled = true;
@@ -168,7 +230,7 @@ namespace SentisTests.Scenarios
                 HoldAll(DescendMps, startFrame, frame);
                 if (frame % UnloadEveryFrames == 0)
                 {
-                    var unload = cargo[frame / UnloadEveryFrames % GridCount];
+                    var unload = cargo[frame / UnloadEveryFrames % _count];
                     unloaded += CountOre(new List<MyInventory> { unload });
                     unload.Clear();
                 }
@@ -180,7 +242,7 @@ namespace SentisTests.Scenarios
                     windowStarted = DateTime.UtcNow;
                     TickMetrics.Take();
                     FrameProbe.Take();
-                    Note("PROFILE WINDOW START: " + GridCount + " ships drilling");
+                    Note("PROFILE WINDOW START: " + _count + " ships drilling");
                 }
                 if (windowStarted != DateTime.MinValue)
                 {
@@ -203,7 +265,7 @@ namespace SentisTests.Scenarios
             var floating = CountFloatingOre() - startFloating;
             var depth = DepthSummary(planetCenter);
             Check(mined > 0, "the ships mined no ore");
-            Note("PROFILE WINDOW END: " + GridCount + " ships mined " + (mined / 1000).ToString("F1") + " t in " + WindowSeconds +
+            Note("PROFILE WINDOW END: " + _count + " ships mined " + (mined / 1000).ToString("F1") + " t in " + WindowSeconds +
                  "s, floating ore objects " + floating + ", depth below start " + depth + " | " + CutPhysicsCounters() + " | " + metrics.Format() + " | " + simWork);
 
             foreach (var gridDrills in drills)
@@ -309,11 +371,21 @@ namespace SentisTests.Scenarios
 
         private int CountFloatingOre()
         {
-            var sphere = new BoundingSphereD(_center, LatticeStep * GridsPerRow);
-            var found = MyEntities.GetTopMostEntitiesInSphere(ref sphere);
-            try { return found.Count(e => e is MyFloatingObject); }
-            finally { found.Clear(); }
+            var count = 0;
+            foreach (var sphere in Spheres())
+            {
+                var s = sphere;
+                var found = MyEntities.GetTopMostEntitiesInSphere(ref s);
+                try { count += found.Count(e => e is MyFloatingObject); }
+                finally { found.Clear(); }
+            }
+            return count;
         }
+
+        /// <summary>Where the ships drill: the lattice, or each ship's site when they are spread.</summary>
+        private IEnumerable<BoundingSphereD> Spheres() => _spread
+            ? _sites.Select(site => new BoundingSphereD(site, 150))
+            : new[] { new BoundingSphereD(_center, LatticeStep * GridsPerRow) };
 
         private static List<MyInventory> InventoriesOf(MyCubeGrid grid)
         {
@@ -344,6 +416,12 @@ namespace SentisTests.Scenarios
             try
             {
                 RestoreRuntimeConfig();
+                if (_spread)
+                {
+                    FakeClients.RemoveAll();
+                    foreach (var steamId in _protected) Sandbox.Game.World.MySession.Static?.RemoteAdminSettings.Remove(steamId);
+                    _protected.Clear();
+                }
                 if (_planet != null)
                 {
                     RemoveFloatingObjects();
@@ -355,11 +433,14 @@ namespace SentisTests.Scenarios
 
         private void RemoveFloatingObjects()
         {
-            var sphere = new BoundingSphereD(_center, LatticeStep * GridsPerRow);
-            var found = MyEntities.GetTopMostEntitiesInSphere(ref sphere);
-            foreach (var entity in found.OfType<MyFloatingObject>().ToList())
-                if (!entity.MarkedForClose) entity.Close();
-            found.Clear();
+            foreach (var sphere in Spheres())
+            {
+                var s = sphere;
+                var found = MyEntities.GetTopMostEntitiesInSphere(ref s);
+                foreach (var entity in found.OfType<MyFloatingObject>().ToList())
+                    if (!entity.MarkedForClose) entity.Close();
+                found.Clear();
+            }
         }
 
         public override void CleanupLeftovers()

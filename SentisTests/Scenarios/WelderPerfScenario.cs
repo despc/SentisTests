@@ -52,13 +52,13 @@ namespace SentisTests.Scenarios
         /// <summary>The dynamic platform without a zone: what the zone adds to the dynamic runs.</summary>
         public const string DynamicScenarioName = "welder_perf_dynamic";
         private const float ZoneRadius = 300f;
-        private const string ProjectionResource = "SentisTests.Resources.PerfProjection.xml";
-        private const string WelderResource = "SentisTests.Resources.PerfWelderShip.xml";
-        private const string BlueprintName = "Spitfire Evolution (Vanilla)";
+        internal const string ProjectionResource = "SentisTests.Resources.PerfProjection.xml";
+        internal const string WelderResource = "SentisTests.Resources.PerfWelderShip.xml";
+        internal const string BlueprintName = "Spitfire Evolution (Vanilla)";
         /// <summary>The ship welded from the projection, shipped with the plugin (tools/extract_grid.py).</summary>
-        private const string BlueprintResource = "SentisTests.Resources.Spitfire.xml";
-        private const float RadiusMultiplier = 100f;
-        private const int WelderCount = 6;
+        internal const string BlueprintResource = "SentisTests.Resources.Spitfire.xml";
+        internal const float RadiusMultiplier = 100f;
+        internal const int WelderCount = 6;
         private const int MaxWeldSeconds = 1200;
 
         private bool _captured;
@@ -360,7 +360,7 @@ namespace SentisTests.Scenarios
         /// is chosen to put it next to an armor block of the platform - on a face of the ship open to
         /// the outside, and with no block of the platform ending up inside the ship.
         /// </summary>
-        private string UseAsBlueprint(MyObjectBuilder_CubeGrid platformOb, MyObjectBuilder_CubeGrid source)
+        internal static string UseAsBlueprint(MyObjectBuilder_CubeGrid platformOb, MyObjectBuilder_CubeGrid source)
         {
             var projectorOb = platformOb.CubeBlocks.OfType<MyObjectBuilder_ProjectorBase>().FirstOrDefault();
             Check(projectorOb != null, "the authored platform has no projector");
@@ -486,7 +486,7 @@ namespace SentisTests.Scenarios
                         yield return new Vector3I(x, y, z);
         }
 
-        private static double FarthestCornerDistance(Vector3D center, BoundingBoxD box)
+        internal static double FarthestCornerDistance(Vector3D center, BoundingBoxD box)
         {
             var dx = Math.Max(Math.Abs(center.X - box.Min.X), Math.Abs(center.X - box.Max.X));
             var dy = Math.Max(Math.Abs(center.Y - box.Min.Y), Math.Abs(center.Y - box.Max.Y));
@@ -494,7 +494,7 @@ namespace SentisTests.Scenarios
             return Math.Sqrt(dx * dx + dy * dy + dz * dz);
         }
 
-        private static Dictionary<string, int> RuntimeComponentsNeeded(
+        internal static Dictionary<string, int> RuntimeComponentsNeeded(
             IEnumerable<MySlimBlock> blocks, int multiplier)
         {
             var needs = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -514,7 +514,7 @@ namespace SentisTests.Scenarios
             return needs;
         }
 
-        private static List<MyCubeGrid> PhysicalFixtureGrids(Vector3D center, double radius, MyCubeGrid preview)
+        internal static List<MyCubeGrid> PhysicalFixtureGrids(Vector3D center, double radius, MyCubeGrid preview)
         {
             return WorldApi.GridsInSphere(center, radius)
                 .Where(grid => grid != null && grid != preview && !grid.MarkedForClose && !grid.Closed)
