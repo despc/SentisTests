@@ -110,7 +110,7 @@ namespace SentisTests.Scenarios
             Note("spawning static " + DeckSide + "x" + DeckSide + " platform with the embedded " +
                  expected + "-block blueprint");
             var platformOb = WorldApi.GridOb(WorldApi.EntityPrefix + "platform", MyCubeSize.Large, true,
-                PlatformPos = TestRunner.RunOrigin ?? PlatformPos, platformBlocks);
+                (TestRunner.RunOrigin ?? PlatformPos) + Shift, platformBlocks);
             foreach (var b in platformOb.CubeBlocks)
             {
                 var pb = b as VRage.Game.MyObjectBuilder_ProjectorBase;

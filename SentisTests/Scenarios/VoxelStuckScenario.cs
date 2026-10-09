@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -40,7 +40,7 @@ namespace SentisTests.Scenarios
             WorldApi.EnsureUnpaused(Name);
             var assembly = AppDomain.CurrentDomain.GetAssemblies()
                 .FirstOrDefault(a => a.GetType("SentisGameplayImprovements.Assholes.Voxels", false) != null);
-            Check(assembly != null, "SentisGameplayImprovements with Voxels is not loaded");
+            SkipUnless(assembly != null, "SentisGameplayImprovements with Voxels is not loaded");
             var voxels = assembly.GetType("SentisGameplayImprovements.Assholes.Voxels");
             var unstick = voxels.GetMethod("Unstick", BindingFlags.Static | BindingFlags.Public);
             var distance = (double)voxels.GetField("TeleportDistance").GetRawConstantValue();

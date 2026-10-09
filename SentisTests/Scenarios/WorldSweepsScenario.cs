@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -92,7 +92,7 @@ namespace SentisTests.Scenarios
         private IEnumerator Contraband(Vector3D centre, long player)
         {
             var behaviorType = PluginType("SentisAdventures.Adventures.Contraband.ContrabandGridPositionBehavior");
-            Check(behaviorType != null, "SentisAdventures is not loaded");
+            SkipUnless(behaviorType != null, "SentisAdventures is not loaded");
             _contraband = behaviorType.GetField("Instance", Any).GetValue(null);
             var beacons = (IEnumerable)behaviorType.GetProperty("ContrabandBeacons").GetValue(_contraband);
             var process = behaviorType.GetMethod("ProcessBeacons", Any);
@@ -171,7 +171,7 @@ namespace SentisTests.Scenarios
         private IEnumerator Freezer(Vector3D at)
         {
             var freezeLogic = PluginType("SentisOptimisationsPlugin.Freezer.FreezeLogic");
-            Check(freezeLogic != null, "SentisOptimisations is not loaded");
+            SkipUnless(freezeLogic != null, "SentisOptimisations is not loaded");
             var scan = freezeLogic.GetMethod("Scan", Any);
             var scans = (IDictionary)freezeLogic.GetField("Scans", Any).GetValue(null);
             Check(scan != null && scans != null, "the freezer has no Scan or Scans");
@@ -210,7 +210,7 @@ namespace SentisTests.Scenarios
         {
             var sweepType = PluginType("SentisGameplayImprovements.BackgroundActions.GridSweep");
             var renamerType = PluginType("SentisGameplayImprovements.BackgroundActions.GridAutoRenamer");
-            Check(sweepType != null && renamerType != null, "SentisGameplayImprovements is not loaded");
+            SkipUnless(sweepType != null && renamerType != null, "SentisGameplayImprovements is not loaded");
 
             // nobody owns it, and it has the game's name
             var unowned = Grid("unowned", at, 0, "LargeBlockBatteryBlock");

@@ -108,6 +108,8 @@ namespace SentisTests.Game
             public double Radius;
             public double Phase;
             public double AngularSpeed;
+            // a path of its own (seconds -> where), instead of the circle in the world's XZ plane
+            public Func<double, Vector3D> Path;
 
             public readonly ConcurrentQueue<ServerMessage> Incoming = new ConcurrentQueue<ServerMessage>();
             public readonly List<ServerMessage> Downlink = new List<ServerMessage>();
@@ -264,6 +266,12 @@ namespace SentisTests.Game
         /// Moves a fake client to a new spot at once: its replication position and its character
         /// (teleported, then held there). Game thread.
         /// </summary>
+        /// <summary>Gives a client a path of its own: seconds since the clients started -> where it is (its character steered there).</summary>
+        public static void SetPath(int index, Func<double, Vector3D> path) => _clients[index].Path = path;
+
+        /// <summary>Seconds since the clients started, as the paths take them.</summary>
+        public static double Seconds => _frames / 60.0;
+
         public static void MoveTo(int index, Vector3D center)
         {
             var client = _clients[index];
@@ -321,8 +329,15 @@ namespace SentisTests.Game
         }
 
         /// <summary>Removes all fake clients from the replication server. Game thread.</summary>
+        /// <summary>
+        /// While set, <see cref="RemoveAll"/> does nothing: several scenarios run at once (ClusterTwinsScenario) and one
+        /// finishing must not take the others' players away.
+        /// </summary>
+        public static bool KeepOnRemoveAll;
+
         public static void RemoveAll()
         {
+            if (KeepOnRemoveAll) return;
             var clients = _clients;
             var count = _clientCount;
             _clientCount = 0;
@@ -798,6 +813,7 @@ namespace SentisTests.Game
 
         private static Vector3D TargetPosition(FakeClient client, double seconds)
         {
+            if (client.Path != null) return client.Path(seconds);
             var angle = client.Phase + client.AngularSpeed * seconds;
             return client.Center + new Vector3D(Math.Cos(angle), 0, Math.Sin(angle)) * client.Radius;
         }

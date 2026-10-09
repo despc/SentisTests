@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -37,7 +37,7 @@ namespace SentisTests.Scenarios
             WorldApi.EnsureUnpaused(Name);
             var plugin = AppDomain.CurrentDomain.GetAssemblies()
                 .Select(a => a.GetType("SentisGameplayImprovements.SentisGameplayImprovementsPlugin", false)).FirstOrDefault(t => t != null);
-            Check(plugin != null, "SentisGameplayImprovements is not loaded");
+            SkipUnless(plugin != null, "SentisGameplayImprovements is not loaded");
             _limiter = plugin.GetField("_limiter", BindingFlags.Static | BindingFlags.Public)?.GetValue(null);
             var type = _limiter.GetType();
             const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;

@@ -47,4 +47,13 @@
        имя - любой игрок из сейва. -->
   <OwnerPlayerName></OwnerPlayerName>
 
+  <!-- Чертёж дома с Isy's Inventory Manager для pb_iim и pb_iim_watch: свой чертёж ПБ-дома, в
+       репозитории его нет. Пусто или файла нет по этому пути - сценарии помечаются SKIPPED. -->
+  <IimBlueprintPath></IimBlueprintPath>
+
+  <!-- procdump64.exe: им снимается память процесса, когда сценарий роняет сервер (строка CRASH DUMP
+       в логе). Пусто - ищется в tools рядом с сервером и в PATH. Без него дампа не будет, остальное
+       (стеки, список процессов, лимиты памяти) пишется и так. -->
+  <ProDumpPath></ProDumpPath>
+
 </MainConfig>

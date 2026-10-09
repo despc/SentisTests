@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -227,25 +227,34 @@ namespace SentisTests.Scenarios
 
         private IEnumerator Profile()
         {
-            var asm = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "Profiler");
-            if (asm == null)
+            // The Profiler plugin is optional: without it, or with another version of it, the load
+            // test still runs and only says that it profiled nothing.
+            var queue = Integrations.TypeOf(Integrations.Profiler, "Profiler.Core.ProfilerResultQueue")
+                ?.GetMethod("Profile", BindingFlags.Static | BindingFlags.Public);
+            var empty = Integrations.TypeOf(Integrations.Profiler, "Profiler.Basics.GameEntityMask")
+                ?.GetField("Empty", BindingFlags.Static | BindingFlags.Public);
+            if (queue == null || empty == null)
             {
-                Note("PROFILE: the Profiler plugin is not loaded");
+                Note("PROFILE: the Profiler plugin is not loaded here");
                 yield break;
             }
-            var queue = asm.GetType("Profiler.Core.ProfilerResultQueue").GetMethod("Profile", BindingFlags.Static | BindingFlags.Public);
-            var maskType = asm.GetType("Profiler.Basics.GameEntityMask");
-            var mask = maskType.GetField("Empty", BindingFlags.Static | BindingFlags.Public).GetValue(null);
+
+            object Make(string typeName, params object[] args)
+            {
+                var type = Integrations.TypeOf(Integrations.Profiler, typeName);
+                return type == null ? null : Activator.CreateInstance(type, args);
+            }
+
             var profilers = new List<(string Name, object Profiler)>
             {
-                ("frame", Activator.CreateInstance(asm.GetType("Profiler.Basics.GameLoopProfiler"))),
-                ("entities by type", Activator.CreateInstance(asm.GetType("Profiler.Basics.EntityTypeProfiler"))),
-                ("blocks by type", Activator.CreateInstance(asm.GetType("Profiler.Basics.BlockTypeProfiler"), mask)),
-                ("blocks by definition", Activator.CreateInstance(asm.GetType("Profiler.Basics.BlockDefinitionProfiler"), mask)),
-                ("session components", Activator.CreateInstance(asm.GetType("Profiler.Basics.SessionComponentsProfiler"))),
-                ("physics clusters", Activator.CreateInstance(asm.GetType("Profiler.Basics.PhysicsProfiler"))),
-                ("methods", Activator.CreateInstance(asm.GetType("Profiler.Basics.MethodNameProfiler"))),
-            };
+                ("frame", Make("Profiler.Basics.GameLoopProfiler")),
+                ("entities by type", Make("Profiler.Basics.EntityTypeProfiler")),
+                ("blocks by type", Make("Profiler.Basics.BlockTypeProfiler", empty.GetValue(null))),
+                ("blocks by definition", Make("Profiler.Basics.BlockDefinitionProfiler", empty.GetValue(null))),
+                ("session components", Make("Profiler.Basics.SessionComponentsProfiler")),
+                ("physics clusters", Make("Profiler.Basics.PhysicsProfiler")),
+                ("methods", Make("Profiler.Basics.MethodNameProfiler")),
+            }.Where(p => p.Profiler != null).ToList();
             var subscriptions = new List<IDisposable>();
             try
             {

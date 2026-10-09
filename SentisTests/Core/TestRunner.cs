@@ -19,6 +19,9 @@ namespace SentisTests.Core
         Error,
         Timeout,
         Aborted,
+
+        /// <summary>The thing the scenario tests is not here (its plugin is not loaded): nothing was run or spawned.</summary>
+        Skipped,
     }
 
     public class TestResult
@@ -93,12 +96,49 @@ namespace SentisTests.Core
                 _queue.Enqueue(n);
         }
 
-        public static void EnqueueAll(Vector3D? origin = null, double cleanupDelaySeconds = 0)
+        /// <summary>
+        /// Queues every scenario that can run here. Scenarios waiting for a plugin that is not
+        /// loaded are recorded as skipped on the spot - they never start, spawn nothing and cost no
+        /// frames - so a stand without the plugins still gets one complete report.
+        /// </summary>
+        public static int EnqueueAll(Vector3D? origin = null, double cleanupDelaySeconds = 0)
         {
             PendingOrigin = origin;
             PendingCleanupDelaySeconds = cleanupDelaySeconds;
-            foreach (var name in ScenarioRegistry.Names)
-                _queue.Enqueue(name);
+            var queued = 0;
+            foreach (var info in ScenarioRegistry.All)
+            {
+                if (info.Available)
+                {
+                    _queue.Enqueue(info.Name);
+                    queued++;
+                }
+                else
+                {
+                    RecordSkipped(info.Name, info.UnavailableReason);
+                }
+            }
+
+            return queued;
+        }
+
+        /// <summary>Records a scenario that never started: its plugin is not loaded.</summary>
+        public static void RecordSkipped(string name, string reason)
+        {
+            var result = new TestResult
+            {
+                Scenario = name,
+                Verdict = TestVerdict.Skipped,
+                DurationSeconds = 0,
+                Message = reason,
+            };
+            lock (_historyLock)
+            {
+                _history.Add(result);
+            }
+
+            Log.Warn("[TEST] SKIPPED {0} - {1}", name, reason);
+            WriteReport(result);
         }
 
         public static void StopActive(string reason)
@@ -199,6 +239,14 @@ namespace SentisTests.Core
                     if (_queue.Count > 0)
                     {
                         var name = _queue.Dequeue();
+                        var reason = ScenarioRegistry.UnavailableReason(name);
+                        if (reason != null)
+                        {
+                            // Queued before its plugin was unloaded, or queued by name by hand.
+                            RecordSkipped(name, reason);
+                            return;
+                        }
+
                         try
                         {
                             Start(name);
@@ -230,6 +278,10 @@ namespace SentisTests.Core
             {
                 Finish(TestVerdict.Failed, e.Message);
             }
+            catch (ScenarioSkippedException e)
+            {
+                Finish(TestVerdict.Skipped, e.Message);
+            }
             catch (Exception e)
             {
                 var crashed = _active != null ? _active.Name : "?";
@@ -249,6 +301,10 @@ namespace SentisTests.Core
                     moved = top.MoveNext();
                 }
                 catch (ScenarioFailedException)
+                {
+                    throw;
+                }
+                catch (ScenarioSkippedException)
                 {
                     throw;
                 }
@@ -404,6 +460,8 @@ namespace SentisTests.Core
             var line = "[TEST] " + result;
             if (verdict == TestVerdict.Passed)
                 Log.Info(line);
+            else if (verdict == TestVerdict.Skipped)
+                Log.Warn(line);
             else
                 Log.Error(line);
             WriteReport(result);
@@ -416,6 +474,16 @@ namespace SentisTests.Core
 
             Scenarios.ConfigOverride.RestoreLeftovers();
             var scenario = ScenarioRegistry.Create(name);
+
+            // What the scenario class itself declares it needs, on top of the registration: nothing
+            // is spawned and no frames are measured for a scenario whose plugin is not loaded.
+            var wanted = Integrations.MissingReason(scenario.Requires);
+            if (wanted != null)
+            {
+                RecordSkipped(name, wanted);
+                return;
+            }
+
             RunOrigin = PendingOrigin;
             RunCleanupDelaySeconds = PendingCleanupDelaySeconds;
             PendingOrigin = null;

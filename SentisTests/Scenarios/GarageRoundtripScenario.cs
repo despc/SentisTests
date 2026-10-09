@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -45,7 +45,7 @@ namespace SentisTests.Scenarios
             WorldApi.EnsureUnpaused(Name);
             var save = PluginType("VirtualGarage.VirtualGarageSave");
             var load = PluginType("VirtualGarage.VirtualGarageLoad");
-            Check(save != null && load != null, "the VirtualGarage plugin is not loaded");
+            SkipUnless(save != null && load != null, "the VirtualGarage plugin is not loaded");
 
             var anchor = WorldApi.LoadAuthoredGroup(WheelPerfScenario.ResourceName, WorldApi.EntityPrefix + Prefix + "anchor")[0]
                 .PositionAndOrientation.Value.GetMatrix().Translation;

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -292,7 +292,7 @@ namespace SentisTests.Scenarios
                 tracker = tracker ?? assembly.GetType("SentisOptimisationsPlugin.Freezer.CompensationTracker", false);
                 logic = logic ?? assembly.GetType("SentisOptimisationsPlugin.Freezer.FreezeLogic", false);
             }
-            Check(tracker != null && logic != null, "SentisOptimisations freezer is not loaded");
+            SkipUnless(tracker != null && logic != null, "SentisOptimisations freezer is not loaded");
             const BindingFlags flags = BindingFlags.Public | BindingFlags.Static;
             _peekPending = tracker.GetMethod("PeekPending", flags);
             _peekTaken = tracker.GetMethod("PeekTakenFrames", flags);

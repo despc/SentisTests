@@ -6,17 +6,31 @@ namespace SentisTests.Game
 {
     internal static class RuntimePluginControls
     {
-        private static Type PluginType(string assemblyName, string typeName)
+        /// <summary>
+        /// A type of an optional plugin, or null when that plugin is not loaded: the controls below
+        /// are also read on a server that has none of them (an isolation run, or a plain Torch one),
+        /// where a missing type is the ordinary case and not an error.
+        /// </summary>
+        private static Type PluginType(string assemblyName, string typeName) =>
+            Core.Integrations.TypeOf(assemblyName, typeName);
+
+        /// <summary>The same, for the controls that cannot answer anything sensible without the plugin.</summary>
+        private static Type RequiredPluginType(string assemblyName, string typeName) =>
+            PluginType(assemblyName, typeName)
+            ?? throw new Core.ScenarioSkippedException(Core.Integrations.MissingReason(assemblyName));
+
+        /// <summary>The plugin's config object, or null when the plugin is not loaded.</summary>
+        private static object ConfigOrNull(string assemblyName, string pluginTypeName)
         {
-            var assembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a =>
-                string.Equals(a.GetName().Name, assemblyName, StringComparison.Ordinal));
-            return assembly?.GetType(typeName, true);
+            var pluginType = PluginType(assemblyName, pluginTypeName);
+            return pluginType?.GetProperty("Config", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
         }
 
         private static object Config(Type pluginType)
         {
-            return pluginType.GetProperty("Config", BindingFlags.Public | BindingFlags.Static)
-                ?.GetValue(null) ?? throw new InvalidOperationException(pluginType.FullName + ".Config is unavailable");
+            return pluginType?.GetProperty("Config", BindingFlags.Public | BindingFlags.Static)
+                       ?.GetValue(null)
+                   ?? throw new InvalidOperationException(pluginType?.FullName + ".Config is unavailable");
         }
 
         public static bool FreezerEnabled
@@ -26,16 +40,18 @@ namespace SentisTests.Game
                 var type = PluginType("SentisOptimisations",
                     "SentisOptimisationsPlugin.SentisOptimisationsPlugin");
                 if (type == null) return false; // plugin not loaded (isolation runs)
-                return (bool)Config(type).GetType().GetProperty("FreezerEnabled").GetValue(Config(type));
+                var config = ConfigOrNull("SentisOptimisations",
+                    "SentisOptimisationsPlugin.SentisOptimisationsPlugin");
+                var property = config?.GetType().GetProperty("FreezerEnabled");
+                return property != null && (bool)property.GetValue(config);
             }
         }
 
         public static void SetFreezerEnabled(bool enabled)
         {
-            var type = PluginType("SentisOptimisations",
+            var config = ConfigOrNull("SentisOptimisations",
                 "SentisOptimisationsPlugin.SentisOptimisationsPlugin");
-            if (type == null) return; // plugin not loaded (isolation runs)
-            var config = Config(type);
+            if (config == null) return; // nothing to switch off here
             // Torch writes the change to the config file at once, so the operator's value is noted
             // first: the runner puts it back after the run, or after a restart if the run was killed.
             Scenarios.ConfigOverride.Remember(Scenarios.ConfigOverride.Optimisations, "FreezerEnabled");
@@ -46,15 +62,17 @@ namespace SentisTests.Game
         {
             get
             {
-                var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.SentisOptimisationsPlugin");
-                return (string)Config(type).GetType().GetProperty("AntifreezeBlocksSubtypes").GetValue(Config(type));
+                var config = ConfigOrNull("SentisOptimisations",
+                    "SentisOptimisationsPlugin.SentisOptimisationsPlugin");
+                return config == null ? "" : (string)config.GetType().GetProperty("AntifreezeBlocksSubtypes")?.GetValue(config);
             }
         }
 
         public static void SetAntifreezeBlocksSubtypes(string subtypes)
         {
-            var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.SentisOptimisationsPlugin");
-            var config = Config(type);
+            var config = ConfigOrNull("SentisOptimisations",
+                "SentisOptimisationsPlugin.SentisOptimisationsPlugin");
+            if (config == null) return; // nothing to switch off here
             Scenarios.ConfigOverride.Remember(Scenarios.ConfigOverride.Optimisations, "AntifreezeBlocksSubtypes");
             config.GetType().GetProperty("AntifreezeBlocksSubtypes").SetValue(config, subtypes);
         }
@@ -62,7 +80,7 @@ namespace SentisTests.Game
         /// <summary>Public static field or property of the SentisOptimisations FrozenGridSaveCache.</summary>
         public static object FrozenGridSaveCacheStat(string name)
         {
-            var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.Freezer.FrozenGridSaveCache");
+            var type = RequiredPluginType("SentisOptimisations", "SentisOptimisationsPlugin.Freezer.FrozenGridSaveCache");
             return type.GetField(name, BindingFlags.Public | BindingFlags.Static)?.GetValue(null)
                    ?? throw new InvalidOperationException("FrozenGridSaveCache." + name + " is unavailable");
         }
@@ -201,6 +219,7 @@ namespace SentisTests.Game
         public static void SetGridStreamBuilderVerify(bool verify)
         {
             var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.GridStreamBuilders");
+            if (type == null) return; // the check this turns on lives in the plugin
             type.GetField("VerifyCachedBuilders", BindingFlags.Public | BindingFlags.Static).SetValue(null, verify);
             if (!verify) return;
             type.GetField("VerifyMismatches", BindingFlags.Public | BindingFlags.Static).SetValue(null, 0L);
@@ -212,6 +231,7 @@ namespace SentisTests.Game
         public static (long Mismatches, string FirstDifference) GridStreamBuilderVerifyResult()
         {
             var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.GridStreamBuilders");
+            if (type == null) return (0, null); // plugin not loaded (isolation runs)
             var elements = (System.Collections.IEnumerable)type.GetField("VerifyDifferentElements", BindingFlags.Public | BindingFlags.Static).GetValue(null);
             if (elements == null) return (0, null);
             var names = new System.Collections.Generic.List<string>();
@@ -225,12 +245,13 @@ namespace SentisTests.Game
         public static object FrozenGridSaveCacheStatOrNull(string name)
         {
             var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.Freezer.FrozenGridSaveCache");
-            return type.GetField(name, BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
+            return type?.GetField(name, BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
         }
 
         public static void SetFrozenGridSaveCacheVerify(bool verify)
         {
             var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.Freezer.FrozenGridSaveCache");
+            if (type == null) return; // the check this turns on lives in the plugin
             (type.GetField("VerifyPreparedBuilders", BindingFlags.Public | BindingFlags.Static)
              ?? throw new InvalidOperationException("FrozenGridSaveCache.VerifyPreparedBuilders is unavailable")).SetValue(null, verify);
         }
@@ -243,6 +264,7 @@ namespace SentisTests.Game
         public static void ForgetFreezeQueue()
         {
             var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.Freezer.FreezeLogic");
+            if (type == null) return; // no freezer, nothing queued
             var queue = type.GetField("InFreezeQueue", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
             var clear = queue?.GetType().GetMethod("Clear", Type.EmptyTypes);
             if (clear == null)
@@ -252,7 +274,7 @@ namespace SentisTests.Game
 
         public static bool IsGridFrozen(long gridId)
         {
-            var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.Freezer.FreezeLogic");
+            var type = RequiredPluginType("SentisOptimisations", "SentisOptimisationsPlugin.Freezer.FreezeLogic");
             var frozen = type.GetField("FrozenGrids", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
             var contains = frozen?.GetType().GetMethod("Contains", new[] { typeof(long) });
             if (contains == null)
@@ -263,7 +285,7 @@ namespace SentisTests.Game
         /// <summary>Whether the freezer turned this grid's body into a fixed one (FreezePhysics).</summary>
         public static bool IsGridPhysicsFrozen(long gridId)
         {
-            var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.Freezer.FreezeLogic");
+            var type = RequiredPluginType("SentisOptimisations", "SentisOptimisationsPlugin.Freezer.FreezeLogic");
             var frozen = type.GetField("FrozenPhysicsGrids", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
             var contains = frozen?.GetType().GetMethod("Contains", new[] { typeof(long) });
             if (contains == null)
@@ -275,7 +297,7 @@ namespace SentisTests.Game
         {
             get
             {
-                var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.Freezer.FreezeLogic");
+                var type = RequiredPluginType("SentisOptimisations", "SentisOptimisationsPlugin.Freezer.FreezeLogic");
                 var frozen = type.GetField("FrozenGrids", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
                 var count = frozen?.GetType().GetProperty("Count", BindingFlags.Public | BindingFlags.Instance);
                 if (count == null)
@@ -347,22 +369,25 @@ namespace SentisTests.Game
             }
         }
 
+        /// <summary>What the game gives a welder when no plugin widens its radius.</summary>
+        public const float VanillaWelderRadiusMultiplier = 1f;
+
         public static float WelderRadiusMultiplier
         {
             get
             {
-                var type = PluginType("SentisGameplayImprovements",
+                var config = ConfigOrNull("SentisGameplayImprovements",
                     "SentisGameplayImprovements.SentisGameplayImprovementsPlugin");
-                var config = Config(type);
-                return (float)config.GetType().GetProperty("WelderRadiusMultiplier").GetValue(config);
+                var property = config?.GetType().GetProperty("WelderRadiusMultiplier");
+                return property == null ? VanillaWelderRadiusMultiplier : (float)property.GetValue(config);
             }
         }
 
         public static void SetWelderRadiusMultiplier(float multiplier)
         {
-            var type = PluginType("SentisGameplayImprovements",
+            var config = ConfigOrNull("SentisGameplayImprovements",
                 "SentisGameplayImprovements.SentisGameplayImprovementsPlugin");
-            var config = Config(type);
+            if (config == null) return; // the radius is the game's own
             Scenarios.ConfigOverride.Remember(Scenarios.ConfigOverride.Gameplay, "WelderRadiusMultiplier");
             config.GetType().GetProperty("WelderRadiusMultiplier").SetValue(config, multiplier);
         }

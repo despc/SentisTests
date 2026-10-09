@@ -41,7 +41,7 @@ namespace SentisTests.Scenarios
         {
             Note("loading production fixture");
             var ob = WorldApi.LoadGridTemplate(ResourceName, WorldApi.EntityPrefix + "production",
-                new Vector3D(450, 0, 0), Vector3.Forward, Vector3.Up);
+                new Vector3D(450, 0, 0) + Shift, Vector3.Forward, Vector3.Up);
             ob.IsStatic = true;
             var grid = WorldApi.SpawnGrid(ob);
             Track(grid);

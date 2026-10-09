@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using NLog;
 using SentisTests.Core;
@@ -18,13 +19,26 @@ namespace SentisTests.Commands
     {
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
-        [Command("list", "List available SentisTests scenarios")]
+        [Command("list", "List SentisTests scenarios. 'all' also shows the ones waiting for a plugin that is not loaded")]
         [Permission(MyPromoteLevel.Admin)]
-        public void List()
+        public void List(string what = null)
         {
-            var names = ScenarioRegistry.Names;
-            Context.Respond("scenarios (" + names.Count + "): " + string.Join(", ", names) +
-                            Environment.NewLine + "usage: !test run <name> | !test run all | !test stop | !test status | !test cleanup");
+            var all = string.Equals(what, "all", StringComparison.OrdinalIgnoreCase);
+            var here = ScenarioRegistry.All.Where(s => all || s.Available).ToList();
+            if (here.Count == 0)
+            {
+                Context.Respond("no scenario runs on this server as it stands; '!test list all' shows the ones waiting for a plugin");
+                return;
+            }
+
+            // A scenario that drives another plugin is marked with what it waits for, so an admin on
+            // a bare server sees why it is not in the list instead of finding a failing test.
+            var lines = here.Select(s => s.Available
+                ? s.Name
+                : s.Name + " [" + s.UnavailableReason + "]");
+            Context.Respond("scenarios (" + here.Count + "): " + string.Join(", ", lines) +
+                            Environment.NewLine + "usage: !test run <name> | !test run all | !test stop | !test status | !test cleanup" +
+                            (all ? "" : Environment.NewLine + "'!test list all' also lists scenarios whose plugin is not loaded"));
         }
 
         [Command("run", "Run a scenario by name, 'all', or several names: !test run smoke projector_weld")]
@@ -52,11 +66,17 @@ namespace SentisTests.Commands
             {
                 if (names.Length == 1 && string.Equals(names[0], "all", StringComparison.OrdinalIgnoreCase))
                 {
-                    TestRunner.EnqueueAll(origin, inspectDelay);
-                    Context.Respond("queued all scenarios: " + string.Join(", ", ScenarioRegistry.Names) +
+                    var skipped = ScenarioRegistry.Unavailable;
+                    var queued = TestRunner.EnqueueAll(origin, inspectDelay);
+                    Context.Respond("queued " + queued + " scenarios: " +
+                                    string.Join(", ", ScenarioRegistry.AvailableNames) +
                                     (interactive
                                         ? string.Format(" (at your position; structures stay ~{0:F0}s for inspection)", inspectDelay)
-                                        : ""));
+                                        : "") +
+                                    (skipped.Count == 0
+                                        ? ""
+                                        : Environment.NewLine + "skipped (their plugins are not loaded): " +
+                                          string.Join(", ", skipped.Select(p => p.Key))));
                     return;
                 }
 
@@ -68,8 +88,15 @@ namespace SentisTests.Commands
                     return;
                 }
 
+                var waiting = names.Select(n => new KeyValuePair<string, string>(n, ScenarioRegistry.UnavailableReason(n)))
+                    .Where(p => p.Value != null).ToList();
+
                 TestRunner.Enqueue(names, origin, inspectDelay);
                 Context.Respond("queued: " + string.Join(", ", names) +
+                    (waiting.Count == 0
+                        ? ""
+                        : Environment.NewLine + string.Join(Environment.NewLine,
+                            waiting.Select(p => p.Key + " will be skipped: " + p.Value))) +
                                 (interactive
                                     ? string.Format(" 30m ahead of you; structures stay ~{0:F0}s for inspection", inspectDelay)
                                     : "") +

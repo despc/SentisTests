@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -80,7 +80,7 @@ namespace SentisTests.Scenarios
             if (_contains != null) return;
             var type = AppDomain.CurrentDomain.GetAssemblies()
                            .Select(a => a.GetType("SentisOptimisationsPlugin.Freezer.FreezeLogic")).FirstOrDefault(t => t != null)
-                       ?? throw new ScenarioFailedException("SentisOptimisations freezer is not loaded");
+                       ?? throw new ScenarioSkippedException("SentisOptimisations freezer is not loaded");
             _frozen = type.GetField("FrozenGrids", BindingFlags.Static | BindingFlags.Public).GetValue(null);
             _physics = type.GetField("FrozenPhysicsGrids", BindingFlags.Static | BindingFlags.Public).GetValue(null);
             _contains = _frozen.GetType().GetMethod("Contains");
@@ -197,7 +197,7 @@ namespace SentisTests.Scenarios
                 : "SentisOptimisationsPlugin.SentisOptimisationsPlugin";
             var type = AppDomain.CurrentDomain.GetAssemblies()
                 .Select(a => a.GetType(typeName)).FirstOrDefault(t => t != null)
-                ?? throw new InvalidOperationException(plugin + " is not loaded");
+                ?? throw new ScenarioSkippedException(Core.Integrations.MissingReason(plugin));
             var property = type.GetProperty("Config", BindingFlags.Public | BindingFlags.Static | BindingFlags.NonPublic);
             if (property != null) return property.GetValue(null);
             var field = type.GetField("_config", BindingFlags.Static | BindingFlags.NonPublic);

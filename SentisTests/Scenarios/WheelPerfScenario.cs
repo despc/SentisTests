@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -170,6 +170,12 @@ namespace SentisTests.Scenarios
             var north = Vector3D.Cross(up0, east);
             var rows = (_count + GridsPerRow - 1) / GridsPerRow;
             var center = TestRunner.RunOrigin ?? FlattestSite(authored, east, north, rows);
+            // A fake player next to the lattice: with selective physics updates a cluster with nobody in it is not stepped,
+            // and the vehicles hung where they were spawned, not moving, when the scenario before had taken its player away
+            // (stand, 09.10.2026: ground_probe, then wheel_perf at 0.0 m/s)
+            var watcherAt = Ground(center + north * ((rows + 1) / 2.0 * LatticeStep + 20));
+            FakeClients.Add(1, WatcherNetwork, i => (watcherAt + Vector3D.Normalize(watcherAt - planetCenter) * 2, 0, 0), withCharacters: true);
+            _fakePlayer = true;
             Note("planet " + _planet.StorageName + ", vehicle of " + template.Count + " grids, chassis " +
                  height0.ToString("F2") + " m over the ground, chassis up · vertical = " + Vector3D.Dot(chassis0.Up, up0).ToString("F3"));
 
@@ -785,12 +791,12 @@ namespace SentisTests.Scenarios
         {
             get
             {
-                var config = GameplayPlugin?.GetProperty("Config")?.GetValue(null) ?? throw new ScenarioFailedException("SentisGameplayImprovements is not loaded");
+                var config = GameplayPlugin?.GetProperty("Config")?.GetValue(null) ?? throw new ScenarioSkippedException("SentisGameplayImprovements is not loaded");
                 return (bool)config.GetType().GetProperty("AutoRestoreFromVoxel").GetValue(config);
             }
             set
             {
-                var config = GameplayPlugin?.GetProperty("Config")?.GetValue(null) ?? throw new ScenarioFailedException("SentisGameplayImprovements is not loaded");
+                var config = GameplayPlugin?.GetProperty("Config")?.GetValue(null) ?? throw new ScenarioSkippedException("SentisGameplayImprovements is not loaded");
                 config.GetType().GetProperty("AutoRestoreFromVoxel").SetValue(config, value);
             }
         }
@@ -862,9 +868,16 @@ namespace SentisTests.Scenarios
                    axis * Vector3D.Dot(axis, v) * (1 - Math.Cos(angle));
         }
 
+        private static readonly FakeClients.NetworkProfile WatcherNetwork = new FakeClients.NetworkProfile { RttMs = 50 };
+        private bool _fakePlayer;
+
         public override void Cleanup()
         {
-            try { RestoreRuntimeConfig(); }
+            try
+            {
+                RestoreRuntimeConfig();
+                if (_fakePlayer) FakeClients.RemoveAll();
+            }
             finally { base.Cleanup(); }
         }
 

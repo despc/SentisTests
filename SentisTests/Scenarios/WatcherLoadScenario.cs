@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -62,7 +62,7 @@ namespace SentisTests.Scenarios
             WorldApi.EnsureUnpaused(Name);
             // ------------------------------------------------------------- SentisWatcher
             var assembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "SentisWatcher");
-            Check(assembly != null, "SentisWatcher is not loaded");
+            SkipUnless(assembly != null, "SentisWatcher is not loaded");
             var plugin = assembly.GetType("SentisWatcher.SentisWatcherPlugin").GetProperty("Instance").GetValue(null);
             var store = plugin.GetType().GetProperty("Store").GetValue(plugin);
             Check(store != null, "SentisWatcher records nothing");

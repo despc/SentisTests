@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -54,7 +54,7 @@ namespace SentisTests.Scenarios
             WorldApi.EnsureUnpaused(Name);
             var assembly = AppDomain.CurrentDomain.GetAssemblies()
                 .FirstOrDefault(a => a.GetType("SentisGameplayImprovements.AsteroidFieldSpawner", false) != null);
-            Check(assembly != null, "SentisGameplayImprovements with AsteroidFieldSpawner is not loaded");
+            SkipUnless(assembly != null, "SentisGameplayImprovements with AsteroidFieldSpawner is not loaded");
             var spawner = assembly.GetType("SentisGameplayImprovements.AsteroidFieldSpawner");
             var extent = spawner.GetMethod("Extent", BindingFlags.Static | BindingFlags.Public);
             var clearance = (double)spawner.GetField("Clearance").GetRawConstantValue();

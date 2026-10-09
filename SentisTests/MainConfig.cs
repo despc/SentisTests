@@ -50,6 +50,19 @@ namespace SentisTests
         public int DebugBridgePort { get; set; } = 18899;
 
         /// <summary>
+        /// Where Sysinternals procdump64.exe is: a file, a folder, or empty to look next to the
+        /// server (and in its <c>tools</c> folder) and on PATH. Without it a fatal exception leaves
+        /// no dump.
+        /// </summary>
+        public string ProDumpPath { get; set; } = "";
+
+        /// <summary>
+        /// A ship or base blueprint (<c>bp.sbc</c>) with a programmable block whose script the
+        /// <c>pb_iim</c> scenarios measure. Without it those scenarios are skipped.
+        /// </summary>
+        public string IimBlueprintPath { get; set; } = "";
+
+        /// <summary>
         /// Display name of the player that owns and built the spawned test ships.
         /// welder passes its OWN OwnerId to the projector as the owner of the block it starts, so
         /// the tools have to belong to a real player - the same one who hand-welds the projection

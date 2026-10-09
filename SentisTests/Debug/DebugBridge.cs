@@ -1097,15 +1097,18 @@ namespace SentisTests.Debug
         private static Assembly GameplayAssembly()
         {
             return AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a =>
-                string.Equals(a.GetName().Name, "SentisGameplayImprovements", StringComparison.Ordinal));
+                string.Equals(a.GetName().Name, Core.Integrations.Gameplay, StringComparison.Ordinal));
         }
 
+        /// <summary>The plugin's config for the endpoints that drive it; a plain answer when it is not loaded.</summary>
         private static object GameplayConfig(out Type pluginType)
         {
-            var assembly = GameplayAssembly();
-            if (assembly == null) throw new InvalidOperationException("SentisGameplayImprovements assembly is not loaded");
-            pluginType = assembly.GetType("SentisGameplayImprovements.SentisGameplayImprovementsPlugin", true);
-            return pluginType.GetProperty("Config", BindingFlags.Public | BindingFlags.Static).GetValue(null);
+            pluginType = Core.Integrations.TypeOf(Core.Integrations.Gameplay,
+                "SentisGameplayImprovements.SentisGameplayImprovementsPlugin");
+            if (pluginType == null)
+                throw new InvalidOperationException(Core.Integrations.MissingReason(Core.Integrations.Gameplay));
+            return pluginType.GetProperty("Config", BindingFlags.Public | BindingFlags.Static)?.GetValue(null)
+                   ?? throw new InvalidOperationException(Core.Integrations.Gameplay + " has no config");
         }
 
         private static JObject ToolRadii()
@@ -1151,13 +1154,15 @@ namespace SentisTests.Debug
                 "drill", Value("DrillRadiusMultiplier"), "samples", samples);
         }
 
-        private static bool IsFrozenGrid(long gridId)
-        {
-            return Game.RuntimePluginControls.IsGridFrozen(gridId);
-        }
+        /// <summary>Whether the freezer holds this grid; false on a server without the freezer plugin.</summary>
+        private static bool IsFrozenGrid(long gridId) =>
+            Core.Integrations.IsLoaded(Core.Integrations.Optimisations) &&
+            Game.RuntimePluginControls.IsGridFrozen(gridId);
 
         private static JObject FreezerState()
         {
+            if (!Core.Integrations.IsLoaded(Core.Integrations.Optimisations))
+                return Obj("enabled", false, "frozenGridCount", -1, "note", Core.Integrations.MissingReason(Core.Integrations.Optimisations));
             return Obj("enabled", Game.RuntimePluginControls.FreezerEnabled,
                 "frozenGridCount", Game.RuntimePluginControls.FrozenGridCount);
         }
@@ -1323,6 +1328,8 @@ namespace SentisTests.Debug
 
         private static JObject SetFreezer(bool enabled)
         {
+            if (!Core.Integrations.IsLoaded(Core.Integrations.Optimisations))
+                return Err(Core.Integrations.MissingReason(Core.Integrations.Optimisations));
             Game.RuntimePluginControls.SetFreezerEnabled(enabled);
             return FreezerState();
         }
@@ -1333,7 +1340,8 @@ namespace SentisTests.Debug
                 string.Equals(a.GetName().Name, "SentisOptimisations", StringComparison.Ordinal));
             var type = assembly?.GetType("SentisOptimisationsPlugin.ShipTool.ShipToolPatch");
             var method = type?.GetMethod("GetWelderRadius", BindingFlags.Public | BindingFlags.Static);
-            if (method == null) throw new InvalidOperationException("SentisOptimisations GetWelderRadius is unavailable");
+            // No plugin, no widened radius: the sample still lists what the game itself gave the welder.
+            if (method == null) return -1f;
             return (float)method.Invoke(null, new object[] { welder });
         }
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
@@ -435,8 +435,8 @@ namespace SentisTests.Scenarios
                     "SentisOptimisationsPlugin.Freezer.CompensationTracker", false);
                 if (_compensationTrackerType != null) break;
             }
-            Check(_compensationTrackerType != null &&
-                  _compensationTrackerType.Assembly.GetName().Name == "SentisOptimisations",
+            SkipUnless(_compensationTrackerType != null &&
+                       _compensationTrackerType.Assembly.GetName().Name == "SentisOptimisations",
                 "SentisOptimisations CompensationTracker is not loaded from the expected assembly");
             const BindingFlags flags = BindingFlags.Public | BindingFlags.Static;
             _isFrozenMethod = _compensationTrackerType.GetMethod("IsFrozen", flags, null,

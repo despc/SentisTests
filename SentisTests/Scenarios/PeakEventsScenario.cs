@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -132,13 +132,21 @@ namespace SentisTests.Scenarios
             yield return WaitForTicks(120);
 
             // ------------------------------------------------------------ respawn screen
-            var refresh = AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("SpaceEngineers.Game.GUI.MyGuiScreenMedicals", false)).First(t => t != null)
-                .GetMethod("RefreshRespawnPointsRequest", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
-            for (var i = 0; i < 4; i++)
+            var refresh = Integrations.TypeAnywhere("SpaceEngineers.Game.GUI.MyGuiScreenMedicals")
+                ?.GetMethod("RefreshRespawnPointsRequest", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            if (refresh == null)
             {
-                var m = Measure("respawn screen list #" + (i + 1) + " (" + RespawnPoints + " points)", () => FakeClients.AsClient(0, () => refresh.Invoke(null, null)), 20);
-                while (m.MoveNext()) yield return m.Current;
-                yield return WaitForTicks(i == 0 ? 60 : 600);
+                // A game build without that screen costs this one measurement, not the scenario.
+                Note("respawn screen list: RefreshRespawnPointsRequest is not in this game");
+            }
+            else
+            {
+                for (var i = 0; i < 4; i++)
+                {
+                    var m = Measure("respawn screen list #" + (i + 1) + " (" + RespawnPoints + " points)", () => FakeClients.AsClient(0, () => refresh.Invoke(null, null)), 20);
+                    while (m.MoveNext()) yield return m.Current;
+                    yield return WaitForTicks(i == 0 ? 60 : 600);
+                }
             }
 
             // ------------------------------------------------------------ respawn

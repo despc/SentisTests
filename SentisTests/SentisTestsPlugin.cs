@@ -134,6 +134,12 @@ namespace SentisTests
                 ScenarioRegistry.Register(PbSaveFrozenScenario.ScenarioName, () => new PbSaveFrozenScenario());
                 ScenarioRegistry.Register(VoxelBlockingProbeScenario.ScenarioName, () => new VoxelBlockingProbeScenario());
                 ScenarioRegistry.Register(TopGridsPlayersScenario.ScenarioName, () => new TopGridsPlayersScenario());
+                ScenarioRegistry.Register(TopGridsPlayersOpenScenario.ScenarioName, () => new TopGridsPlayersOpenScenario());
+                ScenarioRegistry.Register(ClusterTwinsScenario.Production, () => new ClusterTwinsScenario(ClusterTwinsScenario.Production, () => new ProductionScenario(), 8, new VRageMath.Vector3D(0, 0, 150000), 420));
+                ScenarioRegistry.Register(ClusterTwinsScenario.Toggle, () => new ClusterTwinsScenario(ClusterTwinsScenario.Toggle, () => new ProductionScenario(), 8, new VRageMath.Vector3D(0, 0, 150000), 420, toggleSeconds: 3));
+                ScenarioRegistry.Register("cluster_twins_warheads", () => new ClusterTwinsScenario("cluster_twins_warheads", () => new WarheadMassScenario(all: false), 3, new VRageMath.Vector3D(0, 0, 150000), 420));
+                ScenarioRegistry.Register("cluster_twins_chain", () => new ClusterTwinsScenario("cluster_twins_chain", () => new WarheadChainScenario(), 6, new VRageMath.Vector3D(0, 0, 150000), 300));
+                ScenarioRegistry.Register(ClusterTwinsScenario.Weld, () => new ClusterTwinsScenario(ClusterTwinsScenario.Weld, () => new ProjectorWeldScenario(), 6, new VRageMath.Vector3D(0, 0, 150000), 600));
                 ScenarioRegistry.Register(FallThroughTunnelScenario.ScenarioName, () => new FallThroughTunnelScenario());
                 ScenarioRegistry.Register(OfflineCharacterScenario.ScenarioName, () => new OfflineCharacterScenario());
                 ScenarioRegistry.Register(FreezerStressScenario.ScenarioName, () => new FreezerStressScenario());
@@ -148,6 +154,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(PeakEventsScenario.ScenarioName, () => new PeakEventsScenario());
                 ScenarioRegistry.Register(GridStreamScenario.ScenarioName, () => new GridStreamScenario());
                 ScenarioRegistry.Register(CharacterPerfScenario.ScenarioName, () => new CharacterPerfScenario());
+                ScenarioRegistry.Register(PlanetFlightScenario.ScenarioName, () => new PlanetFlightScenario());
                 ScenarioRegistry.Register(ProceduralJumpScenario.ScenarioName, () => new ProceduralJumpScenario());
                 ScenarioRegistry.Register(RemoteControlAnchorScenario.ScenarioName, () => new RemoteControlAnchorScenario());
                 ScenarioRegistry.Register(LaserAntennaControlScenario.ScenarioName, () => new LaserAntennaControlScenario());
@@ -210,6 +217,9 @@ namespace SentisTests
                 ScenarioRegistry.Register(ProductionFreezerStressScenario.ScenarioName,
                     () => new ProductionFreezerStressScenario());
 
+                DeclareRequirements();
+                Log.Info("optional plugins: {0}", Integrations.StatusLine());
+
                 try
                 {
                     FrameProbe.Install(torch.Managers.GetManager<PatchManager>());
@@ -246,6 +256,81 @@ namespace SentisTests
             {
                 Log.Error(e, "SentisTests Init failed");
             }
+        }
+
+        /// <summary>
+        /// The scenarios that exist to check another plugin. Named here, in one place, so a server
+        /// with nothing but Torch and this plugin runs the scenarios that need only the game, and
+        /// skips the rest with the plugin they are waiting for - never a failing test for a thing
+        /// that is simply not installed.
+        /// </summary>
+        private static void DeclareRequirements()
+        {
+            ScenarioRegistry.Needs(Integrations.Ai,
+                AiStatusUiScenario.ScenarioName,
+                BotRadiationScenario.ScenarioName,
+                BotRefuelScenario.ScenarioName,
+                BotPitScenario.ScenarioName, BotPitScenario.ClosedName, BotPitScenario.FarName,
+                BotCliffScenario.ScenarioName, BotCliffScenario.WithHydrogenName,
+                BotSeatFinishScenario.ScenarioName,
+                BotNoDuplicateScenario.ScenarioName,
+                BotSpareBlockScenario.ScenarioName,
+                BotMoveApartScenario.ScenarioName,
+                TurretProbeScenario.ScenarioName,
+                TurretWatchScenario.ScenarioName);
+
+            ScenarioRegistry.Needs(Integrations.Gameplay,
+                AsteroidFieldScenario.ScenarioName,
+                ContractPricesScenario.ScenarioName,
+                ExplosionScenario.ScenarioName,
+                FallThroughTunnelScenario.ScenarioName,
+                GravityDriveScenario.ScenarioName,
+                PcuLimitScenario.ScenarioName,
+                PcuLimitCostScenario.ScenarioName,
+                PvEZoneScenario.ScenarioName,
+                StructThisGcScenario.ScenarioName,
+                VoxelStuckScenario.ScenarioName,
+                WreckRestoreScenario.ScenarioName);
+
+            ScenarioRegistry.Needs(Integrations.Optimisations,
+                FreezeProductionScenario.ScenarioName,
+                LongFreezeProductionScenario.ScenarioName,
+                FreezeDisassemblyScenario.ScenarioName,
+                FreezePowerScenario.ScenarioName,
+                FreezerPhysicsScenario.ScenarioName,
+                FreezerStressScenario.ScenarioName, FreezerStressScenario.ProfileScenarioName,
+                ProductionFreezerStressScenario.ScenarioName,
+                FrozenRadiusWeldScenario.ScenarioName,
+                FrozenSavePerfScenario.ScenarioName,
+                PbSaveFrozenScenario.ScenarioName,
+                PbSaveThreadScenario.ScenarioName,
+                PbSaveOffThreadScenario.ScenarioName,
+                PbScriptLoadScenario.IimName, PbScriptLoadScenario.IimWatchName,
+                PanelServerScenario.ScenarioName,
+                PowerSwitchScenario.ScenarioName,
+                UnsteppedBlocksScenario.ScenarioName,
+                OfflineCharacterScenario.ScenarioName,
+                PhysicsResumeScenario.ScenarioName,
+                LaserLinkAwakeScenario.ScenarioName,
+                LaserAntennaControlScenario.ScenarioName,
+                RemoteControlAnchorScenario.ScenarioName,
+                PbPerfScenario.ScenarioName,
+                PistonStackScenario.ScenarioName,
+                TopGridsPlayersScenario.ScenarioName,
+                TopGridsPlayersOpenScenario.ScenarioName);
+
+            ScenarioRegistry.Needs(Integrations.Watcher,
+                WatcherRecordScenario.ScenarioName,
+                WatcherLoadScenario.ScenarioName);
+
+            ScenarioRegistry.Needs(Integrations.Adventures, NpcSpawnScenario.ScenarioName);
+            ScenarioRegistry.Needs(Integrations.Garage, GarageRoundtripScenario.ScenarioName);
+
+            // One pass over the world per plugin that sweeps it: the scenario needs all three.
+            ScenarioRegistry.Needs(new[] { Integrations.Adventures, Integrations.Gameplay, Integrations.Optimisations },
+                WorldSweepsScenario.ScenarioName);
+            ScenarioRegistry.Needs(new[] { Integrations.Watcher, Integrations.Optimisations },
+                WatcherLedgerScenario.ScenarioName);
         }
 
         private void ResolveReportDirectory()

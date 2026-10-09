@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Linq;
 using System.Reflection;
@@ -28,7 +28,7 @@ namespace SentisTests.Scenarios
         public override IEnumerator Run()
         {
             var page = AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("SentisAi.GUI.ConfigGUI", false)).FirstOrDefault(t => t != null);
-            Check(page != null, "no SentisAi.GUI.ConfigGUI");
+            SkipUnless(page != null, "no SentisAi.GUI.ConfigGUI");
             var update = page.GetMethod("UpdateStatus", BindingFlags.Instance | BindingFlags.NonPublic);
             var status = page.GetField("_status", BindingFlags.Instance | BindingFlags.NonPublic);
             Check(update != null && status != null, "the page has no UpdateStatus or _status");

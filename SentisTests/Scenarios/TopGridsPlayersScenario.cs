@@ -22,9 +22,14 @@ namespace SentisTests.Scenarios
     /// load table of a run with the freezer off), the biggest grid of each name; what the file does not give - no file,
     /// a grid that is gone - is made up to <see cref="Grids"/> with the grids of the most blocks.
     /// </summary>
-    public sealed class TopGridsPlayersScenario : TestScenario
+    public class TopGridsPlayersScenario : TestScenario
     {
         public const string ScenarioName = "top_grids_players";
+
+        /// <summary>The freezer on, as the players' grids run at home (false: the world as it is, the freezer on or off).</summary>
+        protected virtual bool NeedsFreezer => true;
+
+        protected virtual int Hold => HoldSeconds;
         private const string Prefix = "topgrids-";
         private const int Grids = 20;
         private const int HoldSeconds = 420;
@@ -35,14 +40,14 @@ namespace SentisTests.Scenarios
         private readonly List<ulong> _protected = new List<ulong>();
 
         public override string Name => ScenarioName;
-        public override int TimeoutSeconds => HoldSeconds + 180;
+        public override int TimeoutSeconds => Hold + 180;
 
         public override IEnumerator Run()
         {
             WorldApi.EnsureUnpaused(Name);
             FakeClients.RemoveAll();
             yield return WaitForTicks(30);
-            Check(RuntimePluginControls.FreezerEnabled, "the freezer is off: this measures the world with it on");
+            if (NeedsFreezer) Check(RuntimePluginControls.FreezerEnabled, "the freezer is off: this measures the world with it on");
 
             var all = MyEntities.GetEntities().OfType<MyCubeGrid>().Where(g => !g.MarkedForClose && g.Physics != null && !g.IsPreview).ToList();
             var chosen = new List<MyCubeGrid>();
@@ -85,7 +90,7 @@ namespace SentisTests.Scenarios
 
             var hold = Stopwatch.StartNew();
             var nextNote = 60.0;
-            while (hold.Elapsed.TotalSeconds < HoldSeconds)
+            while (hold.Elapsed.TotalSeconds < Hold)
             {
                 if (hold.Elapsed.TotalSeconds >= nextNote)
                 {
@@ -96,7 +101,7 @@ namespace SentisTests.Scenarios
                 }
                 yield return null;
             }
-            Note("TOP GRIDS PLAYERS RESULT | held " + HoldSeconds + " s, characters alive at the end " + Enumerable.Range(0, chosen.Count).Count(FakeClients.HasLiveCharacter) +
+            Note("TOP GRIDS PLAYERS RESULT | held " + Hold + " s, characters alive at the end " + Enumerable.Range(0, chosen.Count).Count(FakeClients.HasLiveCharacter) +
                  " of " + chosen.Count + ", grids frozen at the end: " + Frozen(chosen));
         }
 
@@ -129,4 +134,17 @@ namespace SentisTests.Scenarios
             finally { base.Cleanup(); }
         }
     }
+
+    /// <summary>
+    /// The same players by the heaviest grids, kept 25 minutes and with the world as it is - the freezer may be off:
+    /// a holder for comparing measurements taken from outside (SentisClusters: the clusters in a row and side by side).
+    /// </summary>
+    public sealed class TopGridsPlayersOpenScenario : TopGridsPlayersScenario
+    {
+        public new const string ScenarioName = "top_grids_players_open";
+        public override string Name => ScenarioName;
+        protected override bool NeedsFreezer => false;
+        protected override int Hold => 1500;
+    }
+
 }

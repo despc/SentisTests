@@ -56,6 +56,8 @@ namespace SentisTests.Scenarios
             Up = Vector3D.Normalize(anchorM.Translation - planet.PositionComp.GetPosition());
             Side = Vector3D.Normalize(Vector3D.CalculatePerpendicularVector(Up));
             Centre = anchorM.Translation + Up * AltitudeM + Side * SideOffsetM;
+            // a copy run with others far apart (ClusterTwinsScenario): out in space, its own cluster
+            Centre += Shift;
 
             FakeClients.RemoveAll();
             var player = Centre + Up * 60 + Side * 40;

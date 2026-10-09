@@ -574,7 +574,9 @@ namespace SentisTests.Game
         /// <summary>A player's blueprint file (bp.sbc) readied for spawn as <see cref="LoadAuthoredGroup"/> does an embedded one.</summary>
         public static List<MyObjectBuilder_CubeGrid> LoadBlueprintFile(string path, string name)
         {
-            if (!System.IO.File.Exists(path)) throw new Core.ScenarioFailedException("blueprint not found: " + path);
+            // A blueprint of the operator's world that is simply not on this server: the scenario
+            // that was told to use it cannot run here, which is not a fault of the server.
+            Core.TestScenario.RequireFile(path, "blueprint");
             return GroupFromXml(System.IO.File.ReadAllText(path), path, name);
         }
 

@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -31,7 +32,14 @@ namespace SentisTests.Core
         {
             try
             {
-                var initializer = Type.GetType("Torch.Server.Initializer, Torch.Server", true);
+                // Torch.Server is the dedicated host; a stand without it (a plain game, another host)
+                // simply keeps Windows error reporting for its crashes.
+                var initializer = Type.GetType("Torch.Server.Initializer, Torch.Server", false);
+                if (initializer == null)
+                {
+                    Log.Info("CrashDump: Torch.Server is not this process - nothing to hook, fatal exceptions go to Windows error reporting");
+                    return;
+                }
                 var handler = initializer.GetMethod("HandleException", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
                               ?? throw new MissingMethodException(initializer.FullName, "HandleException");
                 Harmony.Patch(handler, prefix: new HarmonyMethod(typeof(CrashDump).GetMethod(nameof(HandleExceptionPrefix), BindingFlags.Static | BindingFlags.NonPublic)));
@@ -63,7 +71,7 @@ namespace SentisTests.Core
             var procdump = ProcDump();
             if (procdump == null)
             {
-                Log.Error("CrashDump: procdump64.exe not found, no dump");
+                Log.Error("CrashDump: procdump64.exe not found, no dump. Put it in " + ToolsFolder + " or name it in SentisTests.cfg (ProDumpPath).");
                 return null;
             }
             Directory.CreateDirectory(Folder);
@@ -90,13 +98,33 @@ namespace SentisTests.Core
             return File.Exists(path) ? path : null;
         }
 
+        private static readonly string ToolsFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools");
+
+        /// <summary>
+        /// Sysinternals procdump64.exe: where the config points, next to the server or in its
+        /// <c>tools</c> folder, or anywhere on PATH. Absent means no dumps, nothing else.
+        /// </summary>
         private static string ProcDump()
         {
-            var candidates = new[]
+            var candidates = new List<string>();
+            var configured = SentisTestsPlugin.Config?.ProDumpPath;
+            if (!string.IsNullOrWhiteSpace(configured))
             {
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools", "procdump64.exe"),
-                @"C:\SE\tools\procdump64.exe"
-            };
+                if (Path.IsPathRooted(configured) || configured.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                    candidates.Add(configured);
+                else
+                    candidates.Add(Path.Combine(configured, "procdump64.exe"));
+            }
+
+            candidates.Add(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools", "procdump64.exe"));
+            candidates.Add(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "procdump64.exe"));
+            foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';'))
+            {
+                if (string.IsNullOrWhiteSpace(dir)) continue;
+                try { candidates.Add(Path.Combine(dir.Trim(), "procdump64.exe")); }
+                catch (ArgumentException) { }   // a PATH entry that is not a usable path
+            }
+
             return candidates.FirstOrDefault(File.Exists);
         }
 

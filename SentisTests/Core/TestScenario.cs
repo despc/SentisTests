@@ -23,6 +23,12 @@ namespace SentisTests.Core
 
         public abstract string Name { get; }
 
+        /// <summary>
+        /// Where this run is moved to from the scenario's own place: a scenario that supports it adds this to what it
+        /// spawns. Set by <see cref="Scenarios.ClusterTwinsScenario"/>, which runs several copies at once far apart.
+        /// </summary>
+        public VRageMath.Vector3D Shift { get; set; }
+
         public virtual int TimeoutSeconds
         {
             get { return SentisTestsPlugin.Config?.DefaultTimeoutSeconds ?? 300; }
@@ -39,6 +45,16 @@ namespace SentisTests.Core
         internal IReadOnlyList<IMyEntity> Tracked { get { return _tracked; } }
 
         public abstract IEnumerator Run();
+
+        /// <summary>
+        /// Optional plugins this scenario drives. The registry gates on what was declared when the
+        /// scenario was registered; a scenario can name them here too and the runner checks both,
+        /// so a registration that forgot cannot turn "plugin absent" into a failing test.
+        /// </summary>
+        public virtual string[] Requires => null;
+
+        /// <summary>Skips the scenario when one of these optional plugins is not loaded.</summary>
+        protected static void RequirePlugin(params string[] names) => Integrations.Require(names);
 
         /// <summary>Moves the tracked list out without deleting anything (deferred cleanup).</summary>
         public List<IMyEntity> TakeTracked()
@@ -93,10 +109,38 @@ namespace SentisTests.Core
             Log.Info("[TEST:{0}] {1}", Name, message);
         }
 
+        /// <summary>
+        /// Like <see cref="Check"/>, for the things this server is not supposed to have: another
+        /// plugin, a blueprint of somebody's world, a game type another build has. The scenario is
+        /// SKIPPED with the reason instead of FAILED - nothing here is wrong, the subject is absent.
+        /// </summary>
+        protected static void SkipUnless(bool condition, string what)
+        {
+            if (!condition)
+                throw new ScenarioSkippedException(what);
+        }
+
         protected static void Check(bool condition, string what)
         {
             if (!condition)
                 throw new ScenarioFailedException(what);
+        }
+
+        /// <summary>Fails when a type the scenario reaches for by name is not there (a plugin, or a game type this build does not have).</summary>
+        protected static Type RequireType(Type type, string what)
+        {
+            if (type == null)
+                throw new ScenarioSkippedException(what + " is not in this server");
+            return type;
+        }
+
+        /// <summary>Skips the scenario when a file it was told to use is not there (a blueprint of the operator's world).</summary>
+        public static string RequireFile(string path, string what)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
+                throw new ScenarioSkippedException(what + " is not here: " +
+                    (string.IsNullOrWhiteSpace(path) ? "no path set" : path));
+            return path;
         }
 
         protected static T Require<T>(object value, string what) where T : class

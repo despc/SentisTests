@@ -49,7 +49,9 @@ namespace SentisTests.Scenarios
             }
             Note("PATCH JUMPS | " + checkedEntries + " patched entries: " + oneInstruction + " one-instruction jumps, " + twoInstructions.Count + " two-instruction (mov rax; jmp rax)");
             foreach (var name in twoInstructions) Note("TWO-INSTRUCTION JUMP " + name);
-            Check(checkedEntries > 0, "no patched entries found");
+            // With no plugin patching Torch there is nothing to look at: that is a server without the
+            // subject, not a broken jump.
+            SkipUnless(checkedEntries > 0, "no Torch-rewritten methods here - nothing to check the jump form of");
             Check(twoInstructions.Count == 0, twoInstructions.Count + " patched methods entered by Torch's two-instruction jump");
             yield break;
         }

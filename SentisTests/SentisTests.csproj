@@ -14,16 +14,18 @@
     <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <NoWarn>CS0168;CS0219;CS0414;CS0649;CS1591;CS0108;CS0114;NU1701;NU5104</NoWarn>
-    <!-- Root for Space Engineers dedicated server / torch install -->
+    <!-- Where the Space Engineers dedicated server and the Torch install to build against live.
+         Another path: -p:SeRoot=D:\SE, or the SE_ROOT environment variable. -->
+    <SeRoot Condition="'$(SeRoot)' == '' and '$(SE_ROOT)' != ''">$(SE_ROOT)</SeRoot>
     <SeRoot Condition="'$(SeRoot)' == ''">C:\SE</SeRoot>
     <SeDs>$(SeRoot)\DedicatedServer64</SeDs>
+    <!-- Written into the release archive name; keep in step with manifest.xml. -->
+    <PluginVersion>0.1.0</PluginVersion>
     <EnableDefaultPageItems>false</EnableDefaultPageItems>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="8.0.0" />
-    <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
 
   <ItemGroup>
@@ -37,8 +39,10 @@
     <Reference Include="Torch.API"><HintPath>$(SeRoot)\Torch.API.dll</HintPath><Private>False</Private></Reference>
     <Reference Include="NLog"><HintPath>$(SeRoot)\NLog.dll</HintPath><Private>False</Private></Reference>
     <Reference Include="Newtonsoft.Json"><HintPath>$(SeRoot)\Newtonsoft.Json.dll</HintPath><Private>False</Private></Reference>
-    <!-- Vendored -->
-    <Reference Include="0Harmony"><HintPath>lib\0Harmony.dll</HintPath><Private>False</Private></Reference>
+    <!-- Vendored. Torch itself has no Harmony, so the plugin ships its own: it is copied next to
+         the plugin dll and loaded from there. A server that already loaded the same version for
+         another plugin keeps that one copy - they are the same assembly. -->
+    <Reference Include="0Harmony"><HintPath>lib\0Harmony.dll</HintPath><Private>True</Private></Reference>
     <!-- Game -->
     <Reference Include="HavokWrapper"><HintPath>$(SeDs)\HavokWrapper.dll</HintPath><Private>False</Private></Reference>
     <Reference Include="Microsoft.CodeAnalysis"><HintPath>$(SeDs)\Microsoft.CodeAnalysis.dll</HintPath><Private>False</Private></Reference>
@@ -68,6 +72,29 @@
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
   </ItemGroup>
+
+  <!-- A Torch install is needed to compile against; say so instead of failing on a hundred unresolved names. -->
+  <Target Name="CheckSeRoot" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(SeRoot)\Torch.dll')"
+           Text="No Torch.dll under '$(SeRoot)'. Build with -p:SeRoot=&lt;folder of your Torch install&gt; (or set SE_ROOT); the game assemblies are read from '$(SeDs)', so a dedicated server install next to Torch is needed too." />
+  </Target>
+
+  <!-- Runs with every build: the plugin folder as it goes to a user, and an archive of it. -->
+  <Target Name="Package" AfterTargets="Build">
+    <ItemGroup>
+      <PluginFile Include="$(OutDir)SentisTests.dll" />
+      <PluginFile Include="$(OutDir)manifest.xml" />
+      <PluginFile Include="$(OutDir)LICENSE" />
+      <PluginFile Include="$(OutDir)NOTICE" />
+      <PluginFile Include="$(OutDir)0Harmony.dll" />
+      <ReadmeFile Include="$(MSBuildProjectDirectory)\..\README.md" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)plugin\SentisTests" />
+    <Copy SourceFiles="@(PluginFile)" DestinationFolder="$(OutDir)plugin\SentisTests" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(ReadmeFile)" DestinationFolder="$(OutDir)plugin\SentisTests" SkipUnchangedFiles="true" />
+    <ZipDirectory SourceDirectory="$(OutDir)plugin" DestinationFile="$(OutDir)SentisTests-$(PluginVersion).zip" Overwrite="true" />
+    <Message Importance="high" Text="Packaged $(OutDir)plugin\SentisTests and $(OutDir)SentisTests-$(PluginVersion).zip" />
+  </Target>
 
   <ItemGroup>
     <None Include="manifest.xml" CopyToOutputDirectory="PreserveNewest" />

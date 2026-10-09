@@ -70,6 +70,8 @@ namespace SentisTests.Scenarios
             public int FrozenBlocks;
             public List<string> Problems = new List<string>();
             public double MaxKick;
+            // the grid of the fastest kick seen: which, in which thaw, how long after it, and how far it went
+            public string MaxKickWhat;
             // Speed of the chassis (the first grid) right after a thaw: moving tops excluded.
             public double MaxChassisKick;
             // Grids whose body vanilla keeps fixed (a landing gear locked to a static grid or voxels).
@@ -218,7 +220,7 @@ namespace SentisTests.Scenarios
             // second, a body thrown at a hundred is a thaw gone wrong even if nothing came off.
             foreach (var rig in _rigs)
                 if (rig.MaxKick > MaxThawSpeed)
-                    rig.Problems.Add("a grid at " + rig.MaxKick.ToString("F1") + " m/s right after a thaw");
+                    rig.Problems.Add("a grid at " + rig.MaxKick.ToString("F1") + " m/s right after a thaw: " + rig.MaxKickWhat);
 
             Note("FREEZER RESULT | " + string.Join(" | ", _rigs.Select(r => r.Name + ": physics frozen " + r.PhysicsFrozenCycles + ", logic only " +
                  r.LogicOnlyCycles + ", not frozen " + r.NotFrozenCycles + ", max speed after thaw " + r.MaxKick.ToString("F1") + " m/s (chassis " + r.MaxChassisKick.ToString("F2") + "), problems " +
@@ -254,8 +256,21 @@ namespace SentisTests.Scenarios
                         rig.ThawPoses = rig.Grids.Select(g => g.PositionComp.GetPosition()).ToList();
                     }
                     if (rig.ThawedAt == null || rig.AfterPoses != null) continue;
-                    foreach (var g in rig.Grids.Where(g => !g.Closed && g.Physics != null))
-                        rig.MaxKick = Math.Max(rig.MaxKick, g.Physics.LinearVelocity.Length());
+                    for (var i = 0; i < rig.Grids.Count; i++)
+                    {
+                        var g = rig.Grids[i];
+                        if (g.Closed || g.Physics == null) continue;
+                        var speed = g.Physics.LinearVelocity.Length();
+                        if (speed <= rig.MaxKick) continue;
+                        rig.MaxKick = speed;
+                        var at = g.PositionComp.GetPosition();
+                        rig.MaxKickWhat = "grid " + i + " '" + g.DisplayName + "' (" + g.GetFatBlocks().Count + " fat blocks: " +
+                                          string.Join(",", g.GetFatBlocks().Select(b => b.GetType().Name).Distinct().Take(4)) + ") " + when + ", " +
+                                          (now - rig.ThawedAt.Value).TotalSeconds.ToString("F2") + " s after the thaw, " +
+                                          (i < rig.ThawPoses.Count ? (at - rig.ThawPoses[i]).Length().ToString("F2") : "?") + " m from where it thawed, angular " +
+                                          g.Physics.AngularVelocity.Length().ToString("F1") + " rad/s, body " +
+                                          (g.Physics.RigidBody == null ? "none" : g.Physics.RigidBody.IsFixedOrKeyframed ? "fixed" : g.Physics.RigidBody.IsActive ? "active" : "asleep");
+                    }
                     var chassis = rig.Grids[0];
                     if (!chassis.Closed && chassis.Physics != null)
                         rig.MaxChassisKick = Math.Max(rig.MaxChassisKick, chassis.Physics.LinearVelocity.Length());

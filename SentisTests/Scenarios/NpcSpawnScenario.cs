@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -49,7 +49,7 @@ namespace SentisTests.Scenarios
             WorldApi.EnsureUnpaused(Name);
             var spawner = PluginType("SentisAdventures.NPCSpawner");
             var processor = PluginType("SentisAdventures.Adventures.WorldRandomNPC.NpcProcessor");
-            Check(spawner != null && processor != null, "the SentisAdventures plugin is not loaded");
+            SkipUnless(spawner != null && processor != null, "the SentisAdventures plugin is not loaded");
             Check(PluginType("SentisAdventures.FixShipLogic") == null, "FixShipLogic is still in the plugin");
             var repository = processor.GetField("NpcRepository", BindingFlags.Static | BindingFlags.Public);
             var ready = Wait(() => repository.GetValue(null) != null, "the plugin has its database", 30);

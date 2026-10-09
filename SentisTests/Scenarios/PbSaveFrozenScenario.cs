@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -67,10 +67,10 @@ namespace SentisTests.Scenarios
             Check(torch != null, "Torch instance is not available to the test plugin");
             InstallProbe((PatchManager)torch.Managers.GetManager(typeof(PatchManager)));
             var optimisations = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "SentisOptimisations");
-            Check(optimisations != null, "SentisOptimisations is not loaded");
-            var saveHasCode = optimisations.GetType("SentisOptimisationsPlugin.PBFix", true).GetMethod("SaveHasCode", BindingFlags.Public | BindingFlags.Static)
+            SkipUnless(optimisations != null, "SentisOptimisations is not loaded");
+            var saveHasCode = optimisations.GetType("SentisOptimisationsPlugin.PBFix", false).GetMethod("SaveHasCode", BindingFlags.Public | BindingFlags.Static)
                               ?? throw new MissingMethodException("PBFix", "SaveHasCode");
-            var scriptSaves = optimisations.GetType("Optimizer.Optimizations.ParallelEntitySave", true).GetMethod("ScriptSaves", BindingFlags.Public | BindingFlags.Static)
+            var scriptSaves = optimisations.GetType("Optimizer.Optimizations.ParallelEntitySave", false).GetMethod("ScriptSaves", BindingFlags.Public | BindingFlags.Static)
                               ?? throw new MissingMethodException("ParallelEntitySave", "ScriptSaves");
 
             var anchorM = WorldApi.LoadAuthoredGroup(WheelPerfScenario.ResourceName, WorldApi.EntityPrefix + Prefix + "anchor")[0]

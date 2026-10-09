@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -25,7 +25,11 @@ namespace SentisTests.Scenarios
         public const string IimName = "pb_iim";
         /// <summary>The same with punishing off: every run over the limit noted with what the script was doing, for the whole watch.</summary>
         public const string IimWatchName = "pb_iim_watch";
-        private const string IimBlueprint = @"C:\SE\tools\blueprints\iim_house\bp.sbc";
+        /// <summary>
+        /// Where the scripted base stands as a blueprint - <c>IimBlueprintPath</c> in SentisTests.cfg.
+        /// Without it the scenario is skipped: the script it measures belongs to somebody's world.
+        /// </summary>
+        private static string IimBlueprint => SentisTestsPlugin.Config?.IimBlueprintPath ?? "";
         private const string Prefix = "pb-script-";
         private const double WatchSeconds = 180;
 
@@ -52,6 +56,7 @@ namespace SentisTests.Scenarios
 
         public override IEnumerator Run()
         {
+            RequireFile(_blueprint, "the scripted base this test spawns (SentisTests.cfg: IimBlueprintPath)");
             WorldApi.EnsureUnpaused(Name);
             // (no freezing: a grid a kilometre up with the player 300 m off was frozen, out of its groups, and its script never ran)
             _optimisations.Set("FreezerEnabled", false);
@@ -60,7 +65,7 @@ namespace SentisTests.Scenarios
             // (looked for in the loaded assemblies: Type.GetType with the assembly's name went to Torch's resolver, which threw)
             var so = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "SentisOptimisations");
             var load = so?.GetType("SentisOptimisationsPlugin.PbLoad");
-            Check(load != null, "SentisOptimisations' PbLoad not found");
+            SkipUnless(load != null, "SentisOptimisations' PbLoad not found");
             T Call<T>(string method, params object[] args) => (T)load.GetMethod(method, BindingFlags.Static | BindingFlags.Public).Invoke(null, args);
             var config = so.GetType("SentisOptimisationsPlugin.SentisOptimisationsPlugin")?.GetProperty("Config", BindingFlags.Static | BindingFlags.Public)?.GetValue(null);
             double Setting(string name, double fallback) => Convert.ToDouble(config?.GetType().GetProperty(name)?.GetValue(config) ?? fallback);

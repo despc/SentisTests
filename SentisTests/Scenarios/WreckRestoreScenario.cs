@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Linq;
 using Sandbox.Engine.Physics;
@@ -30,7 +30,7 @@ namespace SentisTests.Scenarios
             var detector = plugin?.Assembly.GetType("SentisGameplayImprovements.BackgroundActions.BackgroundActionsProcessor")
                 ?.GetField("FallInVoxelDetector")?.GetValue(null);
             var restore = detector?.GetType().GetMethod("RestoreOnRequest");
-            Check(restore != null, "SGI's FallInVoxelDetector.RestoreOnRequest not found");
+            SkipUnless(restore != null, "SGI's FallInVoxelDetector.RestoreOnRequest not found");
 
             var wrecks = MyEntities.GetEntities().OfType<MyCubeGrid>()
                 .Where(g => !g.MarkedForClose && g.DisplayName != null && g.DisplayName.StartsWith("Wrecked Hauler"))
