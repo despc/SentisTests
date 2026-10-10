@@ -29,7 +29,7 @@ namespace SentisTests.Scenarios
         public const string ScenarioName = "planet_flight";
         private const string Prefix = "char-";
         private const int Flyers = 4;
-        private const double AltitudeM = 40;
+        private const double AltitudeM = 60;
         private const double SpeedMps = 90;
         private const double CircleRadiusM = 2500;
         private const double SettleSeconds = 15;
@@ -41,6 +41,7 @@ namespace SentisTests.Scenarios
         public override int TimeoutSeconds => (int)(FlySeconds + 300);
 
         private long _added, _removed, _reordered;
+        private readonly List<ulong> _protected = new List<ulong>();
 
         public override IEnumerator Run()
         {
@@ -78,6 +79,16 @@ namespace SentisTests.Scenarios
             }
             FakeClients.Add(Flyers, Network, i => (paths[i](0), 0, 0), withCharacters: true);
             for (var i = 0; i < Flyers; i++) FakeClients.SetPath(i, paths[i]);
+            // at 90 m/s low over the ground one of them flew into a mountain side now and then (the steering follows
+            // the ground a frame late): the test is about the load a flight makes, so they are invulnerable, the way
+            // the admin menu sets it
+            for (var i = 0; i < FakeClients.Count; i++)
+            {
+                var steamId = FakeClients.PlayerOf(i).Id.SteamId;
+                _protected.Add(steamId);
+                Sandbox.Game.World.MySession.Static.RemoteAdminSettings[steamId] =
+                    Sandbox.Game.World.AdminSettingsEnum.Invulnerable | Sandbox.Game.World.AdminSettingsEnum.Untargetable;
+            }
 
             var settle = WaitForSeconds(SettleSeconds, "flyers take off");
             while (settle.MoveNext()) yield return settle.Current;
@@ -132,7 +143,12 @@ namespace SentisTests.Scenarios
 
         public override void Cleanup()
         {
-            try { FakeClients.RemoveAll(); }
+            try
+            {
+                FakeClients.RemoveAll();
+                foreach (var steamId in _protected) Sandbox.Game.World.MySession.Static?.RemoteAdminSettings.Remove(steamId);
+                _protected.Clear();
+            }
             finally { base.Cleanup(); }
         }
     }

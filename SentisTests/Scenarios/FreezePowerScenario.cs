@@ -31,6 +31,15 @@ namespace SentisTests.Scenarios
     public sealed class FreezePowerScenario : TestScenario
     {
         public const string ScenarioName = "freeze_power";
+        /// <summary>
+        /// The power sources in clusters of their own, for SentisClusters: <see cref="SpreadSites"/> sites (solar panels, a
+        /// reactor and a hydrogen engine, each charging an empty battery) 20 km apart on the sunlit side, an invulnerable
+        /// player at each, the freezer off. After <see cref="RunSeconds"/> every site must have charged its batteries and
+        /// burned its fuel, and all of them alike.
+        /// </summary>
+        public const string SpreadScenarioName = "power_spread";
+        private const int SpreadSites = 8;
+        private const double SpreadStep = 20000;
         private const string Prefix = "frzpow-";
         private const double AboveSurfaceM = 30000;
         private const double ApartM = 1000;
@@ -55,11 +64,22 @@ namespace SentisTests.Scenarios
         private Site _near;
         private Site _far;
 
-        public override string Name => ScenarioName;
+        public override string Name => _spread ? SpreadScenarioName : ScenarioName;
         public override int TimeoutSeconds => (int)(RunSeconds + FreezeWaitSeconds + 500);
+
+        private readonly bool _spread;
+        private readonly List<ulong> _protected = new List<ulong>();
+
+        public FreezePowerScenario(bool spread = false) { _spread = spread; }
 
         public override IEnumerator Run()
         {
+            if (_spread)
+            {
+                var spread = RunSpread();
+                while (spread.MoveNext()) yield return spread.Current;
+                yield break;
+            }
             WorldApi.EnsureUnpaused(Name);
             FakeClients.RemoveAll();
             yield return WaitForTicks(30);
@@ -179,6 +199,95 @@ namespace SentisTests.Scenarios
             {
                 Note("the engine burned no measurable hydrogen at either site, so that half says nothing");
             }
+        }
+
+        private IEnumerator RunSpread()
+        {
+            WorldApi.EnsureUnpaused(Name);
+            FakeClients.RemoveAll();
+            yield return WaitForTicks(30);
+            _config.Set("FreezerEnabled", false);
+
+            var anchorM = WorldApi.LoadAuthoredGroup(WheelPerfScenario.ResourceName, WorldApi.EntityPrefix + Prefix + "anchor")[0]
+                .PositionAndOrientation.Value.GetMatrix();
+            var planet = MyGamePruningStructure.GetClosestPlanet(anchorM.Translation);
+            Check(planet != null, "no planet");
+            var sun = Vector3D.Normalize(MySector.DirectionToSunNormalized);
+            var centre = planet.PositionComp.GetPosition();
+            var at = centre + sun * (planet.MaximumRadius + AboveSurfaceM);
+            var side = Vector3D.Normalize(Vector3D.CalculatePerpendicularVector(sun));
+            var across = Vector3D.Cross(sun, side);
+
+            var sites = new List<Site>();
+            var places = new List<Vector3D>();
+            for (var i = 0; i < SpreadSites; i++)
+            {
+                var place = at + side * ((i % 4 - 1.5) * SpreadStep) + across * ((i / 4 - 0.5) * SpreadStep);
+                places.Add(place);
+                sites.Add(BuildSite("site " + i, place, sun, side));
+                yield return null;
+            }
+            var settle = WaitForSeconds(SettleSeconds, "the sites settle");
+            while (settle.MoveNext()) yield return settle.Current;
+            foreach (var site in sites)
+            {
+                Check(site.SolarBattery != null && site.ReactorBattery != null && site.EngineBattery != null, site.Label + ": a battery is missing");
+                Check(site.Reactor != null && site.Engine != null, site.Label + ": no reactor or no engine");
+                site.Prepare();
+            }
+
+            // a player at every site, invulnerable and untargetable the way the admin menu sets them
+            FakeClients.Add(sites.Count, Network, p => (places[p] + sun * 30, 0, 0), withCharacters: true);
+            for (var p = 0; p < FakeClients.Count; p++)
+            {
+                var steamId = FakeClients.PlayerOf(p).Id.SteamId;
+                _protected.Add(steamId);
+                Sandbox.Game.World.MySession.Static.RemoteAdminSettings[steamId] =
+                    Sandbox.Game.World.AdminSettingsEnum.Invulnerable | Sandbox.Game.World.AdminSettingsEnum.Untargetable;
+            }
+            var starting = WaitUntil(null, StartupSeconds, "the engines pick up");
+            while (starting.MoveNext()) yield return starting.Current;
+            foreach (var site in sites) site.StopStarter();
+            var running = WaitUntil(null, StartupSeconds, "the starter batteries are out");
+            while (running.MoveNext()) yield return running.Current;
+
+            var start = sites.Select(x => x.Read()).ToList();
+            var measuring = WaitUntil(null, RunSeconds, "measuring");
+            while (measuring.MoveNext()) yield return measuring.Current;
+            var got = sites.Select((x, i) => x.Read().Minus(start[i])).ToList();
+
+            double Median(Func<Reading, double> f)
+            {
+                var v = got.Select(f).OrderBy(x => x).ToList();
+                return v[v.Count / 2];
+            }
+            var problems = new List<string>();
+            void Alike(string what, Func<Reading, double> f, double least)
+            {
+                var median = Median(f);
+                if (median <= least)
+                {
+                    problems.Add(what + ": the median is " + median.ToString("F4") + ", nothing to compare");
+                    return;
+                }
+                for (var i = 0; i < got.Count; i++)
+                {
+                    var v = f(got[i]);
+                    if (v < median * 0.75 || v > median * 1.25)
+                        problems.Add(sites[i].Label + " " + what + " " + v.ToString("F4") + " against the median " + median.ToString("F4"));
+                }
+            }
+            Alike("solar charge", r => r.SolarCharge, 0.0001);
+            Alike("reactor charge", r => r.ReactorCharge, 0.001);
+            Alike("uranium burned", r => r.Uranium, 0.001);
+            Alike("engine charge", r => r.EngineCharge, 0.0001);
+            if (Median(r => r.Hydrogen) > 0.0001) Alike("hydrogen burned", r => r.Hydrogen, 0.0001);
+
+            Note("POWER SPREAD RESULT | " + sites.Count + " sites " + SpreadStep / 1000 + " km apart, " + RunSeconds.ToString("F0") + " s | median: battery on solar " +
+                 Median(r => r.SolarCharge).ToString("F4") + " MWh, on reactor " + Median(r => r.ReactorCharge).ToString("F4") + " MWh, on engine " +
+                 Median(r => r.EngineCharge).ToString("F4") + " MWh, uranium " + Median(r => r.Uranium).ToString("F3") + " kg, hydrogen " +
+                 (Median(r => r.Hydrogen) * 100).ToString("F2") + "% | " + string.Join(" | ", sites.Select((x, i) => x.Label + ": " + got[i])));
+            Check(problems.Count == 0, string.Join("; ", problems));
         }
 
         // ------------------------------------------------------------------ readings
@@ -311,7 +420,7 @@ namespace SentisTests.Scenarios
             {
                 if (until != null && until()) yield break;
                 var elapsed = (DateTime.UtcNow - started).TotalSeconds;
-                if (elapsed - lastFull >= LogEverySeconds)
+                if (elapsed - lastFull >= LogEverySeconds && _near != null)
                 {
                     lastFull = elapsed;
                     Note(what + " " + elapsed.ToString("F0") + "/" + seconds.ToString("F0") + "s | near " +
@@ -428,6 +537,8 @@ namespace SentisTests.Scenarios
             {
                 FakeClients.RemoveAll();
                 _config.Restore();
+                foreach (var steamId in _protected) Sandbox.Game.World.MySession.Static?.RemoteAdminSettings.Remove(steamId);
+                _protected.Clear();
             }
             finally { base.Cleanup(); }
         }

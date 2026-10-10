@@ -27,6 +27,20 @@ namespace SentisTests.Scenarios
 
         public override string Name => ScenarioName;
 
+        private static readonly FakeClients.NetworkProfile Network = new FakeClients.NetworkProfile { RttMs = 50 };
+        private ulong? _protected;
+
+        public override void Cleanup()
+        {
+            try
+            {
+                FakeClients.RemoveAll();
+                if (_protected.HasValue) Sandbox.Game.World.MySession.Static?.RemoteAdminSettings.Remove(_protected.Value);
+                _protected = null;
+            }
+            finally { base.Cleanup(); }
+        }
+
         public override IEnumerator Run()
         {
             WorldApi.EnsureUnpaused(Name);
@@ -74,6 +88,15 @@ namespace SentisTests.Scenarios
                 grids.Add(grid);
                 yield return null;
             }
+            // a player by the plates: with selective physics updates a cluster with nobody in it is not stepped, and the
+            // plates hung where they appeared - every orientation "Unlocked" (stand, 10.10.2026, after the scenario
+            // before had taken its player away)
+            var watcherAt = planet.GetClosestSurfacePointGlobal(anchor + east * (300 + 25 * Forwards.Length / 2.0) + Vector3D.Normalize(Vector3D.Cross(east, up)) * 40);
+            FakeClients.Add(1, Network, p => (watcherAt + up * 3, 0, 0), withCharacters: true);
+            var steamId = FakeClients.PlayerOf(0).Id.SteamId;
+            _protected = steamId;
+            Sandbox.Game.World.MySession.Static.RemoteAdminSettings[steamId] =
+                Sandbox.Game.World.AdminSettingsEnum.Invulnerable | Sandbox.Game.World.AdminSettingsEnum.Untargetable;
             var wait = WaitForSeconds(12, "gears fall and lock");
             while (wait.MoveNext()) yield return wait.Current;
             var report = new List<string>();
