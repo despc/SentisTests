@@ -261,6 +261,11 @@ REST:
 - `gas_perf` — 400 генераторов O2/H2.
 - `thrust_ion`, `thrust_atmo` — двигатели под нагрузкой.
 - `pb_perf` — тяжёлые программные блоки и их наказание.
+- `pb_static_init` — скрипты со статической инициализацией, скомпилированные вне игрового потока (SO `PbCompile`):
+  класс со статическим конструктором (минимальный скрипт из PR #2 и `Settings` из AutomaticSystemBase), инициализатор
+  поля с объектами скрипта, инициализатор, читающий статику класса с конструктором, `Program` со `static readonly`
+  полями. Каждый должен отработать без исключения и после перекомпиляции. До PR #2 падал с
+  `TypeInitializationException`; число подготовленных методов каждого скрипта — в логе при `Diagnostic logs` SO.
 - `piston_perf`, `piston_extend` — поршни в мире.
 - `character_perf` — персонажи на джетпаках.
 - `wheel_perf`, `wheel_perf_64`, `wheel_small*`, `wheel_parked_64`, `wheel_physics_ab` — колёсная техника.
