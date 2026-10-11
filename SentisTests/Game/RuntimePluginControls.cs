@@ -369,6 +369,16 @@ namespace SentisTests.Game
             }
         }
 
+        /// <summary>SentisOptimisations' settings-page readout, by player: "name: welders waiting for a frame with room to build a projected block, ..."; "-" when none; null without it.</summary>
+        public static string ProjectionBuildsWaiting
+        {
+            get
+            {
+                var config = ConfigOrNull("SentisOptimisations", "SentisOptimisationsPlugin.SentisOptimisationsPlugin");
+                return config?.GetType().GetProperty("ProjectionBuildsWaiting")?.GetValue(config)?.ToString();
+            }
+        }
+
         /// <summary>What the game gives a welder when no plugin widens its radius.</summary>
         public const float VanillaWelderRadiusMultiplier = 1f;
 

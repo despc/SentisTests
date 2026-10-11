@@ -317,7 +317,8 @@ namespace SentisTests.Scenarios
                     lastLog = DateTime.UtcNow;
                     Note("profiling: elapsed=" + (DateTime.UtcNow - started).TotalSeconds.ToString("F0") +
                          "s, built=" + built + "/" + expected +
-                         ", finished=" + finished + ", physical-grids=" + physical.Count + " | " +
+                         ", finished=" + finished + ", physical-grids=" + physical.Count +
+                         ", welders waiting for a projection build (by player) " + (RuntimePluginControls.ProjectionBuildsWaiting ?? "?") + " | " +
                          MixedWeldScenario.PluginCounters());
                 }
                 yield return null;

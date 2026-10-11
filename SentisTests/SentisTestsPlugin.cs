@@ -102,6 +102,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(FrozenRadiusWeldScenario.ScenarioName, () => new FrozenRadiusWeldScenario());
                 ScenarioRegistry.Register(WelderPerfScenario.ScenarioName, () => new WelderPerfScenario());
                 ScenarioRegistry.Register(WelderSpreadScenario.ScenarioName, () => new WelderSpreadScenario());
+                ScenarioRegistry.Register(ToolOffsetScenario.ScenarioName, () => new ToolOffsetScenario());
                 ScenarioRegistry.Register(WelderPerfScenario.ZoneScenarioName,
                     () => new WelderPerfScenario(WelderPerfScenario.ZoneScenarioName, inZone: true, dynamicPlatform: false));
                 ScenarioRegistry.Register(WelderPerfScenario.ZoneDynamicScenarioName,
