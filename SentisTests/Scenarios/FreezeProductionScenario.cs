@@ -72,8 +72,7 @@ namespace SentisTests.Scenarios
             _config.Set("FreezeDistanceStatic", FreezeDistanceM);
             _config.Set("FreezeDistanceDynamic", FreezeDistanceM);
 
-            var anchorM = WorldApi.LoadAuthoredGroup(WheelPerfScenario.ResourceName, WorldApi.EntityPrefix + Prefix + "anchor")[0]
-                .PositionAndOrientation.Value.GetMatrix();
+            var anchorM = WorldApi.PlanetAnchor(WorldApi.EntityPrefix + Prefix + "anchor");
             var planet = MyGamePruningStructure.GetClosestPlanet(anchorM.Translation);
             Check(planet != null, "no planet");
             var up = Vector3D.Normalize(anchorM.Translation - planet.PositionComp.GetPosition());

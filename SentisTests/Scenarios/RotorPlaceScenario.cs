@@ -48,6 +48,9 @@ namespace SentisTests.Scenarios
     ///
     /// "rotor_place_freezer": after the placing, the player goes a kilometre and a half away, the freezer freezes the base,
     /// the ship and the heads, they sleep 20 s, the player comes back, they wake - and the heads are watched again.
+    /// "rotor_place_preloaded": the heads' construction models loaded first as SentisOptimisations loads them ahead when a
+    /// grid starts being ground - out of its background thread they came without collision (12.10.2026), and a head placed
+    /// as a frame got a whole cube of collision inside the stator.
     /// Pistons stand beside the rotors in every variant.
     /// After each the heads are watched for <see cref="WatchSeconds"/>: there and attached, the hinge in the world, the
     /// head where it was put relative to the stator, not moving against it, and upright on its axis (not over
@@ -61,6 +64,10 @@ namespace SentisTests.Scenarios
         public const string FixName = "rotor_fix";
         public const string FixOffName = "rotor_fix_off";
         public const string FreezerName = "rotor_place_freezer";
+        public const string PreloadedName = "rotor_place_preloaded";
+
+        /// <summary>The heads' construction models loaded first as SentisOptimisations loads them ahead (GrinderPatches).</summary>
+        private readonly bool _preloaded;
 
         /// <summary>The heads watched again after the grids were frozen by SentisOptimisations' freezer and woken.</summary>
         private readonly bool _freezer;
@@ -73,8 +80,9 @@ namespace SentisTests.Scenarios
         private readonly ConfigOverride _config = new ConfigOverride();
         private MyEntity _zone;
 
-        public RotorPlaceScenario(bool? zoneTracking = null, bool? fixCheck = null, bool freezer = false)
+        public RotorPlaceScenario(bool? zoneTracking = null, bool? fixCheck = null, bool freezer = false, bool preloaded = false)
         {
+            _preloaded = preloaded;
             _freezer = freezer;
             _zoneTracking = zoneTracking;
             _fixCheck = fixCheck;
@@ -94,7 +102,7 @@ namespace SentisTests.Scenarios
         private readonly List<Vector3I> _baseCells = new List<Vector3I>(), _shipCells = new List<Vector3I>();
         private readonly List<string> _failures = new List<string>();
 
-        public override string Name => _freezer ? FreezerName : _fixCheck != null ? (_fixCheck.Value ? FixName : FixOffName) :
+        public override string Name => _preloaded ? PreloadedName : _freezer ? FreezerName : _fixCheck != null ? (_fixCheck.Value ? FixName : FixOffName) :
             _zoneTracking == null ? ScenarioName : _zoneTracking.Value ? ZoneName : ZoneGameName;
         public override int TimeoutSeconds => 300;
 
@@ -111,6 +119,20 @@ namespace SentisTests.Scenarios
         public override IEnumerator Run()
         {
             WorldApi.EnsureUnpaused(Name);
+            if (_preloaded)
+            {
+                // the heads' stage models loaded the way SO loads them when grinding starts (a background thread): before
+                // 12.10.2026 they came out of it without collision, and a head made as a frame got the whole cube as its
+                // collision instead (MyCubeBlockCollector.AddShapesBox) - inside the stator
+                var heads = OnBase.Concat(OnShip).Distinct()
+                    .Select(s => MyDefinitionManager.Static.GetAllDefinitions().OfType<MyMechanicalConnectionBlockBaseDefinition>().FirstOrDefault(d => d.Id.SubtypeName == s))
+                    .Select(d => MyDefinitionManager.Static.TryGetDefinitionGroup(d?.TopPart)?[MyCubeSize.Large]).Where(d => d?.BuildProgressModels != null).Distinct().ToList();
+                var fresh = heads.Where(d => d.BuildProgressModels.All(m => VRage.Game.Models.MyModels.GetModel(m.File)?.LoadedData != true)).ToList();
+                foreach (var head in fresh) MyCubeBlockDefinition.PreloadConstructionModels(head);
+                yield return Wait(() => heads.All(d => d.BuildProgressModels.All(m => VRage.Game.Models.MyModels.GetModel(m.File)?.LoadedData == true)), "the heads' stage models are loaded", 120);   // (behind a whole grid's types, when grinding started)
+                Note("ROTOR PLACE | heads' stage models: " + string.Join(", ", heads.Select(d => $"{d.Id.SubtypeName}{(fresh.Contains(d) ? "" : " (loaded already)")} " +
+                     string.Join("/", d.BuildProgressModels.Select(m => (VRage.Game.Models.MyModels.GetModel(m.File).HavokCollisionShapes?.Length ?? 0).ToString())) + " shapes")));
+            }
             // over any planet of the world (a copy of a server's world has none of the stand's test places): its
             // biggest one, above the surface in a fixed direction
             var planet = MyEntities.GetEntities().OfType<MyPlanet>().OrderByDescending(x => x.MaximumRadius).FirstOrDefault();

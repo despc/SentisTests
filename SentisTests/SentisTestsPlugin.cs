@@ -103,6 +103,10 @@ namespace SentisTests
                 ScenarioRegistry.Register(WelderPerfScenario.ScenarioName, () => new WelderPerfScenario());
                 ScenarioRegistry.Register(WelderSpreadScenario.ScenarioName, () => new WelderSpreadScenario());
                 ScenarioRegistry.Register(ToolOffsetScenario.ScenarioName, () => new ToolOffsetScenario());
+                ScenarioRegistry.Register(PistonProjectionScenario.ScenarioName, () => new PistonProjectionScenario());
+                ScenarioRegistry.Register(AssemblerPullProbeScenario.ScenarioName, () => new AssemblerPullProbeScenario());
+                ScenarioRegistry.Register(ConstructionModelShapesScenario.ScenarioName, () => new ConstructionModelShapesScenario());
+                ScenarioRegistry.Register(ConveyorReachScenario.ScenarioName, () => new ConveyorReachScenario());
                 ScenarioRegistry.Register(WelderPerfScenario.ZoneScenarioName,
                     () => new WelderPerfScenario(WelderPerfScenario.ZoneScenarioName, inZone: true, dynamicPlatform: false));
                 ScenarioRegistry.Register(WelderPerfScenario.ZoneDynamicScenarioName,
@@ -213,6 +217,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(RotorPlaceScenario.FixName, () => new RotorPlaceScenario(fixCheck: true));
                 ScenarioRegistry.Register(RotorPlaceScenario.FixOffName, () => new RotorPlaceScenario(fixCheck: false));
                 ScenarioRegistry.Register(RotorPlaceScenario.FreezerName, () => new RotorPlaceScenario(freezer: true));
+                ScenarioRegistry.Register(RotorPlaceScenario.PreloadedName, () => new RotorPlaceScenario(preloaded: true));
                 ScenarioRegistry.Register(PistonHeadGuardScenario.ScenarioName, () => new PistonHeadGuardScenario());
                 ScenarioRegistry.Register(AsteroidSeedsScenario.ScenarioName, () => new AsteroidSeedsScenario());
                 ScenarioRegistry.Register(RotorPlaceScenario.ZoneName, () => new RotorPlaceScenario(zoneTracking: true));

@@ -558,6 +558,23 @@ namespace SentisTests.Game
         public static void RevertTerrain(MyPlanet planet, Vector3D centre, double radius) =>
             RevertTerrain(planet, new BoundingBoxD(centre - new Vector3D(radius + 2), centre + new Vector3D(radius + 2)));
 
+        /// <summary>
+        /// The place by a planet's surface the scenarios built near the wheel_perf anchor use: that anchor, in the stand's
+        /// world. In a world without a planet there (a copy of a server's world) a point on the surface of its biggest
+        /// planet, in a fixed direction of its own (not the one rotor_place and piston_projection use).
+        /// </summary>
+        public static MatrixD PlanetAnchor(string name)
+        {
+            var anchor = LoadAuthoredGroup(SentisTests.Scenarios.WheelPerfScenario.ResourceName, name)[0].PositionAndOrientation.Value.GetMatrix();
+            if (MyGamePruningStructure.GetClosestPlanet(anchor.Translation) != null) return anchor;
+            var planet = MyEntities.GetEntities().OfType<MyPlanet>().OrderByDescending(p => p.MaximumRadius).FirstOrDefault();
+            if (planet == null) return anchor;
+            var probe = planet.PositionComp.GetPosition() + Vector3D.Normalize(new Vector3D(-0.52, 0.71, 0.47)) * planet.MaximumRadius;
+            var surface = planet.GetClosestSurfacePointGlobal(ref probe);
+            Log.Info("the wheel_perf anchor is near no planet in this world: placed on the surface of {0} instead", planet.StorageName);
+            return MatrixD.CreateTranslation(surface);
+        }
+
         public static List<MyObjectBuilder_CubeGrid> LoadAuthoredGroup(string resourceName, string name)
         {
             string xml;
