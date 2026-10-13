@@ -107,6 +107,14 @@ namespace SentisTests
                 ScenarioRegistry.Register(AssemblerPullProbeScenario.ScenarioName, () => new AssemblerPullProbeScenario());
                 ScenarioRegistry.Register(ConstructionModelShapesScenario.ScenarioName, () => new ConstructionModelShapesScenario());
                 ScenarioRegistry.Register(ConveyorReachScenario.ScenarioName, () => new ConveyorReachScenario());
+                ScenarioRegistry.Register(DrillPrintProbeScenario.ScenarioName, () => new DrillPrintProbeScenario());
+                ScenarioRegistry.Register(RigShakeScenario.ScenarioName, () => new RigShakeScenario());
+                ScenarioRegistry.Register(OwnershipMissingBlockScenario.ScenarioName, () => new OwnershipMissingBlockScenario());
+                ScenarioRegistry.Register(DrillDockScenario.ScenarioName, () => new DrillDockScenario());
+                ScenarioRegistry.Register(DrillDockScenario.MineName, () => new DrillDockScenario(DrillDockScenario.MineName));
+                ScenarioRegistry.Register(DrillDockScenario.OreName, () => new DrillDockScenario(DrillDockScenario.OreName));
+                ScenarioRegistry.Register(BotDrillFlyScenario.ScenarioName, () => new BotDrillFlyScenario());
+                ScenarioRegistry.Register(DrillStateScenario.ScenarioName, () => new DrillStateScenario());
                 ScenarioRegistry.Register(WelderPerfScenario.ZoneScenarioName,
                     () => new WelderPerfScenario(WelderPerfScenario.ZoneScenarioName, inZone: true, dynamicPlatform: false));
                 ScenarioRegistry.Register(WelderPerfScenario.ZoneDynamicScenarioName,
