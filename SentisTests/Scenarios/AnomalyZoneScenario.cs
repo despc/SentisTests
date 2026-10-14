@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Sandbox.Common.ObjectBuilders;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.Game.Multiplayer;
@@ -10,8 +11,11 @@ using Sandbox.Game.World;
 using Sandbox.ModAPI;
 using SentisTests.Core;
 using SentisTests.Game;
+using VRage;
+using VRage.ObjectBuilders;
 using VRage.Game;
 using VRage.Game.ModAPI;
+using VRage.ModAPI;
 using VRageMath;
 
 namespace SentisTests.Scenarios
@@ -23,6 +27,7 @@ namespace SentisTests.Scenarios
     ///   editable, a hit on it does nothing;
     /// - a player of A alone inside captures: A gets points, a reward structure appears near the center, its container
     ///   holds the rewards and belongs to the player;
+    /// - (at the end) a ship's jump from or to within 15 km of the zone is turned down, one far from it goes;
     /// - a player of B comes in: the zone is contested;
     /// - B goes, A captures again: the first structure is gone and its contents are in the new one;
     /// - the new structure emptied: it goes away;
@@ -75,6 +80,8 @@ namespace SentisTests.Scenarios
             Setting("PointsLostOnDeath", 1);
             Setting("SpawnRewards", true);
             Setting("CenterCube", true);
+            Setting("NoJumpsNearZones", true);
+            Setting("NoJumpRadius", 15000.0);
             Call("Forget", ZoneId);
             Call("PutZone", ZoneId, "Сценарий", site.X, site.Y, site.Z, Radius, CaptureSeconds);
             Note("zone of " + Radius + " m, capture " + CaptureSeconds + " s at " + site);
@@ -174,7 +181,57 @@ namespace SentisTests.Scenarios
             var weeklyGrids = (long[])Call("WeeklyGrids");
             Check(weeklyGrids.Length >= 1 && weeklyGrids.Any(id => Grid(id) != null), "no weekly reward structure");
             foreach (var id in weeklyGrids) Track(Grid(id));
-            Note("PASS: center cube, capture, reward structure, contest, carry-over, emptied structure, death, weekly");
+
+            // jump drives: no jump from or to within the set distance of the zone, one far from it goes
+            var outward = Vector3D.Normalize(site - anchor);
+            var side = Vector3D.Normalize(Vector3D.Cross(outward, Vector3D.Up));
+            var near = Ship(site + side * 3000, a);
+            var far = Ship(site + side * 40000, a);
+            yield return WaitForTicks(30);
+            Check(Jumps(near, near.PositionComp.GetPosition() + side * 100000, a) == false, "a jump from 3 km off the zone went");
+            Check(Jumps(far, site + side * 5000, a) == false, "a jump to 5 km off the zone went");
+            Check(Jumps(far, far.PositionComp.GetPosition() + side * 100000, a) == true, "a jump far from the zone did not go (the ship cannot jump at all?)");
+            Note("PASS: center cube, capture, reward structure, contest, carry-over, emptied structure, death, weekly, jumps near the zone");
+        }
+
+        /// <summary>A ship of the player: a charged large jump drive and a battery.</summary>
+        private MyCubeGrid Ship(Vector3D position, long owner)
+        {
+            var builder = new MyObjectBuilder_CubeGrid
+            {
+                GridSizeEnum = MyCubeSize.Large,
+                IsStatic = false,
+                DisplayName = WorldApi.EntityPrefix + "az-jumper",
+                CreatePhysics = true,
+                PersistentFlags = MyPersistentEntityFlags2.InScene | MyPersistentEntityFlags2.Enabled,
+                PositionAndOrientation = new MyPositionAndOrientation(position, Vector3.Forward, Vector3.Up),
+                CubeBlocks = new List<MyObjectBuilder_CubeBlock>
+                {
+                    new MyObjectBuilder_JumpDrive
+                    {
+                        SubtypeName = "LargeJumpDrive", Min = new SerializableVector3I(0, 0, 0), StoredPower = 3f, Enabled = true,
+                        Owner = owner, BuiltBy = owner, ShareMode = MyOwnershipShareModeEnum.Faction
+                    },
+                    new MyObjectBuilder_BatteryBlock
+                    {
+                        SubtypeName = "LargeBlockBatteryBlock", Min = new SerializableVector3I(3, 0, 0), CurrentStoredPower = 3f, MaxStoredPower = 3f,
+                        Enabled = true, ProducerEnabled = true, Owner = owner, BuiltBy = owner, ShareMode = MyOwnershipShareModeEnum.Faction
+                    }
+                }
+            };
+            MyAPIGateway.Entities.RemapObjectBuilder(builder);
+            var grid = (MyCubeGrid)MyAPIGateway.Entities.CreateFromObjectBuilderAndAdd(builder);
+            Track(grid);
+            return grid;
+        }
+
+        /// <summary>Whether the server lets the ship's jump go (the drives start charging), then calls it off.</summary>
+        private static bool Jumps(MyCubeGrid ship, Vector3D target, long user)
+        {
+            ship.RequestJump(target, user);
+            var going = ship.GridSystems.JumpSystem.IsJumping;
+            if (going) ship.GridSystems.JumpSystem.AbortJump(Sandbox.Game.GameSystems.MyGridJumpDriveSystem.MyJumpFailReason.None);
+            return going;
         }
 
         private static MyCubeGrid Grid(long id) =>
