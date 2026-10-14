@@ -158,6 +158,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(ClusterTwinsScenario.Weld, () => new ClusterTwinsScenario(ClusterTwinsScenario.Weld, () => new ProjectorWeldScenario(), 6, new VRageMath.Vector3D(0, 0, 150000), 600));
                 ScenarioRegistry.Register(FallThroughTunnelScenario.ScenarioName, () => new FallThroughTunnelScenario());
                 ScenarioRegistry.Register(OfflineCharacterScenario.ScenarioName, () => new OfflineCharacterScenario());
+                ScenarioRegistry.Register(AnomalyZoneScenario.ScenarioName, () => new AnomalyZoneScenario());
                 ScenarioRegistry.Register(FreezerStressScenario.ScenarioName, () => new FreezerStressScenario());
                 ScenarioRegistry.Register(FreezerStressScenario.ProfileScenarioName, () => new FreezerStressScenario(profile: true));
                 ScenarioRegistry.Register(GrinderPerfScenario.ScenarioName, () => new GrinderPerfScenario());
@@ -300,6 +301,8 @@ namespace SentisTests
         /// </summary>
         private static void DeclareRequirements()
         {
+            ScenarioRegistry.Needs(Integrations.AnomalyZone, AnomalyZoneScenario.ScenarioName);
+
             ScenarioRegistry.Needs(Integrations.Ai,
                 AiStatusUiScenario.ScenarioName,
                 BotRadiationScenario.ScenarioName,

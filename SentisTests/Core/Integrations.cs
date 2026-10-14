@@ -38,10 +38,13 @@ namespace SentisTests.Core
         /// <summary>Profiler: the method timings the load tests read.</summary>
         public const string Profiler = "Profiler";
 
+        /// <summary>SentisAnomalyZone: king of the hill zones, driven through its AnomalyZoneApi.</summary>
+        public const string AnomalyZone = "SentisAnomalyZone";
+
         /// <summary>Every optional plugin, in the order of the start-up log line.</summary>
         public static readonly IReadOnlyList<string> Known = new List<string>
         {
-            Optimisations, Gameplay, Ai, Watcher, Adventures, Garage, Profiler,
+            Optimisations, Gameplay, Ai, Watcher, Adventures, Garage, Profiler, AnomalyZone,
         };
 
         // Types are resolved once per session and kept; a plugin that is not loaded yet is looked
