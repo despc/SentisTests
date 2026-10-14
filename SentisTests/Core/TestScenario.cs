@@ -94,7 +94,16 @@ namespace SentisTests.Core
         /// </summary>
         public virtual void CleanupLeftovers() { }
 
+        /// <summary>
+        /// True for a scenario that leaves what it made in the world on purpose (for a run after a restart): the runner
+        /// then does not take the grids that appeared while it ran.
+        /// </summary>
+        public virtual bool KeepsNewGrids => false;
+
         // ---------------------------------------------------------------- helpers
+
+        /// <summary>The runner hands over what appeared in the world while the scenario ran (see TestRunner.Finish).</summary>
+        internal void Adopt(IMyEntity entity) => Track(entity);
 
         protected void Track(IMyEntity entity)
         {

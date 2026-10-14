@@ -215,6 +215,8 @@ namespace SentisTests.Core
                         ename = entity.DisplayName;
                     if (string.IsNullOrEmpty(ename)) continue;
                     if (!ename.StartsWith(Game.WorldApi.EntityPrefix) && !LegacyNames.Contains(ename)) continue;
+                    // left on purpose for the run after the restart (thaw_seed -> thaw_release)
+                    if (ename.StartsWith(Scenarios.ThawRestartScenario.Prefix)) continue;
                     if (entity.MarkedForClose) continue;
                     entity.Close();
                     closed++;
@@ -234,6 +236,7 @@ namespace SentisTests.Core
             {
                 PurgeStaleTestEntities();
                 ProcessCleanupQueue();
+                FallRecorder.Tick();
                 if (_active == null)
                 {
                     if (_queue.Count > 0)
@@ -366,6 +369,44 @@ namespace SentisTests.Core
 
         public static TickMetrics.Snapshot BaselineMetrics;
 
+        private static HashSet<long> _gridsBefore;
+
+        /// <summary>How deep under the ground a grid of a scenario has to be at its end to count as fallen through.</summary>
+        private const double UndergroundM = 30;
+
+        /// <summary>
+        /// Grids of the scenario (its own and those it left untracked) more than <see cref="UndergroundM"/> under the
+        /// ground when it ends: one "UNDERGROUND |" line, so a run shows what fell through a planet and where.
+        /// </summary>
+        private static void ReportUnderground(TestScenario scenario)
+        {
+            var fallen = new List<string>();
+            foreach (var grid in scenario.Tracked.OfType<Sandbox.Game.Entities.MyCubeGrid>())
+            {
+                if (grid.Closed || grid.MarkedForClose || grid.Physics == null) continue;
+                var at = grid.PositionComp.WorldAABB.Center;
+                var planet = Sandbox.Game.Entities.MyGamePruningStructure.GetClosestPlanet(at);
+                if (planet == null) continue;
+                var centre = planet.PositionComp.GetPosition();
+                var depth = (planet.GetClosestSurfacePointGlobal(ref at) - centre).Length() - (at - centre).Length();
+                if (depth > UndergroundM)
+                    fallen.Add((grid.DisplayName ?? grid.EntityId.ToString()) + " " + depth.ToString("F0") + " m" + (grid.IsStatic ? " static" : "") +
+                               " v=" + grid.Physics.LinearVelocity.Length().ToString("F1"));
+            }
+            if (fallen.Count > 0)
+                Log.Warn("UNDERGROUND | {0}: {1} grids under the ground at its end: {2}", scenario.Name, fallen.Count, string.Join("; ", fallen.Take(40)));
+        }
+
+        private static bool OwnedByRealPlayer(Sandbox.Game.Entities.MyCubeGrid grid)
+        {
+            foreach (var owner in grid.BigOwners)
+            {
+                var steamId = Sandbox.Game.World.MySession.Static.Players.TryGetSteamId(owner);
+                if (steamId != 0 && !Game.FakeClients.IsFake(steamId)) return true;
+            }
+            return false;
+        }
+
         private static void Finish(TestVerdict verdict, string message)
         {
             var scenario = _active;
@@ -395,6 +436,35 @@ namespace SentisTests.Core
                 try { scenario.CleanupLeftovers(); }
                 catch (Exception e) { Log.Warn("leftover cleanup failed for {0}: {1}", scenario.Name, e.Message); }
             }
+
+            // Grids the game made while the scenario ran never went through Track: wheels it put on suspensions,
+            // pieces of split grids, respawn rovers of fake players. Left behind they piled up on the stand - 460
+            // grids ("Wheel" x177, "SentisTests_LG_N" x178) found under the planet on 10.10.2026, fallen through it
+            // when the freezer let them go. Every grid that was not there when the scenario started goes with its
+            // own, unless a real player owns it.
+            if (delay >= 0 && _gridsBefore != null && !scenario.KeepsNewGrids)
+            {
+                try
+                {
+                    var adopted = 0;
+                    var underground = 0;
+                    foreach (var grid in Sandbox.Game.Entities.MyEntities.GetEntities().OfType<Sandbox.Game.Entities.MyCubeGrid>().ToList())
+                    {
+                        if (grid.Closed || grid.MarkedForClose || _gridsBefore.Contains(grid.EntityId) || scenario.Tracked.Contains(grid)) continue;
+                        if (OwnedByRealPlayer(grid)) continue;
+                        scenario.Adopt(grid);
+                        adopted++;
+                        var at = grid.PositionComp.WorldAABB.Center;
+                        var planet = Sandbox.Game.Entities.MyGamePruningStructure.GetClosestPlanet(at);
+                        if (planet != null && planet.MinimumRadius - (at - planet.PositionComp.GetPosition()).Length() > 300) underground++;
+                    }
+                    if (adopted > 0) Log.Info("cleanup of {0}: {1} grids it left untracked go with it ({2} of them fallen under the ground)", scenario.Name, adopted, underground);
+                }
+                catch (Exception e) { Log.Warn("untracked grid sweep failed for {0}: {1}", scenario.Name, e.Message); }
+            }
+            _gridsBefore = null;
+            try { ReportUnderground(scenario); }
+            catch (Exception e) { Log.Warn("underground check failed for {0}: {1}", scenario.Name, e.Message); }
 
             // Whatever the scenario put back or forgot to, the plugin settings it touched go back to
             // what they were before it: Torch writes every change to the config file, and a stand
@@ -488,6 +558,7 @@ namespace SentisTests.Core
             RunCleanupDelaySeconds = PendingCleanupDelaySeconds;
             PendingOrigin = null;
             BaselineMetrics = TickMetrics.Take();
+            _gridsBefore = new HashSet<long>(Sandbox.Game.Entities.MyEntities.GetEntities().OfType<Sandbox.Game.Entities.MyCubeGrid>().Select(g => g.EntityId));
             _active = scenario;
             _stopwatch = Stopwatch.StartNew();
             _stack.Clear();

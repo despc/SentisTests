@@ -151,7 +151,22 @@ namespace SentisTests.Scenarios
             var lastLog = DateTime.UtcNow;
             while (true)
             {
-                orePerGridLeft[cursor] = CountOre(inventories[cursor]);
+                // a cluster SentisClusters detached refines on a thread of its own while this counts: an inventory
+                // changing under the count is counted again on the next frame
+                var counted = true;
+                try
+                {
+                    orePerGridLeft[cursor] = CountOre(inventories[cursor]);
+                }
+                catch (InvalidOperationException)
+                {
+                    counted = false;
+                }
+                if (!counted)
+                {
+                    yield return null;
+                    continue;
+                }
                 cursor = (cursor + 1) % GridCount;
                 if (cursor != 0)
                 {

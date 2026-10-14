@@ -110,6 +110,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(DrillPrintProbeScenario.ScenarioName, () => new DrillPrintProbeScenario());
                 ScenarioRegistry.Register(RigShakeScenario.ScenarioName, () => new RigShakeScenario());
                 ScenarioRegistry.Register(OwnershipMissingBlockScenario.ScenarioName, () => new OwnershipMissingBlockScenario());
+                ScenarioRegistry.Register(AiTaskSplitScenario.ScenarioName, () => new AiTaskSplitScenario());
                 ScenarioRegistry.Register(DrillDockScenario.ScenarioName, () => new DrillDockScenario());
                 ScenarioRegistry.Register(DrillDockScenario.MineName, () => new DrillDockScenario(DrillDockScenario.MineName));
                 ScenarioRegistry.Register(DrillDockScenario.OreName, () => new DrillDockScenario(DrillDockScenario.OreName));
@@ -165,6 +166,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(GrinderPerfScenario.SpreadScenarioName, () => new GrinderPerfScenario(spread: true));
                 ScenarioRegistry.Register(ThrustPerfScenario.IonScenarioName, () => new ThrustPerfScenario(atmospheric: false));
                 ScenarioRegistry.Register(ThrustPerfScenario.AtmoScenarioName, () => new ThrustPerfScenario(atmospheric: true));
+                ScenarioRegistry.Register(ThrustPerfScenario.CrashScenarioName, () => new ThrustPerfScenario(atmospheric: true, crash: true));
                 ScenarioRegistry.Register(GasPerfScenario.ScenarioName, () => new GasPerfScenario());
                 ScenarioRegistry.Register(PbPerfScenario.ScenarioName, () => new PbPerfScenario());
                 ScenarioRegistry.Register(VoxelStreamScenario.ScenarioName, () => new VoxelStreamScenario());
@@ -173,6 +175,17 @@ namespace SentisTests
                 ScenarioRegistry.Register(GridStreamScenario.ScenarioName, () => new GridStreamScenario());
                 ScenarioRegistry.Register(CharacterPerfScenario.ScenarioName, () => new CharacterPerfScenario());
                 ScenarioRegistry.Register(PlanetFlightScenario.ScenarioName, () => new PlanetFlightScenario());
+                ScenarioRegistry.Register(ThawFallScenario.ScenarioName, () => new ThawFallScenario());
+                ScenarioRegistry.Register(ThawFallScenario.FarScenarioName, () => new ThawFallScenario(far: true));
+                ScenarioRegistry.Register(ThawFallScenario.NoSectorScenarioName, () => new ThawFallScenario(noSector: true));
+                ScenarioRegistry.Register(ThawFallScenario.ToggleScenarioName, () => new ThawFallScenario(toggle: true));
+                ScenarioRegistry.Register(ThawRestartScenario.SeedName, () => new ThawRestartScenario(seed: true));
+                ScenarioRegistry.Register(ThawRestartScenario.ReleaseName, () => new ThawRestartScenario(seed: false));
+                ScenarioRegistry.Register(AsteroidDrillScenario.ScenarioName, () => new AsteroidDrillScenario());
+                ScenarioRegistry.Register(VoxelStreamOrderScenario.ScenarioName, () => new VoxelStreamOrderScenario());
+                ScenarioRegistry.Register(HeavyNeighbourScenario.ScenarioName, () => new HeavyNeighbourScenario());
+                ScenarioRegistry.Register(DetachChurnScenario.ScenarioName, () => new DetachChurnScenario());
+                ScenarioRegistry.Register(PurgeUndergroundScenario.ScenarioName, () => new PurgeUndergroundScenario());
                 ScenarioRegistry.Register(ProceduralJumpScenario.ScenarioName, () => new ProceduralJumpScenario());
                 ScenarioRegistry.Register(RemoteControlAnchorScenario.ScenarioName, () => new RemoteControlAnchorScenario());
                 ScenarioRegistry.Register(LaserAntennaControlScenario.ScenarioName, () => new LaserAntennaControlScenario());

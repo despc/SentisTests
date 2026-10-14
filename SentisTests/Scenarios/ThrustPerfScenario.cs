@@ -48,9 +48,25 @@ namespace SentisTests.Scenarios
         private readonly Random _rng = new Random(20260920);
         private readonly List<MyCubeGrid> _ships = new List<MyCubeGrid>();
 
-        public ThrustPerfScenario(bool atmospheric) => _atmospheric = atmospheric;
+        public const string CrashScenarioName = "thrust_atmo_crash";
+        /// <summary>How deep under the ground a piece of a crashed ship may end up: it should stay on the ground.</summary>
+        private const double CrashSinkM = 10;
+        private readonly bool _crash;
+        private HashSet<long> _gridsBefore;
 
-        public override string Name => _atmospheric ? AtmoScenarioName : IonScenarioName;
+        /// <param name="crash">
+        /// over the planet, the ships are let fall with their thrusters off, the way thrust_atmo had it until
+        /// 10.10.2026: 300 m down at 80 m/s, hundreds of blocks off each - and pieces driven 56-72 m into the ground
+        /// (62 of them), where they stayed and later went through to the planet's centre. Fails on any piece more
+        /// than <see cref="CrashSinkM"/> under the ground.
+        /// </param>
+        public ThrustPerfScenario(bool atmospheric, bool crash = false)
+        {
+            _atmospheric = atmospheric || crash;
+            _crash = crash;
+        }
+
+        public override string Name => _crash ? CrashScenarioName : _atmospheric ? AtmoScenarioName : IonScenarioName;
         public override int TimeoutSeconds => (int)(RunSeconds + 300);
 
         private string ThrusterSubtype => _atmospheric ? "LargeBlockSmallAtmosphericThrust" : "LargeBlockSmallThrust";
@@ -70,6 +86,7 @@ namespace SentisTests.Scenarios
                 ? anchorM.Translation + up * PlanetHeightM
                 : centre + up * ((anchorM.Translation - centre).Length() + SpaceHeightM);
 
+            _gridsBefore = new HashSet<long>(MyEntities.GetEntities().OfType<MyCubeGrid>().Select(g => g.EntityId));
             for (var i = 0; i < Ships; i++)
             {
                 _ships.Add(BuildShip(i, first + east * (ShipSpacingM * i), up));
@@ -87,14 +104,24 @@ namespace SentisTests.Scenarios
                  " thrusters in all, gravity " + gravity.ToString("F2") + " m/s2, " + Batteries + " batteries per ship: " +
                  WorldApi.DescribePower(_ships[0]));
 
-            // Thrusters off: the cost of the ships alone.
+            // Thrusters off: the cost of the ships alone. Over the planet they are held where they hang: let go, they
+            // fell 300 m, hit the ground at 80 m/s and broke up - hundreds of blocks off each, the pieces driven 60 m
+            // into the ground, where they stayed and later went through to the planet's centre (10.10.2026).
             foreach (var thrust in _ships.SelectMany(WorldApi.FindFunctionals<MyThrust>)) thrust.Enabled = false;
-            var off = WaitForSeconds(IdleSeconds, "thrusters off");
-            while (off.MoveNext()) yield return off.Current;
+            var off = DateTime.UtcNow;
+            while ((DateTime.UtcNow - off).TotalSeconds < IdleSeconds)
+            {
+                Hold();
+                yield return null;
+            }
             TickMetrics.Take();
             FrameProbe.Take();
             var idle = DateTime.UtcNow;
-            while ((DateTime.UtcNow - idle).TotalSeconds < IdleSeconds) yield return null;
+            while ((DateTime.UtcNow - idle).TotalSeconds < IdleSeconds)
+            {
+                Hold();
+                yield return null;
+            }
             var idleProbe = FrameProbe.Take();
             TickMetrics.Take();
 
@@ -135,7 +162,36 @@ namespace SentisTests.Scenarios
             var probe = FrameProbe.Take();
             Note((_atmospheric ? "ATMO" : "ION") + " THRUST RESULT | " + Ships + " ships, " + thrusters + " thrusters | idle, thrusters off: " +
                  Summary(idleProbe) + " | thrusting: " + Summary(probe) + " | " + metrics.Format() + " | " + probe);
+            if (_crash)
+            {
+                var site = _ships.Aggregate(Vector3D.Zero, (sum, s) => sum + s.PositionComp.GetPosition()) / _ships.Count;
+                var sunk = new List<string>();
+                var pieces = 0;
+                foreach (var grid in MyEntities.GetEntities().OfType<MyCubeGrid>().ToList())
+                {
+                    if (grid.Closed || _gridsBefore.Contains(grid.EntityId) || Vector3D.Distance(grid.PositionComp.GetPosition(), site) > 5000) continue;
+                    pieces++;
+                    var at = grid.PositionComp.WorldAABB.Center;
+                    var depth = (planet.GetClosestSurfacePointGlobal(ref at) - centre).Length() - (at - centre).Length();
+                    if (depth > CrashSinkM) sunk.Add((grid.DisplayName ?? "?") + " " + grid.BlocksCount + " blocks " + depth.ToString("F0") + " m (" + FallRecorder.RealGround(planet, at) + ")");
+                }
+                Note("CRASH RESULT | " + pieces + " grids after the crash (ships and their pieces), " + sunk.Count + " under the ground: " + string.Join("; ", sunk.Take(40)));
+                Check(sunk.Count == 0, sunk.Count + " pieces went into the ground");
+                yield break;
+            }
             Check(_ships.All(s => !s.Closed), "a ship was destroyed");
+        }
+
+        /// <summary>Over the planet, with the thrusters off: the ships kept still against gravity.</summary>
+        private void Hold()
+        {
+            if (!_atmospheric || _crash) return;
+            foreach (var ship in _ships)
+            {
+                if (ship.Physics == null) continue;
+                ship.Physics.LinearVelocity = Vector3.Zero;
+                ship.Physics.AngularVelocity = Vector3.Zero;
+            }
         }
 
         private static void Dampeners(MyCubeGrid ship, bool on)

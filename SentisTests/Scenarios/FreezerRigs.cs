@@ -118,6 +118,7 @@ namespace SentisTests.Scenarios
 
         public const string Optimisations = "SentisOptimisations";
         public const string Gameplay = "SentisGameplayImprovements";
+        public const string Clusters = "SentisClusters";
 
         private readonly string _plugin;
         private readonly Dictionary<string, object> _saved = new Dictionary<string, object>();
@@ -194,7 +195,9 @@ namespace SentisTests.Scenarios
         {
             var typeName = plugin == Gameplay
                 ? "SentisGameplayImprovements.SentisGameplayImprovementsPlugin"
-                : "SentisOptimisationsPlugin.SentisOptimisationsPlugin";
+                : plugin == Clusters
+                    ? "SentisClusters.SentisClustersPlugin"
+                    : "SentisOptimisationsPlugin.SentisOptimisationsPlugin";
             var type = AppDomain.CurrentDomain.GetAssemblies()
                 .Select(a => a.GetType(typeName)).FirstOrDefault(t => t != null)
                 ?? throw new ScenarioSkippedException(Core.Integrations.MissingReason(plugin));

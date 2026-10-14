@@ -470,7 +470,7 @@ namespace SentisTests.Game
             _serverClients = (IDictionary)typeof(MyReplicationServer).GetField("m_clientStates", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(_server);
         }
 
-        private static bool IsFake(ulong id) => id >= BaseSteamId && id < BaseSteamId + MaxClients;
+        internal static bool IsFake(ulong id) => id >= BaseSteamId && id < BaseSteamId + MaxClients;
 
         /// <summary>
         /// Fake players out of the world a real client downloads when it joins. The client loads

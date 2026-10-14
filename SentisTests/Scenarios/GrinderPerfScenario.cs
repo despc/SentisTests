@@ -229,7 +229,7 @@ namespace SentisTests.Scenarios
         /// How far the grinders are from the target along the grind axis: for each grinder, the nearest
         /// target block ahead of it within a block's width of its line.
         /// </summary>
-        private static double Gap(List<MyShipGrinder> grinders, MyCubeGrid target, Vector3 dir)
+        internal static double Gap(List<MyShipGrinder> grinders, MyCubeGrid target, Vector3 dir)
         {
             var blocks = target.CubeBlocks.Select(b => target.GridIntegerToWorld(b.Position)).ToList();
             var best = double.MaxValue;
@@ -257,7 +257,7 @@ namespace SentisTests.Scenarios
         }
 
         /// <summary>Holds the grinder on its axis and eases it forward up to PushMps, like thrusters would.</summary>
-        private static void Push(MyCubeGrid grinder, Vector3 dir)
+        internal static void Push(MyCubeGrid grinder, Vector3 dir)
         {
             var physics = grinder.Physics;
             if (physics == null || grinder.Closed) return;
@@ -267,13 +267,13 @@ namespace SentisTests.Scenarios
         }
 
         /// <summary>Items in all the grinder's inventories (the reactor's uranium cancels out in a difference).</summary>
-        private static double Items(MyCubeGrid grid) =>
+        internal static double Items(MyCubeGrid grid) =>
             grid.GetFatBlocks().Where(b => b.HasInventory)
                 .SelectMany(b => Enumerable.Range(0, b.InventoryCount).Select(i => b.GetInventory(i) as MyInventory))
                 .Where(inv => inv != null)
                 .Sum(inv => inv.GetItems().Sum(i => (double)i.Amount));
 
-        private static void Shift(MyObjectBuilder_CubeGrid ob, Vector3D offset)
+        internal static void Shift(MyObjectBuilder_CubeGrid ob, Vector3D offset)
         {
             var m = ob.PositionAndOrientation.Value.GetMatrix();
             m.Translation += offset;
