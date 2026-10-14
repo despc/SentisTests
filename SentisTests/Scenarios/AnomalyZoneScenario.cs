@@ -27,7 +27,8 @@ namespace SentisTests.Scenarios
     ///   editable, a hit on it does nothing;
     /// - a player of A alone inside captures: A gets points, a reward structure appears near the center, its container
     ///   holds the rewards and belongs to the player;
-    /// - (at the end) a ship's jump from or to within 15 km of the zone is turned down, one far from it goes;
+    /// - (at the end) a ship's jump from within 10 km of the zone is turned down, one into 15 km of it ends at 15 km,
+    ///   one far from it goes as asked;
     /// - a player of B comes in: the zone is contested;
     /// - B goes, A captures again: the first structure is gone and its contents are in the new one;
     /// - the new structure emptied: it goes away;
@@ -80,8 +81,8 @@ namespace SentisTests.Scenarios
             Setting("PointsLostOnDeath", 1);
             Setting("SpawnRewards", true);
             Setting("CenterCube", true);
-            Setting("NoJumpsNearZones", true);
-            Setting("NoJumpRadius", 15000.0);
+            Setting("JumpInRadius", 15000.0);
+            Setting("JumpOutRadius", 10000.0);
             Call("Forget", ZoneId);
             Call("PutZone", ZoneId, "Сценарий", site.X, site.Y, site.Z, Radius, CaptureSeconds);
             Note("zone of " + Radius + " m, capture " + CaptureSeconds + " s at " + site);
@@ -182,15 +183,23 @@ namespace SentisTests.Scenarios
             Check(weeklyGrids.Length >= 1 && weeklyGrids.Any(id => Grid(id) != null), "no weekly reward structure");
             foreach (var id in weeklyGrids) Track(Grid(id));
 
-            // jump drives: no jump from or to within the set distance of the zone, one far from it goes
+            // jump drives: no jump out from within 10 km; a jump in to within 15 km ends at 15 km; one far from it goes as asked
             var outward = Vector3D.Normalize(site - anchor);
             var side = Vector3D.Normalize(Vector3D.Cross(outward, Vector3D.Up));
             var near = Ship(site + side * 3000, a);
+            var between = Ship(site - side * 12000, a);
             var far = Ship(site + side * 40000, a);
             yield return WaitForTicks(30);
-            Check(Jumps(near, near.PositionComp.GetPosition() + side * 100000, a) == false, "a jump from 3 km off the zone went");
-            Check(Jumps(far, site + side * 5000, a) == false, "a jump to 5 km off the zone went");
-            Check(Jumps(far, far.PositionComp.GetPosition() + side * 100000, a) == true, "a jump far from the zone did not go (the ship cannot jump at all?)");
+            Check(Jumps(near, near.PositionComp.GetPosition() + side * 100000, a) == null, "a jump from 3 km off the zone went");
+            var inward = Jumps(far, site + side * 5000 + outward * 2000, a);
+            Check(inward != null, "a jump to 5 km off the zone was turned down, not moved to its edge");
+            var landing = Vector3D.Distance(inward.Value, site);
+            Note($"a jump asked to 5.4 km off the zone ends {landing:0} m off it, {Vector3D.Distance(inward.Value, far.PositionComp.GetPosition()):0} m from the ship");
+            Check(landing >= 15000 && landing < 16500, $"a jump into the zone ends {landing:0} m off its center, not at 15 km");
+            var outOf = Jumps(between, between.PositionComp.GetPosition() - side * 100000, a);
+            Check(outOf != null && Vector3D.Distance(outOf.Value, between.PositionComp.GetPosition() - side * 100000) < 2000,
+                "a jump away from 12 km off the zone (outside the jump-out radius) did not go as asked");
+            Check(Jumps(far, far.PositionComp.GetPosition() + side * 100000, a) != null, "a jump far from the zone did not go (the ship cannot jump at all?)");
             Note("PASS: center cube, capture, reward structure, contest, carry-over, emptied structure, death, weekly, jumps near the zone");
         }
 
@@ -225,13 +234,17 @@ namespace SentisTests.Scenarios
             return grid;
         }
 
-        /// <summary>Whether the server lets the ship's jump go (the drives start charging), then calls it off.</summary>
-        private static bool Jumps(MyCubeGrid ship, Vector3D target, long user)
+        private static readonly FieldInfo Destination = typeof(Sandbox.Game.GameSystems.MyGridJumpDriveSystem).GetField("m_selectedDestination", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        /// <summary>Where the server lets the ship's jump go (the drives start charging), or null; the jump is called off.</summary>
+        private static Vector3D? Jumps(MyCubeGrid ship, Vector3D target, long user)
         {
             ship.RequestJump(target, user);
-            var going = ship.GridSystems.JumpSystem.IsJumping;
-            if (going) ship.GridSystems.JumpSystem.AbortJump(Sandbox.Game.GameSystems.MyGridJumpDriveSystem.MyJumpFailReason.None);
-            return going;
+            var system = ship.GridSystems.JumpSystem;
+            if (!system.IsJumping) return null;
+            var destination = (Vector3D)Destination.GetValue(system);
+            system.AbortJump(Sandbox.Game.GameSystems.MyGridJumpDriveSystem.MyJumpFailReason.None);
+            return destination;
         }
 
         private static MyCubeGrid Grid(long id) =>
