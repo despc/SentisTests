@@ -86,6 +86,21 @@ namespace SentisTests.Scenarios
         /// may already have sent the whole queue through by the next frames, so a drained queue with
         /// a matching wake is a pass, not a failure.
         /// </summary>
+        /// <summary>
+        /// Nothing any client is due to get waits nowhere: every state group still dirty for a client is in its queue or
+        /// parked by SO IdleInventorySync (a group dirty and waiting nowhere is never sent). Two looks a second apart.
+        /// </summary>
+        private IEnumerator CheckQueues(string when)
+        {
+            var first = RuntimePluginControls.VerifyReplicationQueues(out _);
+            if (first == null) yield break;
+            var wait = WaitForSeconds(1, "the queues looked at again");
+            while (wait.MoveNext()) yield return wait.Current;
+            var second = RuntimePluginControls.VerifyReplicationQueues(out var lost);
+            Note("QUEUES " + when + " | " + second);
+            Check(lost == 0, lost + " state groups due to clients wait nowhere " + when + ": " + second);
+        }
+
         private IEnumerator CheckTerminalOpening()
         {
             const int Soon = 5;
@@ -234,8 +249,12 @@ namespace SentisTests.Scenarios
                 yield break;
             }
 
+            var queues = CheckQueues("after the steady window");
+            while (queues.MoveNext()) yield return queues.Current;
             var opening = CheckTerminalOpening();
             while (opening.MoveNext()) yield return opening.Current;
+            queues = CheckQueues("after the terminal opening");
+            while (queues.MoveNext()) yield return queues.Current;
 
             // Everyone reconnecting at once, like after a server restart: the same grids are streamed
             // to all clients within a few frames, which is what the grid builder cache is for.

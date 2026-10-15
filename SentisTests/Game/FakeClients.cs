@@ -592,6 +592,30 @@ namespace SentisTests.Game
                 }
             }
             Interlocked.Add(ref _tickTicks, Stopwatch.GetTimestamp() - start);
+            // every 10 s, with a few clients: nothing any client is due to get sits waiting nowhere (a run of many clients
+            // checks it itself - the whole tables of 64 clients are a frame of their own)
+            if (count <= QueueCheckMaxClients && _frames % 600 == 0) CheckQueues();
+        }
+
+        /// <summary>The fake clients up to which every scenario checks the replication queues (<see cref="CheckQueues"/>).</summary>
+        public const int QueueCheckMaxClients = 8;
+
+        /// <summary>State groups found lost (due to a client and waiting nowhere) since the start; each is an error line in the log.</summary>
+        public static long QueuesLost;
+
+        public static void CheckQueues()
+        {
+            try
+            {
+                var text = RuntimePluginControls.VerifyReplicationQueues(out var lost);
+                if (lost <= 0) return;
+                QueuesLost += lost;
+                SentisTestsPlugin.Log.Error("[REPL] state groups lost for clients: " + text);
+            }
+            catch (Exception e)
+            {
+                SentisTestsPlugin.Log.Error(e, "FakeClients: replication queue check failed");
+            }
         }
 
         private static long Delay(long from, double baseMs, double ticksPerMs) =>

@@ -174,6 +174,23 @@ namespace SentisTests.Game
             return method == null ? 0L : (long)method.Invoke(null, null);
         }
 
+        /// <summary>
+        /// SO IdleInventorySync.VerifyQueues: every state group a client still has something to be sent of waits for it
+        /// (in the client's queue or parked); lost = dirty and waiting nowhere at this call and the one before. Null
+        /// text when SO is not loaded.
+        /// </summary>
+        public static string VerifyReplicationQueues(out long lost)
+        {
+            lost = 0;
+            var type = PluginType("SentisOptimisations", "Optimizer.Optimizations.IdleInventorySync");
+            var method = type?.GetMethod("VerifyQueues", BindingFlags.Public | BindingFlags.Static);
+            if (method == null) return null;
+            var args = new object[] { 0L };
+            var text = (string)method.Invoke(null, args);
+            lost = (long)args[0];
+            return text;
+        }
+
         /// <summary>Compares the state group client index with the vanilla scan (slow; test only).</summary>
         public static void SetStateGroupIndexVerify(bool verify)
         {
