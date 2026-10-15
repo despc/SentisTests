@@ -29,7 +29,18 @@ namespace SentisTests.Scenarios
             _initialWelderMultiplier = RuntimePluginControls.WelderRadiusMultiplier;
             _captured = true;
 
+            // x1 taken by the welder before the boat freezes: a frozen welder keeps the radius it had, and the stand's
+            // multiplier is not always x1 (x2 with the prod configs, 14.10.2026: the "doubled" radius was the one it had)
+            var startRadius = welder.DetectorSphere.Radius;
             RuntimePluginControls.SetWelderRadiusMultiplier(1f);
+            if (Math.Abs(_initialWelderMultiplier - 1f) > 0.001f && _initialWelderMultiplier > 0f)
+            {
+                var single = startRadius / _initialWelderMultiplier;
+                var waitSingle = Wait(() => Math.Abs(welder.DetectorSphere.Radius - single) < 0.001f,
+                    "welder radius back at x1 before freezing", 30);
+                while (waitSingle.MoveNext())
+                    yield return waitSingle.Current;
+            }
             RuntimePluginControls.SetFreezerEnabled(true);
             Note("runtime Freezer enabled; waiting for the construction boat to enter FrozenGrids");
 

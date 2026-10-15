@@ -84,6 +84,12 @@ namespace SentisTests.Game
 
         [ThreadStatic] private static BitStream _interceptReader;
 
+        /// <summary>
+        /// Set by a scenario: true for a whole stream (fake client's index, the replicable's network id) that the client is to
+        /// fail to load - it drops it and answers nothing, as a real client whose load failed. Null: every stream loads.
+        /// </summary>
+        public static Func<int, uint, bool> FailLoad;
+
         private struct ClientMessage
         {
             public long DeliverAt;
@@ -221,6 +227,8 @@ namespace SentisTests.Game
                 var name = NamePrefix + index.ToString("D3");
                 Sync.Clients.AddClient(client.Id.Value, name);
                 var identity = Sync.Players.CreateNewIdentity(name);
+                // (their ships weld projections: in the prod world what is not researched is not built, and PCU is limited per player)
+                WorldApi.PrepareTestIdentity(identity.IdentityId);
                 client.Player = Sync.Players.CreateNewPlayer(identity, new Sandbox.Game.World.MyPlayer.PlayerId(client.Id.Value, 0), name,
                     realPlayer: true, initialPlayer: false, newIdentity: true);
                 if (withCharacters && client.Player != null)
@@ -726,6 +734,8 @@ namespace SentisTests.Game
             if (pending.Parts.Count < message.Parts) return;
             _streamStats[5]++;
             client.Streams.Remove(message.Group);
+            // a load that fails on the client: the client drops the replicable and answers nothing (MyReplicationClient.SetReplicableReady)
+            if (FailLoad != null && FailLoad(client.Index, pending.Replicable)) return;
             client.ReadyToSend.Add((pending.Replicable, true));
         }
 

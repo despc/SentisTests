@@ -44,6 +44,19 @@ namespace SentisTests.Scenarios
         public override string Name => ScenarioName;
         public override int TimeoutSeconds => MaxWeldSeconds + 900;
 
+        /// <summary>The block limits of whoever builds at a site (the projector's builder, the welders' owner): in a world
+        /// with limits per player the projection and what is welded of it count against them.</summary>
+        private static string OwnerLimits(Site site)
+        {
+            var ids = new List<long> { site.Projector.BuiltBy };
+            ids.AddRange(site.Welders.Select(w => w.OwnerId));
+            return string.Join(", ", ids.Distinct().Select(id =>
+            {
+                var limits = Sandbox.Game.World.MySession.Static.Players.TryGetIdentity(id)?.BlockLimits;
+                return limits == null ? id + ": no identity" : id + ": PCU built " + limits.PCUBuilt + ", PCU left " + limits.PCU + ", blocks " + limits.BlocksBuilt;
+            }));
+        }
+
         private sealed class Site
         {
             public int Index;
@@ -214,7 +227,8 @@ namespace SentisTests.Scenarios
                 if ((DateTime.UtcNow - lastLog).TotalSeconds >= 30)
                 {
                     lastLog = DateTime.UtcNow;
-                    Note("welding " + (DateTime.UtcNow - started).TotalSeconds.ToString("F0") + "s: sites done " + sites.Count(s => s.DoneAfter != null) + "/" + Sites);
+                    Note("welding " + (DateTime.UtcNow - started).TotalSeconds.ToString("F0") + "s: sites done " + sites.Count(s => s.DoneAfter != null) + "/" + Sites +
+                         "; " + OwnerLimits(sites[0]));
                 }
                 yield return null;
             }

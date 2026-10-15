@@ -62,12 +62,19 @@ namespace SentisTests.Scenarios
 
         private readonly bool _allocProbe;
 
-        public ReplicationPerfScenario(bool allocProbe = false)
+        /// <summary>"replication_noverify": the join without the checks of the cached grid builders and the state group
+        /// index (each cached builder compared with a fresh one by XML is most of the join's time): what the join costs
+        /// on the server.</summary>
+        public const string NoVerifyScenarioName = "replication_noverify";
+        private readonly bool _verify;
+
+        public ReplicationPerfScenario(bool allocProbe = false, bool verify = true)
         {
+            _verify = verify;
             _allocProbe = allocProbe;
         }
 
-        public override string Name => _allocProbe ? AllocScenarioName : ScenarioName;
+        public override string Name => _allocProbe ? AllocScenarioName : _verify ? ScenarioName : NoVerifyScenarioName;
         public override int TimeoutSeconds =>
             300 + (int)(ClientCount * JoinIntervalSeconds) + JoinTimeoutSeconds + (int)(BaselineSeconds + SteadySeconds);
 
@@ -163,9 +170,9 @@ namespace SentisTests.Scenarios
 
             Check(GridFlight.Count == ShipCount, "only " + GridFlight.Count + " of " + ShipCount + " ships are still flying");
             FakeClients.Take(1);
-            RuntimePluginControls.SetGridStreamBuilderVerify(true);
-            RuntimePluginControls.SetStateGroupIndexVerify(true);
-            Note("JOIN WINDOW START, verifying cached grid builders (1 client every " + JoinIntervalSeconds + "s up to " + ClientCount + ", " + Network + ")");
+            RuntimePluginControls.SetGridStreamBuilderVerify(_verify);
+            RuntimePluginControls.SetStateGroupIndexVerify(_verify);
+            Note("JOIN WINDOW START, " + (_verify ? "verifying" : "not verifying") + " cached grid builders (1 client every " + JoinIntervalSeconds + "s up to " + ClientCount + ", " + Network + ")");
             var joinWatch = Stopwatch.StartNew();
             var checkpointWatch = Stopwatch.StartNew();
             while (FakeClients.Count < ClientCount)

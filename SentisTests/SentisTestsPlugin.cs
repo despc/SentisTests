@@ -111,6 +111,12 @@ namespace SentisTests
                 ScenarioRegistry.Register(RigShakeScenario.ScenarioName, () => new RigShakeScenario());
                 ScenarioRegistry.Register(OwnershipMissingBlockScenario.ScenarioName, () => new OwnershipMissingBlockScenario());
                 ScenarioRegistry.Register(AiTaskSplitScenario.ScenarioName, () => new AiTaskSplitScenario());
+                ScenarioRegistry.Register(ComponentListRaceScenario.ScenarioName, () => new ComponentListRaceScenario());
+                ScenarioRegistry.Register(GasWeldRefreshScenario.ScenarioName, () => new GasWeldRefreshScenario());
+                ScenarioRegistry.Register(DoorProbeScenario.ScenarioName, () => new DoorProbeScenario());
+                ScenarioRegistry.Register(DockedDoorScenario.ScenarioName, () => new DockedDoorScenario());
+                ScenarioRegistry.Register(AsteroidResendScenario.AsteroidName, () => new AsteroidResendScenario(false));
+                ScenarioRegistry.Register(AsteroidResendScenario.GridName, () => new AsteroidResendScenario(true));
                 ScenarioRegistry.Register(DrillDockScenario.ScenarioName, () => new DrillDockScenario());
                 ScenarioRegistry.Register(DrillDockScenario.MineName, () => new DrillDockScenario(DrillDockScenario.MineName));
                 ScenarioRegistry.Register(DrillDockScenario.OreName, () => new DrillDockScenario(DrillDockScenario.OreName));
@@ -254,6 +260,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(FrozenSavePerfScenario.ScenarioName, () => new FrozenSavePerfScenario());
                 ScenarioRegistry.Register(ReplicationPerfScenario.ScenarioName, () => new ReplicationPerfScenario());
                 ScenarioRegistry.Register(ReplicationPerfScenario.AllocScenarioName, () => new ReplicationPerfScenario(allocProbe: true));
+                ScenarioRegistry.Register(ReplicationPerfScenario.NoVerifyScenarioName, () => new ReplicationPerfScenario(verify: false));
                 ScenarioRegistry.Register(PatchAuditScenario.ScenarioName, () => new PatchAuditScenario());
                 ScenarioRegistry.Register(PatchRetBufScenario.ScenarioName, () => new PatchRetBufScenario());
                 ScenarioRegistry.Register(PatchJumpsScenario.ScenarioName, () => new PatchJumpsScenario());

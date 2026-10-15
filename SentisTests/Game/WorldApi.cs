@@ -145,6 +145,7 @@ namespace SentisTests.Game
                 if (identity.DisplayName == "SentisTests")
                 {
                     _identityId = identity.IdentityId;
+                    PrepareTestIdentity(_identityId.Value);
                     return _identityId.Value;
                 }
             }
@@ -152,7 +153,67 @@ namespace SentisTests.Game
             var created = players.CreateNewIdentity("SentisTests");
             _identityId = created.IdentityId;
             Log.Info("created test identity {0} ({1})", created.DisplayName, created.IdentityId);
+            PrepareTestIdentity(_identityId.Value);
             return _identityId.Value;
+        }
+
+        /// <summary>A test identity (SentisTests, a fake client's) made able to build what the scenarios weld, in the prod
+        /// world as well: everything researched, and room for PCU.</summary>
+        public static void PrepareTestIdentity(long identityId)
+        {
+            UnlockResearch(identityId);
+            RaisePcu(identityId);
+        }
+
+        /// <summary>PCU a test identity always has left.</summary>
+        private const int TestPcuRoom = 20000000;
+
+        /// <summary>
+        /// Room for PCU for a test identity, in a world with limits per player (the prod world: 5 120 000 PCU for 64
+        /// players, 80 000 each). A projection counts its blocks against its builder, and a welded block its PCU: with
+        /// all the test ships the SentisTests identity's, welder_spread's 16 projections of 2757 blocks stopped at about
+        /// 160 blocks a site, the identity at 80 205 PCU of 80 000 (14.10.2026). Given as the game gives PCU passed from
+        /// one player to another (<c>MyBlockLimits.AddPCU</c>, kept in the identity's TransferedPCUDelta): the world's
+        /// limit stays as it is for the players.
+        /// </summary>
+        private static void RaisePcu(long identityId)
+        {
+            var session = Sandbox.Game.World.MySession.Static;
+            if (session == null || session.BlockLimitsEnabled == MyBlockLimitsEnabledEnum.NONE) return;
+            var limits = session.Players.TryGetIdentity(identityId)?.BlockLimits;
+            if (limits == null || limits.PCU >= TestPcuRoom) return;
+            var add = typeof(Sandbox.Game.World.MyBlockLimits).GetMethod("AddPCU", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+            if (add == null)
+            {
+                Log.Warn("block limits are on, and MyBlockLimits.AddPCU is not there: identity {0} has {1} PCU left", identityId, limits.PCU);
+                return;
+            }
+            var before = limits.PCU;
+            add.Invoke(limits, new object[] { TestPcuRoom - before });
+            Log.Info("block limits are on: identity {0} given room for PCU ({1} left, was {2})", identityId, limits.PCU, before);
+        }
+
+        /// <summary>
+        /// Everything researched for the test identity (and the fake clients' ones), in a world with research on (the prod world: EnableResearch).
+        /// A welder builds a projected block only when its owner has researched it (MyCubeGrid, the projection build
+        /// request: <c>ResearchEnabled &amp;&amp; !CanUse(ownerId, ...)</c>): with the test identity owning the ships, as when
+        /// no player is on the server, armor was built and the rest was not - mixed_weld stopped at 53 of 77 blocks and
+        /// welder_spread at 214 of 2757 at each site (14.10.2026). Done as the game's DebugUnlockAllResearch does, on the
+        /// server only: the check is the server's.
+        /// </summary>
+        public static void UnlockResearch(long identityId)
+        {
+            var session = Sandbox.Game.World.MySession.Static;
+            if (session == null || !session.ResearchEnabled || Sandbox.Game.SessionComponents.MySessionComponentResearch.Static == null) return;
+            var unlock = typeof(Sandbox.Game.SessionComponents.MySessionComponentResearch).GetMethod("DebugUnlockAllResearchSync",
+                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+            if (unlock == null)
+            {
+                Log.Warn("research is on, and MySessionComponentResearch.DebugUnlockAllResearchSync is not there: the test identity builds only what needs no research");
+                return;
+            }
+            unlock.Invoke(null, new object[] { identityId });
+            Log.Info("research is on: everything researched for identity {0}", identityId);
         }
 
         private static long? _ownerIdentityId;
