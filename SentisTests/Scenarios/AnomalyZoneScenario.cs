@@ -58,7 +58,12 @@ namespace SentisTests.Scenarios
             return m.Invoke(null, args);
         }
 
-        private void Setting(string name, object value) => _settingsBefore[name] = Call("Set", name, value);
+        /// <summary>Sets a plugin setting; the value it had before the scenario is kept for the cleanup (the first one).</summary>
+        private void Setting(string name, object value)
+        {
+            var old = Call("Set", name, value);
+            if (!_settingsBefore.ContainsKey(name)) _settingsBefore[name] = old;
+        }
 
         private long CenterGrid => (long)Call("CenterGrid", ZoneId);
         private long RewardGrid => (long)Call("RewardGrid", ZoneId);
@@ -200,6 +205,18 @@ namespace SentisTests.Scenarios
             Check(outOf != null && Vector3D.Distance(outOf.Value, between.PositionComp.GetPosition() - side * 100000) < 2000,
                 "a jump away from 12 km off the zone (outside the jump-out radius) did not go as asked");
             Check(Jumps(far, far.PositionComp.GetPosition() + side * 100000, a) != null, "a jump far from the zone did not go (the ship cannot jump at all?)");
+
+            // jump-in 1 km, jump-out 5 km, a ship 5.2 km off jumps to the center: its edge is 4.1 km off, shorter than the
+            // drives' 5 km the game wants (it drops a shorter jump without a word); the jump goes at least that far
+            Setting("JumpInRadius", 1000.0);
+            Setting("JumpOutRadius", 5000.0);
+            var edgeShip = Ship(site + side * 5200, a);
+            yield return WaitForTicks(30);
+            var toCenter = Jumps(edgeShip, site, a);
+            Check(toCenter != null, "a jump to the center from 5.2 km off the zone did not go");
+            Note($"a jump to the center from 5.2 km off ends {Vector3D.Distance(toCenter.Value, site):0} m off the center, " +
+                 $"{Vector3D.Distance(toCenter.Value, edgeShip.PositionComp.GetPosition()):0} m from the ship");
+            Check(Vector3D.Distance(toCenter.Value, site) >= 1000, "a jump to the center ended inside the jump-in radius");
             Note("PASS: center cube, capture, reward structure, contest, carry-over, emptied structure, death, weekly, jumps near the zone");
         }
 
