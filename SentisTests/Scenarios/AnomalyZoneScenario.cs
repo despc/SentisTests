@@ -26,14 +26,14 @@ namespace SentisTests.Scenarios
     /// - the center cube stands: a static 5x5x5 of heavy armor around a beacon and a battery, not destructible, not
     ///   editable, a hit on it does nothing;
     /// - a player of A alone inside captures: A gets points, a reward structure appears near the center, its container
-    ///   holds the rewards and belongs to the player;
+    ///   holds the zone's own capture reward (not the common ones) and belongs to the player;
     /// - (at the end) a ship's jump from within 10 km of the zone is turned down, one into 15 km of it ends at 15 km,
     ///   one far from it goes as asked;
     /// - a player of B comes in: the zone is contested;
     /// - B goes, A captures again: the first structure is gone and its contents are in the new one;
     /// - the new structure emptied: it goes away;
     /// - A's player dies inside: A loses a point;
-    /// - the weekly rewards given by hand: a structure for the week's winner.
+    /// - the weekly rewards given by hand: a structure for the week's winner with the zone's own weekly reward.
     /// The plugin is driven through SentisAnomalyZone.AnomalyZoneApi by reflection; its settings come back as they were.
     /// </summary>
     public sealed class AnomalyZoneScenario : TestScenario
@@ -90,6 +90,9 @@ namespace SentisTests.Scenarios
             Setting("JumpOutRadius", 10000.0);
             Call("Forget", ZoneId);
             Call("PutZone", ZoneId, "Сценарий", site.X, site.Y, site.Z, Radius, CaptureSeconds);
+            // the zone's own rewards, not the common ones (they go with the zone)
+            Call("AddReward", ZoneId, 0, "Ingot", "Uranium", 7.0);
+            Call("AddReward", ZoneId, 1, "Ingot", "Silver", 13.0);
             Note("zone of " + Radius + " m, capture " + CaptureSeconds + " s at " + site);
 
             FakeClients.Add(2, Network, i => (away + new Vector3D(0, i * 10, 0), 0, 0), withCharacters: true);
@@ -138,7 +141,8 @@ namespace SentisTests.Scenarios
             var first = Grid(RewardGrid);
             var firstItems = Items(first);
             Note($"reward structure {first.EntityId}: {first.BlocksCount} blocks; {Describe(firstItems)}");
-            Check(firstItems.Count > 0, "the reward structure's container is empty");
+            Check(firstItems.Count == 1 && firstItems.TryGetValue("MyObjectBuilder_Ingot/Uranium", out var uranium) && Math.Abs(uranium - 7) < 0.01,
+                "the reward is not the zone's own (7 uranium ingots, nothing else): " + Describe(firstItems));
             var container = first.GetFatBlocks<MyCargoContainer>().First();
             Check(container.OwnerId == a, "the reward container belongs to " + container.OwnerId + ", not to the capturing player " + a);
             Check(!first.DestructibleBlocks && !first.Editable && first.IsStatic, "the reward structure is not static and protected");
@@ -186,6 +190,8 @@ namespace SentisTests.Scenarios
             Note("weekly: " + weekly);
             var weeklyGrids = (long[])Call("WeeklyGrids");
             Check(weeklyGrids.Length >= 1 && weeklyGrids.Any(id => Grid(id) != null), "no weekly reward structure");
+            Check(weeklyGrids.Select(id => Items(Grid(id))).Any(items => items.Count == 1 && items.TryGetValue("MyObjectBuilder_Ingot/Silver", out var silver) && Math.Abs(silver - 13) < 0.01),
+                "no weekly structure with the zone's own reward (13 silver ingots): " + string.Join(" | ", weeklyGrids.Select(id => Describe(Items(Grid(id))))));
             foreach (var id in weeklyGrids) Track(Grid(id));
 
             // jump drives: no jump out from within 10 km; a jump in to within 15 km ends at 15 km; one far from it goes as asked
@@ -217,7 +223,7 @@ namespace SentisTests.Scenarios
             Note($"a jump to the center from 5.2 km off ends {Vector3D.Distance(toCenter.Value, site):0} m off the center, " +
                  $"{Vector3D.Distance(toCenter.Value, edgeShip.PositionComp.GetPosition()):0} m from the ship");
             Check(Vector3D.Distance(toCenter.Value, site) >= 1000, "a jump to the center ended inside the jump-in radius");
-            Note("PASS: center cube, capture, reward structure, contest, carry-over, emptied structure, death, weekly, jumps near the zone");
+            Note("PASS: center cube, capture, the zone's own rewards, reward structure, contest, carry-over, emptied structure, death, weekly, jumps near the zone");
         }
 
         /// <summary>A ship of the player: a charged large jump drive and a battery.</summary>
