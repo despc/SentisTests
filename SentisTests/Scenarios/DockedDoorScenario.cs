@@ -14,6 +14,9 @@ using SentisTests.Game;
 using VRage;
 using VRage.Game;
 using VRage.Game.Entity;
+using VRage.Game.ObjectBuilders.Components;
+using Sandbox.Common.ObjectBuilders;
+using Sandbox.Game.Entities.Character;
 using VRage.ObjectBuilders;
 using VRageMath;
 
@@ -37,9 +40,23 @@ namespace SentisTests.Scenarios
         private const double MoveSeconds = 6, LeafOffM = 0.1;
         private const BindingFlags Any = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
-        private readonly ConfigOverride _config = new ConfigOverride();
+        /// <summary>"docked_door_touch": then a player walks through the open door; "…_sz": in a safe zone without damage.</summary>
+        public const string TouchName = "docked_door_touch", TouchSafeZoneName = "docked_door_touch_sz";
+        private const double TouchSpeedMps = 1;
+        /// <summary>More than this from walking into a door at <see cref="TouchSpeedMps"/> is a ram.</summary>
+        private const float TouchDamageMax = 5;
 
-        public override string Name => ScenarioName;
+        private readonly ConfigOverride _config = new ConfigOverride();
+        private readonly ConfigOverride _gameplay = new ConfigOverride(ConfigOverride.Gameplay);
+        private readonly bool _touch, _safeZone;
+
+        public DockedDoorScenario(bool touch = false, bool safeZone = false)
+        {
+            _touch = touch || safeZone;
+            _safeZone = safeZone;
+        }
+
+        public override string Name => _safeZone ? TouchSafeZoneName : _touch ? TouchName : ScenarioName;
         public override int TimeoutSeconds => 120;
 
         public override IEnumerator Run()
@@ -47,9 +64,12 @@ namespace SentisTests.Scenarios
             WorldApi.EnsureUnpaused(Name);
             _config.Set("DockedCollisionsOff", true);
             _config.Set("FreezerEnabled", false);
+            if (_touch) _gameplay.Set("DisableAnyDamageAfterStartTime", 0);
             var doorDef = MyDefinitionManager.Static.GetAllDefinitions().OfType<MyCubeBlockDefinition>()
                 .Where(d => d.Id.TypeId.ToString() == "MyObjectBuilder_Door" && d.CubeSize == MyCubeSize.Large && d.Public)
-                .OrderBy(d => d.Id.SubtypeName.IndexOf("Offset", StringComparison.OrdinalIgnoreCase) >= 0 ? 0 : 1).ThenBy(d => d.Size.Volume())
+                // (walked into: the door players died at on the server, CorridorRoundDoor)
+                .OrderBy(d => _touch && d.Id.SubtypeName == "CorridorRoundDoor" ? -1 : d.Id.SubtypeName.IndexOf("Offset", StringComparison.OrdinalIgnoreCase) >= 0 ? 0 : 1)
+                .ThenBy(d => d.Size.Volume())
                 .FirstOrDefault();
             Check(doorDef != null, "no large door");
 
@@ -84,7 +104,11 @@ namespace SentisTests.Scenarios
                 Block("Connector", new Vector3I(1, 1, 1), Base6Directions.Direction.Up, Base6Directions.Direction.Forward),
                 Block("LargeBlockBatteryBlock", new Vector3I(0, 1, 0)),
                 Block(doorDef.Id.SubtypeName, new Vector3I(1, -1, 1)),
-            });
+            }.Concat(_touch
+                // (walled in as in a corridor: armor on each side and over it, where an open door's leaves go)
+                ? new[] { new Vector3I(0, -1, 1), new Vector3I(2, -1, 1), new Vector3I(1, -2, 1), new Vector3I(0, -2, 1), new Vector3I(2, -2, 1) }
+                    .Select(p => Block("LargeBlockArmorBlock", p))
+                : Enumerable.Empty<MyObjectBuilder_CubeBlock>()));
             var door = ship.GetFatBlocks().OfType<MyDoor>().FirstOrDefault();
             Check(door != null, $"the door ({doorDef.Id.SubtypeName}) was not made");
             var a = station.GetFatBlocks().OfType<MyShipConnector>().First();
@@ -131,7 +155,91 @@ namespace SentisTests.Scenarios
                 var off = LeafOff(door);
                 if (off > LeafOffM) problems.Add($"{(open ? "open" : "closed")}: a leaf's body {off:0.00} m off the leaf");
             }
+            if (_touch)
+            {
+                var touch = Touch(door);
+                while (touch.MoveNext()) yield return touch.Current;
+                if (_touchProblem != null) problems.Add(_touchProblem);
+            }
             Check(problems.Count == 0, string.Join("; ", problems));
+        }
+
+        // ---- a player walking into the door (from the server, 15.10.2026: one touching such a door died as if rammed,
+        // 10 000 - 54 000 damage a hit from the door block, even in a safe zone)
+
+        private static bool _listening, _registered;
+        private static long _victim;
+        private static int _hits;
+        private static float _damage;
+        private static string _firstHit;
+        private string _touchProblem;
+        private MyEntity _zone;
+
+        private IEnumerator Touch(MyDoor door)
+        {
+            var d = (Sandbox.ModAPI.Ingame.IMyDoor)door;
+            d.OpenDoor();
+            var opening = WaitForSeconds(2, "the door opens");
+            while (opening.MoveNext()) yield return opening.Current;
+            // (into a leaf's body - where Havok has it, which may be off where the leaf is drawn - else the door's middle)
+            var leafBody = Leaves(door).Select(p => p.Physics as MyPhysicsBody).FirstOrDefault(b => b?.RigidBody != null);
+            var at = door.PositionComp.WorldAABB.Center;
+            var side = door.CubeGrid.WorldMatrix.Right;
+            if (_safeZone)
+            {
+                _zone = MySessionComponentSafeZones.CrateSafeZone(MatrixD.CreateWorld(at), MySafeZoneShape.Sphere, MySafeZoneAccess.Blacklist,
+                    null, null, 60f, enable: true);
+                if (_zone is MySafeZone zone) zone.AllowedActions = MySafeZoneAction.All & ~MySafeZoneAction.Damage;
+                var settle = WaitForSeconds(1, "the safe zone is up");
+                while (settle.MoveNext()) yield return settle.Current;
+            }
+            if (!_registered)
+            {
+                _registered = true;
+                Sandbox.ModAPI.MyAPIGateway.Session.DamageSystem.RegisterAfterDamageHandler(int.MaxValue - 2, (target, info) =>
+                {
+                    if (!_listening || !(target is MyCharacter hurt) || hurt.EntityId != _victim) return;
+                    _hits++;
+                    _damage += info.Amount;
+                    if (_firstHit == null)
+                    {
+                        MyEntities.TryGetEntityById(info.AttackerId, out var by);
+                        _firstHit = $"{info.Amount:0} {info.Type} by {by?.GetType().Name ?? info.AttackerId.ToString()}";
+                    }
+                });
+            }
+            var character = FakeClients.Character(0);
+            if (character == null) { _touchProblem = "no character to walk into the door"; yield break; }
+            _victim = character.EntityId;
+            _hits = 0;
+            _damage = 0;
+            _firstHit = null;
+            var from = at + side * 3;
+            double? t0 = null;
+            FakeClients.SetPath(0, s =>
+            {
+                t0 = t0 ?? s;
+                // (into the doorway, and stays there)
+                return from - side * Math.Min(s - t0.Value, 3) * TouchSpeedMps;
+            });
+            var health = character.StatComp?.Health?.Value ?? 0;
+            _listening = true;
+            // (the leaves' bodies' fastest speed meanwhile: a leaf fighting its own grid flies about)
+            var leafSpeed = 0.0;
+            var walkStart = DateTime.UtcNow;
+            while ((DateTime.UtcNow - walkStart).TotalSeconds < 7)
+            {
+                foreach (var leaf in Leaves(door))
+                    if (leaf.Physics?.RigidBody != null) leafSpeed = Math.Max(leafSpeed, leaf.Physics.RigidBody.LinearVelocity.Length());
+                yield return null;
+            }
+            _listening = false;
+            Note($"DOOR TOUCH | the leaves' bodies at up to {leafSpeed:0.0} m/s");
+            var after = character.MarkedForClose ? 0 : character.StatComp?.Health?.Value ?? 0;
+            Note($"DOOR TOUCH | {(_safeZone ? "in a safe zone without damage" : "no safe zone")}, {TouchSpeedMps} m/s through the open door: " +
+                 $"{_hits} hits, {_damage:0} damage{(_firstHit != null ? $" (first {_firstHit})" : "")}; health {health:0} -> {after:0}{(character.IsDead ? ", dead" : "")}; {Describe(door)}");
+            if (_safeZone ? _hits > 0 : _damage > TouchDamageMax)
+                _touchProblem = $"walking into the door at {TouchSpeedMps} m/s: {_hits} hits, {_damage:0} damage{(_safeZone ? " in a safe zone without damage" : "")}";
         }
 
         private static bool LeavesInGridGroup(MyDoor door)
@@ -197,8 +305,11 @@ namespace SentisTests.Scenarios
         {
             try
             {
+                _listening = false;
                 FakeClients.RemoveAll();
+                if (_zone != null && !_zone.MarkedForClose) _zone.Close();
                 _config.Restore();
+                if (_touch) _gameplay.Restore();
             }
             finally { base.Cleanup(); }
         }
