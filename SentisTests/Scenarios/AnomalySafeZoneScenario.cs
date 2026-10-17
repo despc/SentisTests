@@ -19,10 +19,10 @@ namespace SentisTests.Scenarios
 {
     /// <summary>
     /// SentisAnomalyZone's ban on safe zones near a zone (15 km here), on safe zone blocks with zone chips:
-    /// - near the zone the block's turning on is stopped where the game does it: no zone chip is taken
-    ///   (TryConsumeUpkeep says no), no activation countdown starts (as with paid time left);
-    /// - far from it both go as in the game: a chip is taken, the countdown starts;
-    /// - a block's safe zone on near the zone (as one turned on before the zone was there) is turned off within 10 s;
+    /// - near the zone a press of "on" (the block's own steps after it) takes no zone chip, starts no activation
+    ///   countdown, and the safe zone is taken away: the block's "on" button shows it off;
+    /// - far from it it goes as in the game: a chip is taken, the countdown starts, the safe zone stays;
+    /// - a block's safe zone on near the zone (as one turned on before the zone was there) is taken away within 10 s;
     /// - an admins' safe zone (no block) near the zone stays on.
     /// The block's own server steps are called by reflection: a player's request needs a real client.
     /// </summary>
@@ -35,6 +35,8 @@ namespace SentisTests.Scenarios
         private static readonly MethodInfo Pay = typeof(MySafeZoneComponent).GetMethod("TryConsumeUpkeep", BindingFlags.Instance | BindingFlags.NonPublic);
         private static readonly MethodInfo Countdown = typeof(MySafeZoneComponent).GetMethod("StartActivationCountdown", BindingFlags.Instance | BindingFlags.NonPublic);
         private static readonly FieldInfo Activating = typeof(MySafeZoneComponent).GetField("m_activating", BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly MethodInfo Created = typeof(MySafeZoneComponent).GetMethod("OnSafezoneCreated", BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly PropertyInfo ZoneId_ = typeof(MySafeZoneComponent).GetProperty("SafeZoneEntityId", BindingFlags.Instance | BindingFlags.Public);
 
         private readonly Dictionary<string, object> _settingsBefore = new Dictionary<string, object>();
         private Type _api;
@@ -59,7 +61,8 @@ namespace SentisTests.Scenarios
         {
             _api = RequireType(Integrations.TypeOf(Integrations.AnomalyZone, "SentisAnomalyZone.AnomalyZoneApi"), "SentisAnomalyZone.AnomalyZoneApi");
             Check((bool)_api.GetProperty("Running").GetValue(null), "SentisAnomalyZone is not running");
-            Check(Pay != null && Countdown != null && Activating != null, "MySafeZoneComponent has no TryConsumeUpkeep / StartActivationCountdown / m_activating");
+            Check(Pay != null && Countdown != null && Activating != null && Created != null && ZoneId_?.SetMethod != null,
+                "MySafeZoneComponent has no TryConsumeUpkeep / StartActivationCountdown / m_activating / OnSafezoneCreated / SafeZoneEntityId setter");
             WorldApi.EnsureUnpaused(Name);
 
             var anchor = WorldApi.LoadAuthoredGroup(WheelPerfScenario.ResourceName, WorldApi.EntityPrefix + "as-anchor")[0]
@@ -84,35 +87,52 @@ namespace SentisTests.Scenarios
             var farZone = Component(far);
             Check(nearZone != null && farZone != null, "the safe zone blocks have no safe zone component");
 
-            // near: no chip taken, no countdown
+            // near: the block's own steps after a press of "on" (its safe zone made, then turned on): no chip taken, no
+            // countdown, the safe zone taken away so the button shows it off
             var chipsBefore = Chips(near);
-            var paidNear = (bool)Pay.Invoke(nearZone, null);
-            Countdown.Invoke(nearZone, null);
-            Note($"near (5 km): paid {paidNear}, chips {chipsBefore} -> {Chips(near)}, counting down {Activating.GetValue(nearZone)}");
-            Check(!paidNear && Chips(near) == chipsBefore, "a zone chip was taken for a safe zone 5 km off the zone");
+            var pressedNear = Attach(near, owner, false);
+            Created.Invoke(nearZone, new object[] { pressedNear.EntityId });
+            Note($"near (5 km): chips {chipsBefore} -> {Chips(near)}, counting down {Activating.GetValue(nearZone)}");
+            Check(Chips(near) == chipsBefore, "a zone chip was taken for a safe zone 5 km off the zone");
             Check(!(bool)Activating.GetValue(nearZone), "the activation countdown started 5 km off the zone");
+            var gone = Wait(() => nearZone.SafeZoneEntityId == 0 && Gone(pressedNear), "the refused safe zone taken away (the button off)", 5);
+            while (gone.MoveNext()) yield return gone.Current;
 
             // far: as in the game
             var farBefore = Chips(far);
-            var paidFar = (bool)Pay.Invoke(farZone, null);
-            Countdown.Invoke(farZone, null);
-            Note($"far (40 km): paid {paidFar}, chips {farBefore} -> {Chips(far)}, counting down {Activating.GetValue(farZone)}");
-            Check(paidFar && Chips(far) < farBefore, "no zone chip was taken for a safe zone 40 km off the zone");
+            var pressedFar = Attach(far, owner, false);
+            Created.Invoke(farZone, new object[] { pressedFar.EntityId });
+            yield return WaitForTicks(10);
+            Note($"far (40 km): chips {farBefore} -> {Chips(far)}, counting down {Activating.GetValue(farZone)}, safe zone {farZone.SafeZoneEntityId}");
+            Check(Chips(far) < farBefore, "no zone chip was taken for a safe zone 40 km off the zone");
             Check((bool)Activating.GetValue(farZone), "the activation countdown did not start 40 km off the zone");
+            Check(farZone.SafeZoneEntityId == pressedFar.EntityId && !Gone(pressedFar), "the safe zone 40 km off the zone was taken away");
 
-            // a block's safe zone already on near the zone: turned off; an admins' one stays on
-            var blockZone = (MySafeZone)MySessionComponentSafeZones.CrateSafeZone(near.GetFatBlocks().First(b => b.BlockDefinition.Id.SubtypeName == "SafeZoneBlock").PositionComp.WorldMatrixRef,
-                MySafeZoneShape.Sphere, MySafeZoneAccess.Whitelist, new[] { owner }, null, 100, true, true, Color.SkyBlue.ToVector3(), "", near.GetFatBlocks().First(b => b.BlockDefinition.Id.SubtypeName == "SafeZoneBlock").EntityId);
+            // a block's safe zone already on near the zone: taken away (the button off); an admins' one stays on
+            var onNear = Attach(near, owner, true);
             var adminZone = (MySafeZone)MySessionComponentSafeZones.CrateSafeZone(MatrixD.CreateWorld(site + side * 3000), MySafeZoneShape.Sphere, MySafeZoneAccess.Blacklist, null, null, 100, true);
-            Track(blockZone);
             Track(adminZone);
-            Check(blockZone.Enabled && adminZone.Enabled, "the safe zones were not made on");
-            var off = Wait(() => !blockZone.Enabled, "the block's safe zone near the zone turned off", 15);
+            Check(onNear.Enabled && adminZone.Enabled, "the safe zones were not made on");
+            var off = Wait(() => nearZone.SafeZoneEntityId == 0 && Gone(onNear), "the block's safe zone on near the zone taken away", 15);
             while (off.MoveNext()) yield return off.Current;
-            Check(adminZone.Enabled, "the admins' safe zone near the zone was turned off");
+            Check(adminZone.Enabled && !Gone(adminZone), "the admins' safe zone near the zone was turned off");
 
-            Note("PASS: near the zone no chip is taken and no countdown starts; far both go; a block's safe zone on near the zone is turned off, an admins' one is left");
+            Note("PASS: near the zone no chip is taken, no countdown starts and the safe zone is taken away (the button off); far it goes as in the game; " +
+                 "a block's safe zone on near the zone is taken away, an admins' one is left");
         }
+
+        /// <summary>The block's safe zone made as the block does (on or off), the block's safe zone id set to it.</summary>
+        private MySafeZone Attach(MyCubeGrid grid, long owner, bool on)
+        {
+            var block = grid.GetFatBlocks().First(b => b.BlockDefinition.Id.SubtypeName == "SafeZoneBlock");
+            var zone = (MySafeZone)MySessionComponentSafeZones.CrateSafeZone(block.PositionComp.WorldMatrixRef, MySafeZoneShape.Sphere, MySafeZoneAccess.Whitelist,
+                new[] { owner }, null, 100, on, true, Color.SkyBlue.ToVector3(), "", block.EntityId);
+            Track(zone);
+            ZoneId_.SetValue(block.Components.Get<MySafeZoneComponent>(), zone.EntityId);
+            return zone;
+        }
+
+        private static bool Gone(MySafeZone zone) => zone.Closed || zone.MarkedForClose;
 
         /// <summary>A static station with a safe zone block (10 zone chips in it) and a battery.</summary>
         private MyCubeGrid Station(Vector3D position, long owner, string name)
