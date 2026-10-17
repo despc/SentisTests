@@ -59,7 +59,8 @@ namespace SentisTests.Scenarios
 
             // ------------------------------------------------------------- the ship and all joined to it
             var grids = MyEntities.GetEntities().OfType<MyCubeGrid>().Where(g => !g.MarkedForClose).ToList();
-            var ship = grids.Where(g => (g.DisplayName ?? "").IndexOf(ShipName, StringComparison.OrdinalIgnoreCase) >= 0).OrderByDescending(g => g.BlocksCount).FirstOrDefault()
+            var name = TestRunner.Focus ?? ShipName;
+            var ship = grids.Where(g => (g.DisplayName ?? "").IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0).OrderByDescending(g => g.BlocksCount).FirstOrDefault()
                        ?? grids.Where(g => !g.IsStatic).OrderByDescending(g => g.BlocksCount).FirstOrDefault();
             Check(ship != null, "no ship");
             var group = MyCubeGridGroups.Static.GetGroups(GridLinkTypeEnum.Physical).GetGroupNodes(ship) ?? new List<MyCubeGrid> { ship };
@@ -149,6 +150,8 @@ namespace SentisTests.Scenarios
                 ("the biggest grid alone, armour only", b => !(b.TypeId.ToString().EndsWith("_CubeBlock")), g => g == bySize[0], null),
                 ("the biggest grid alone, armour only, asleep", b => !(b.TypeId.ToString().EndsWith("_CubeBlock")), g => g == bySize[0], null),
             };
+            // a ship of one grid has no second
+            if (bySize.Count < 2) variants.RemoveAll(v => v.Name == "the second alone");
             var measuredAll = true;
             foreach (var variant in variants)
             {

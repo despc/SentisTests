@@ -46,8 +46,9 @@ namespace SentisTests.Scenarios
             var monitor = _cost.Assembly.GetType("Optimizer.Optimizations.PhysicsLoadMonitor");
             var share = _cost.GetMethod("Share", any);
 
+            var name = TestRunner.Focus ?? Focus;
             var focus = MyEntities.GetEntities().OfType<MyCubeGrid>()
-                .Where(g => !g.IsStatic && (g.DisplayName ?? "").IndexOf(Focus, StringComparison.OrdinalIgnoreCase) >= 0 && !(g.DisplayName ?? "").StartsWith("["))
+                .Where(g => !g.IsStatic && (g.DisplayName ?? "").IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0 && !(g.DisplayName ?? "").StartsWith("["))
                 .OrderByDescending(g => g.BlocksCount).FirstOrDefault();
             if (focus != null)
             {

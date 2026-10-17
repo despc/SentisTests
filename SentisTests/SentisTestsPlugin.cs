@@ -121,6 +121,8 @@ namespace SentisTests
                 ScenarioRegistry.Register(PhysicsClusterTimingScenario.ScenarioName, () => new PhysicsClusterTimingScenario());
                 ScenarioRegistry.Register(PhysicsGuardScenario.ScenarioName, () => new PhysicsGuardScenario());
                 ScenarioRegistry.Register(PhysicsCalibrationScenario.ScenarioName, () => new PhysicsCalibrationScenario());
+                ScenarioRegistry.Register(PhysicsToolsScenario.ScenarioName, () => new PhysicsToolsScenario());
+                ScenarioRegistry.Register(PhysicsDrillLiveScenario.ScenarioName, () => new PhysicsDrillLiveScenario());
                 ScenarioRegistry.Register(PhysicsShareScenario.ScenarioName, () => new PhysicsShareScenario());
                 ScenarioRegistry.Register(PhysicsShipProbeScenario.ScenarioName, () => new PhysicsShipProbeScenario());
                 ScenarioRegistry.Register(PhysicsExplainScenario.ScenarioName, () => new PhysicsExplainScenario());
@@ -132,6 +134,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(DrillDockScenario.ScenarioName, () => new DrillDockScenario());
                 ScenarioRegistry.Register(DrillDockScenario.MineName, () => new DrillDockScenario(DrillDockScenario.MineName));
                 ScenarioRegistry.Register(DrillDockScenario.OreName, () => new DrillDockScenario(DrillDockScenario.OreName));
+                ScenarioRegistry.Register(DrillDockLineScenario.ScenarioName, () => new DrillDockLineScenario());
                 ScenarioRegistry.Register(BotDrillFlyScenario.ScenarioName, () => new BotDrillFlyScenario());
                 ScenarioRegistry.Register(DrillStateScenario.ScenarioName, () => new DrillStateScenario());
                 ScenarioRegistry.Register(WelderPerfScenario.ZoneScenarioName,

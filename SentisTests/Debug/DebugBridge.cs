@@ -464,6 +464,7 @@ namespace SentisTests.Debug
                         SendJson(ctx, 200, RunGameThread(() => SpawnToolRadiusRig(body.Value<string>("tool"))));
                         break;
                     case "/test":
+                        Core.TestRunner.Focus = body.Value<string>("focus");
                         Core.TestRunner.Enqueue(new[] { body.Value<string>("name") });
                         SendJson(ctx, 200, JObject.FromObject(new { queued = body.Value<string>("name") }));
                         break;

@@ -88,6 +88,9 @@ namespace SentisTests.Core
 
         public static double RunCleanupDelaySeconds { get; private set; }
 
+        /// <summary>A grid's name for the scenarios that look at one grid of the world (null: their own), from DebugBridge's test call.</summary>
+        public static string Focus;
+
         public static void Enqueue(IEnumerable<string> names, Vector3D? origin = null, double cleanupDelaySeconds = 0)
         {
             PendingOrigin = origin;
