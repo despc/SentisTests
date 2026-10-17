@@ -182,6 +182,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(FallThroughTunnelScenario.ScenarioName, () => new FallThroughTunnelScenario());
                 ScenarioRegistry.Register(OfflineCharacterScenario.ScenarioName, () => new OfflineCharacterScenario());
                 ScenarioRegistry.Register(AnomalyZoneScenario.ScenarioName, () => new AnomalyZoneScenario());
+                ScenarioRegistry.Register(AnomalyRewardsScenario.ScenarioName, () => new AnomalyRewardsScenario());
                 ScenarioRegistry.Register(FreezerStressScenario.ScenarioName, () => new FreezerStressScenario());
                 ScenarioRegistry.Register(FreezerStressScenario.ProfileScenarioName, () => new FreezerStressScenario(profile: true));
                 ScenarioRegistry.Register(GrinderPerfScenario.ScenarioName, () => new GrinderPerfScenario());
@@ -337,7 +338,7 @@ namespace SentisTests
         /// </summary>
         private static void DeclareRequirements()
         {
-            ScenarioRegistry.Needs(Integrations.AnomalyZone, AnomalyZoneScenario.ScenarioName);
+            ScenarioRegistry.Needs(Integrations.AnomalyZone, AnomalyZoneScenario.ScenarioName, AnomalyRewardsScenario.ScenarioName);
 
             ScenarioRegistry.Needs(Integrations.Ai,
                 AiStatusUiScenario.ScenarioName,
