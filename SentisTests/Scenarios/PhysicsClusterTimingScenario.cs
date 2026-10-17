@@ -22,7 +22,8 @@ namespace SentisTests.Scenarios
     /// or less, and one in <c>MeasureGapFrames</c> (30) of those shows as 3% of the distance. Passes when the clusters
     /// were timed, each ship went the same distance a frame both ways, to <see cref="Tolerance"/>, and a frame with a
     /// cluster timed took less than <see cref="MaxExtraMs"/> more physics (by PhysicsLoadMonitor) than the others. The
-    /// frames' cost both ways is noted.
+    /// frames' cost both ways is noted. Then a third run with the monitor off on SO's page (<c>DisablePhysicsMonitor</c>):
+    /// no cluster timed, the ships as with the timing off.
     /// </summary>
     public sealed class PhysicsClusterTimingScenario : TestScenario
     {
@@ -90,13 +91,17 @@ namespace SentisTests.Scenarios
 
             // ------------------------------------------------------------- off, then on: the distance a frame
             long ticksTimed0 = 0, framesTimed0 = 0, ticksPlain0 = 0, framesPlain0 = 0;
-            var perFrame = new double[2][];
-            var costs = new string[2];
-            long count = 0;
-            for (var phase = 0; phase < 2; phase++)
+            var monitorOff = AppDomain.CurrentDomain.GetAssemblies().Any(a => a.GetType("SentisOptimisationsPlugin.MainConfig")?.GetProperty("DisablePhysicsMonitor") != null);
+            var phases = monitorOff ? 3 : 2;
+            var perFrame = new double[3][];
+            var costs = new string[3];
+            long count = 0, countOff = 0;
+            for (var phase = 0; phase < phases; phase++)
             {
                 var on = phase == 1;
-                _timingSwitch.SetValue(null, on);
+                var off = phase == 2;
+                _timingSwitch.SetValue(null, phase > 0);
+                if (off) _config.Set("DisablePhysicsMonitor", true);
                 yield return null;
                 var before = (long)measured.GetValue(null);
                 var frame0 = Sandbox.MySandboxGame.Static.SimulationFrameCounter;
@@ -107,14 +112,15 @@ namespace SentisTests.Scenarios
                     ticksTimed0 = Read("StepTicksTimed"); framesTimed0 = Read("StepFramesTimed");
                     ticksPlain0 = Read("StepTicksPlain"); framesPlain0 = Read("StepFramesPlain");
                 }
-                var wait = WaitForSeconds(PhaseSeconds, "the clusters' timing " + (on ? "on" : "off"));
+                var wait = WaitForSeconds(PhaseSeconds, off ? "the physics monitor off" : "the clusters' timing " + (on ? "on" : "off"));
                 while (wait.MoveNext()) yield return wait.Current;
                 costs[phase] = TickMetrics.Take().Format();
                 var frames = Sandbox.MySandboxGame.Static.SimulationFrameCounter - frame0;
                 perFrame[phase] = _ships.Select((s, i) => Vector3D.Distance(s.PositionComp.GetPosition(), at0[i]) / frames).ToArray();
                 if (on) count = (long)measured.GetValue(null) - before;
-                Note($"CLUSTER TIMING {(on ? "ON " : "OFF")} | {frames} frames, a frame: ship 0 {perFrame[phase][0] * 60:0.000} m/s, ship 1 {perFrame[phase][1] * 60:0.000} m/s" +
-                     (on ? $", clusters timed {count}" : "") + " | " + costs[phase]);
+                if (off) countOff = (long)measured.GetValue(null) - before;
+                Note($"CLUSTER TIMING {(off ? "MONITOR OFF" : on ? "ON " : "OFF")} | {frames} frames, a frame: ship 0 {perFrame[phase][0] * 60:0.000} m/s, ship 1 {perFrame[phase][1] * 60:0.000} m/s" +
+                     (on ? $", clusters timed {count}" : off ? $", clusters timed {countOff}" : "") + " | " + costs[phase]);
             }
             double Ms(long ticks, long frames) => frames > 0 ? ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency / frames : 0;
             var timedFrames = Read("StepFramesTimed") - framesTimed0;
@@ -133,7 +139,12 @@ namespace SentisTests.Scenarios
                 var change = on / off - 1;
                 Check(Math.Abs(change) <= Tolerance,
                     $"ship {i} went {change:+0.00%;-0.00%} a frame with the clusters timed: its cluster was stepped {(change > 0 ? "more" : "less")} than once a frame");
+                if (!monitorOff) continue;
+                var vanilla = perFrame[2][i] / off - 1;
+                Check(Math.Abs(vanilla) <= Tolerance, $"ship {i} went {vanilla:+0.00%;-0.00%} a frame with the physics monitor off");
             }
+            if (monitorOff) Check(countOff == 0, $"{countOff} clusters timed with the physics monitor off");
+            else Note("SentisOptimisations has no DisablePhysicsMonitor: the third run skipped");
         }
 
         public override void Cleanup()

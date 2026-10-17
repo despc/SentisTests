@@ -123,6 +123,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(PhysicsCalibrationScenario.ScenarioName, () => new PhysicsCalibrationScenario());
                 ScenarioRegistry.Register(PhysicsToolsScenario.ScenarioName, () => new PhysicsToolsScenario());
                 ScenarioRegistry.Register(PhysicsDrillLiveScenario.ScenarioName, () => new PhysicsDrillLiveScenario());
+                ScenarioRegistry.Register(ClientModWhitelistScenario.ScenarioName, () => new ClientModWhitelistScenario());
                 ScenarioRegistry.Register(PhysicsShareScenario.ScenarioName, () => new PhysicsShareScenario());
                 ScenarioRegistry.Register(PhysicsShipProbeScenario.ScenarioName, () => new PhysicsShipProbeScenario());
                 ScenarioRegistry.Register(PhysicsExplainScenario.ScenarioName, () => new PhysicsExplainScenario());
