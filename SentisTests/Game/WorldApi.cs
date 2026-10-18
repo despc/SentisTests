@@ -664,6 +664,28 @@ namespace SentisTests.Game
             var grids = definitions?.ShipBlueprints?.FirstOrDefault()?.CubeGrids?.ToList();
             if (grids == null || grids.Count == 0)
                 throw new Core.ScenarioFailedException(source + " holds no grids");
+            return ReadyGroup(grids, name);
+        }
+
+        /// <summary>
+        /// A copy of a live grid and everything joined to it physically (subgrids on rotors, pistons, hinges), readied for
+        /// spawn as <see cref="LoadAuthoredGroup"/> readies an embedded one: new ids, the copy's own tops and gears, the
+        /// test player as owner, nobody in its seats. Where it stands is the original's; the caller moves it.
+        /// </summary>
+        public static List<MyObjectBuilder_CubeGrid> CopyLiveGroup(MyCubeGrid any, string name)
+        {
+            var group = new List<VRage.Game.ModAPI.IMyCubeGrid>();
+            MyAPIGateway.GridGroups.GetGroup(any, VRage.Game.ModAPI.GridLinkTypeEnum.Physical, group);
+            // the biggest first: it is the one named, the others are its parts
+            var grids = group.Cast<MyCubeGrid>().OrderByDescending(g => g.BlocksCount)
+                .Select(g => (MyObjectBuilder_CubeGrid)g.GetObjectBuilder(true)).ToList();
+            foreach (var cockpit in grids.SelectMany(g => g.CubeBlocks).OfType<Sandbox.Common.ObjectBuilders.MyObjectBuilder_Cockpit>())
+                cockpit.Pilot = null;
+            return ReadyGroup(grids, name);
+        }
+
+        private static List<MyObjectBuilder_CubeGrid> ReadyGroup(List<MyObjectBuilder_CubeGrid> grids, string name)
+        {
             // Landing gears keep the id of the grid they are locked to, and their object builder has
             // no Remap: without this a copy would reach for the original station.
             var oldIds = grids.Select(g => g.EntityId).ToList();

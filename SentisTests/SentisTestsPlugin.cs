@@ -122,6 +122,16 @@ namespace SentisTests
                 ScenarioRegistry.Register(PhysicsGuardScenario.ScenarioName, () => new PhysicsGuardScenario());
                 ScenarioRegistry.Register(PhysicsCalibrationScenario.ScenarioName, () => new PhysicsCalibrationScenario());
                 ScenarioRegistry.Register(PhysicsToolsScenario.ScenarioName, () => new PhysicsToolsScenario());
+                ScenarioRegistry.Register(VoxelCoarseScenario.ScenarioName, () => new VoxelCoarseScenario());
+                ScenarioRegistry.Register(VoxelCoarseScenario.OffName, () => new VoxelCoarseScenario(off: true));
+                ScenarioRegistry.Register(PhysicsDrillDeepScenario.ScenarioName, () => new PhysicsDrillDeepScenario());
+                ScenarioRegistry.Register(PhysicsDrillDeepScenario.OffName, () => new PhysicsDrillDeepScenario(coarseOff: true));
+                ScenarioRegistry.Register(new PhysicsDrillDeepScenario(drillRadius: 1.5f).Name, () => new PhysicsDrillDeepScenario(drillRadius: 1.5f));
+                ScenarioRegistry.Register(new PhysicsDrillDeepScenario(drillRadius: 1.75f).Name, () => new PhysicsDrillDeepScenario(drillRadius: 1.75f));
+                ScenarioRegistry.Register(new PhysicsDrillDeepScenario(drillRadius: 2f).Name, () => new PhysicsDrillDeepScenario(drillRadius: 2f));
+                ScenarioRegistry.Register(PhysicsDrillDeepScenario.ProbeName, () => new PhysicsDrillDeepScenario(probe: true));
+                ScenarioRegistry.Register(PhysicsDrillDeepScenario.FreshName, () => new PhysicsDrillDeepScenario(fresh: true));
+                ScenarioRegistry.Register(PhysicsDrillDeepScenario.ProbeFreshName, () => new PhysicsDrillDeepScenario(probe: true, fresh: true));
                 ScenarioRegistry.Register(PhysicsDrillLiveScenario.ScenarioName, () => new PhysicsDrillLiveScenario());
                 ScenarioRegistry.Register(ClientModWhitelistScenario.ScenarioName, () => new ClientModWhitelistScenario());
                 ScenarioRegistry.Register(PhysicsShareScenario.ScenarioName, () => new PhysicsShareScenario());
@@ -165,6 +175,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(WheelPerfScenario.ParkedScenarioName, () => new WheelPerfScenario(64, parked: true));
                 ScenarioRegistry.Register(GearProbeScenario.ScenarioName, () => new GearProbeScenario());
                 ScenarioRegistry.Register(FreezerPhysicsScenario.ScenarioName, () => new FreezerPhysicsScenario());
+                ScenarioRegistry.Register(FreezerAsteroidScenario.ScenarioName, () => new FreezerAsteroidScenario());
                 ScenarioRegistry.Register(PhysicsResumeScenario.ScenarioName, () => new PhysicsResumeScenario());
                 ScenarioRegistry.Register(UnsteppedBlocksScenario.ScenarioName, () => new UnsteppedBlocksScenario());
                 ScenarioRegistry.Register(PowerSwitchScenario.ScenarioName, () => new PowerSwitchScenario());
@@ -374,6 +385,7 @@ namespace SentisTests
                 FreezeDisassemblyScenario.ScenarioName,
                 FreezePowerScenario.ScenarioName,
                 FreezerPhysicsScenario.ScenarioName,
+                FreezerAsteroidScenario.ScenarioName,
                 FreezerStressScenario.ScenarioName, FreezerStressScenario.ProfileScenarioName,
                 ProductionFreezerStressScenario.ScenarioName,
                 FrozenRadiusWeldScenario.ScenarioName,
