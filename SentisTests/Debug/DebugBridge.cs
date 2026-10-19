@@ -325,6 +325,16 @@ namespace SentisTests.Debug
                 case "/freezer":
                     SendJson(ctx, 200, RunGameThread(FreezerState));
                     break;
+                case "/npc-claim":
+                    SendJson(ctx, 200, RunGameThread(NpcClaims));
+                    break;
+                case "/connectors":
+                    SendJson(ctx, 200, RunGameThread(ConnectorPairs));
+                    break;
+                case "/freezer-near":
+                    SendJson(ctx, 200, RunGameThread(() => FrozenNearCharacters(
+                        double.TryParse(qkey("static"), out var sm) ? sm : 3000, double.TryParse(qkey("dynamic"), out var dm) ? dm : 10000)));
+                    break;
                 case "/physics":
                     SendJson(ctx, 200, PhysicsStep());
                     break;
@@ -1159,6 +1169,132 @@ namespace SentisTests.Debug
         private static bool IsFrozenGrid(long gridId) =>
             Core.Integrations.IsLoaded(Core.Integrations.Optimisations) &&
             Game.RuntimePluginControls.IsGridFrozen(gridId);
+
+        /// <summary>
+        /// The grids the game spawned for NPCs (encounters, "Unknown Signal"): the claim timer of each (frames since it
+        /// started, null: not started - such a grid cannot be merged with a player's), the claim's limit, and who owns
+        /// and built its blocks (players, NPCs).
+        /// </summary>
+        private static JObject NpcClaims()
+        {
+            var session = Sandbox.Game.World.MySession.Static;
+            var claims = session.NPCGridClaimSystem;
+            var players = session.Players;
+            var list = new JArray();
+            foreach (var grid in MyEntities.GetEntities().OfType<MyCubeGrid>().Where(g => !g.MarkedForClose && g.IsNpcSpawnedGrid))
+            {
+                var owners = grid.GetBlocks().Select(b => b.OwnerId).Where(o => o != 0).Distinct().ToList();
+                var builders = grid.GetBlocks().Select(b => b.BuiltBy).Where(o => o != 0).Distinct().ToList();
+                string Who(long id) => id + (players.IdentityIsNpc(id) ? " npc" : " player") + " " + (players.TryGetIdentity(id)?.DisplayName ?? "?");
+                list.Add(Obj("grid", grid.DisplayName, "id", grid.EntityId, "static", grid.IsStatic, "blocks", grid.BlocksCount,
+                    "claimFrames", claims?.GetFramesElapsed(grid.EntityId), "timeLeft", claims?.GetTimeRemaining(grid.EntityId)?.ToString(),
+                    "smallOwners", string.Join(", ", grid.SmallOwners.Select(Who)), "owners", string.Join(", ", owners.Select(Who)), "builders", string.Join(", ", builders.Take(6).Select(Who))));
+            }
+            // the component itself: whether it is the game's live one, how many grids it holds, what waits to be registered
+            object component = claims;
+            var type = component?.GetType();
+            const System.Reflection.BindingFlags any = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public;
+            var statik = type?.GetField("Static", any)?.GetValue(null);
+            var grids = type?.GetField("m_NPCGrids", any)?.GetValue(component);
+            var toRegister = type?.GetField("m_gridIdsToRegister", any)?.GetValue(component) as System.Collections.ICollection;
+            var changes = type?.GetField("m_NPCGridsChanges", any)?.GetValue(component) as System.Collections.ICollection;
+            var ob = type?.GetField("m_ob", any)?.GetValue(component);
+            var countProp = grids?.GetType().GetProperty("Count");
+            var updateOrder = (component as VRage.Game.Components.MySessionComponentBase)?.UpdateOrder.ToString();
+            return Obj("limitMinutes", session.Settings.NPCGridClaimTimeLimit, "component", type?.FullName, "staticIsIt", ReferenceEquals(statik, component),
+                "updateOrder", updateOrder, "gridsHeld", countProp?.GetValue(grids)?.ToString(), "toRegister", toRegister?.Count ?? -1,
+                "changesPending", changes?.Count ?? -1, "obPending", ob != null, "grids", list);
+        }
+
+        private static readonly System.Reflection.FieldInfo ConnectorDummyField = typeof(Sandbox.Game.Entities.Cube.MyShipConnector).GetField("m_connectorDummy", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        private static readonly System.Reflection.FieldInfo ConnectorFloatersField = typeof(Sandbox.Game.Entities.Cube.MyShipConnector).GetField("m_detectedFloaters", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        private static readonly System.Reflection.FieldInfo ConnectorModeField = typeof(Sandbox.Game.Entities.Cube.MyShipConnector).GetField("m_connectorMode", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        private static readonly System.Reflection.MethodInfo ClusterActive = typeof(Sandbox.Engine.Physics.MyPhysics).GetMethod("IsClusterActive",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public, null, new[] { typeof(int), typeof(int) }, null);
+
+        private static bool? WorldStepped(MyCubeGrid grid)
+        {
+            var world = grid.Physics?.HavokWorld;
+            if (world == null || ClusterActive == null) return null;
+            var physics = Sandbox.Game.World.MySession.Static.GetComponent<Sandbox.Engine.Physics.MyPhysics>();
+            foreach (var cluster in Sandbox.Engine.Physics.MyPhysics.Clusters.GetClusters())
+                if (cluster.UserData == world) return (bool)ClusterActive.Invoke(physics, new object[] { cluster.ClusterId, world.CharacterRigidBodies.Count });
+            return null;
+        }
+
+        /// <summary>
+        /// Every pair of connectors close enough to lock (their lock points within 2 m) that is not locked: what the game's
+        /// TryAttach asks of them, each condition, and what is in the way of our own (frozen, a Havok world not stepped).
+        /// "wouldLock" - every condition of the game met: such a pair should show yellow.
+        /// </summary>
+        private static JObject ConnectorPairs()
+        {
+            var connectors = MyEntities.GetEntities().OfType<MyCubeGrid>().Where(g => !g.MarkedForClose && g.Physics != null)
+                .SelectMany(g => g.GetFatBlocks().OfType<Sandbox.Game.Entities.Cube.MyShipConnector>()).Where(c => !c.MarkedForClose).ToList();
+            var pairs = new JArray();
+            var seen = new HashSet<long>();
+            foreach (var a in connectors)
+            {
+                if (a.InConstraint || !seen.Add(a.EntityId)) continue;
+                var at = a.ConstraintPositionWorld();
+                foreach (var b in connectors)
+                {
+                    if (b == a || b.CubeGrid == a.CubeGrid || b.InConstraint || seen.Contains(b.EntityId)) continue;
+                    var d = Vector3D.Distance(at, b.ConstraintPositionWorld());
+                    if (d > 2) continue;
+                    Vector3D Dir(Sandbox.Game.Entities.Cube.MyShipConnector c) => c.BlockDefinition.ConnectDirection.X * c.WorldMatrix.Left + c.BlockDefinition.ConnectDirection.Y * c.WorldMatrix.Up + c.BlockDefinition.ConnectDirection.Z * c.WorldMatrix.Forward;
+                    var angle = MathHelper.ToDegrees(Vector3D.Angle(Dir(a), Dir(b)));
+                    JObject Side(Sandbox.Game.Entities.Cube.MyShipConnector c)
+                    {
+                        var dummy = ConnectorDummyField?.GetValue(c) as Sandbox.Engine.Physics.MyPhysicsBody;
+                        var floaters = ConnectorFloatersField?.GetValue(c) as System.Collections.ICollection;
+                        var grid = c.CubeGrid;
+                        var dlcs = grid.GetBlocks().Select(x => x.BlockDefinition.DLCs).Where(x => x != null).SelectMany(x => x).Distinct().ToList();
+                        var faction = Sandbox.Game.World.MySession.Static.Factions.TryGetPlayerFaction(c.OwnerId);
+                        return Obj("connector", c.CustomName?.ToString(), "grid", grid.DisplayName, "blocks", grid.BlocksCount, "static", grid.IsStatic,
+                            "working", c.IsWorking, "enabled", c.Enabled, "mode", ConnectorModeField?.GetValue(c)?.ToString(), "small", c.IsSmallConnector,
+                            "status", ((Sandbox.ModAPI.Ingame.IMyShipConnector)c).Status.ToString(), "owner", c.OwnerId, "faction", faction?.Tag,
+                            "detector", dummy == null ? "none" : (dummy.Enabled ? "on" : "off") + (dummy.IsInWorld ? ", in world" : ", not in world"),
+                            "gridsDetected", c.DetectedGridCount, "floaters", floaters?.Count ?? -1,
+                            "frozen", Core.Integrations.IsLoaded(Core.Integrations.Optimisations) && Game.RuntimePluginControls.IsGridFrozen(grid.EntityId),
+                            "worldStepped", WorldStepped(grid), "dlc", string.Join(",", dlcs));
+                    }
+                    var friendly = a.FriendlyWithBlock(b) && b.FriendlyWithBlock(a);
+                    var would = a.IsWorking && b.IsWorking && a.Enabled && b.Enabled && friendly && a.IsSmallConnector == b.IsSmallConnector && d * d < 0.35 && angle > 135;
+                    pairs.Add(Obj("m", Math.Round(d, 2), "angle", Math.Round(angle), "friendly", friendly, "wouldLock", would, "a", Side(a), "b", Side(b)));
+                    seen.Add(b.EntityId);
+                    break;
+                }
+            }
+            return Obj("connectors", connectors.Count, "pairs", pairs);
+        }
+
+        /// <summary>
+        /// Frozen grids with a live character (a player or a bot) nearer than the freezer's distance for their kind: what
+        /// should have thawed. Each with the nearest character and how far it is.
+        /// </summary>
+        private static JObject FrozenNearCharacters(double staticM, double dynamicM)
+        {
+            if (!Core.Integrations.IsLoaded(Core.Integrations.Optimisations))
+                return Obj("note", Core.Integrations.MissingReason(Core.Integrations.Optimisations));
+            var characters = MyEntities.GetEntities().OfType<Sandbox.Game.Entities.Character.MyCharacter>()
+                .Where(c => !c.IsDead && !c.MarkedForClose).ToList();
+            var near = new JArray();
+            var frozen = 0;
+            foreach (var grid in MyEntities.GetEntities().OfType<MyCubeGrid>())
+            {
+                if (grid.MarkedForClose || !Game.RuntimePluginControls.IsGridFrozen(grid.EntityId)) continue;
+                frozen++;
+                var at = grid.PositionComp.WorldAABB.Center;
+                var nearest = characters.OrderBy(c => Vector3D.DistanceSquared(c.PositionComp.GetPosition(), at)).FirstOrDefault();
+                if (nearest == null) continue;
+                var d = Vector3D.Distance(nearest.PositionComp.GetPosition(), at);
+                if (d > (grid.IsStatic ? staticM : dynamicM)) continue;
+                near.Add(Obj("grid", grid.DisplayName, "id", grid.EntityId, "static", grid.IsStatic, "blocks", grid.BlocksCount,
+                    "nearest", nearest.DisplayName, "m", Math.Round(d)));
+            }
+            return Obj("characters", characters.Count, "frozen", frozen, "frozenNear", near);
+        }
 
         private static JObject FreezerState()
         {

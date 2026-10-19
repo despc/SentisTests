@@ -117,8 +117,8 @@ namespace SentisTests.Scenarios
         {
             WorldApi.EnsureUnpaused(Name);
             Rig.Kinds.Clear();
-            var anchor = WorldApi.LoadAuthoredGroup(WheelPerfScenario.ResourceName, WorldApi.EntityPrefix + Prefix + "anchor")[0]
-                .PositionAndOrientation.Value.GetMatrix().Translation;
+            // (by the planet the anchor is on, or on the largest one when this world has none there: the stand with the prod's world)
+            var anchor = WorldApi.PlanetAnchor(WorldApi.EntityPrefix + Prefix + "anchor").Translation;
             var planet = MyGamePruningStructure.GetClosestPlanet(anchor);
             Check(planet != null, "no planet");
             _ground = new PlanetGround(planet);

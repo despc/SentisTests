@@ -64,8 +64,8 @@ namespace SentisTests.Scenarios
             _config.Set("EnablePhysicsGuard", false);
 
             // ------------------------------------------------------------- where
-            var anchorM = WorldApi.LoadAuthoredGroup(WheelPerfScenario.ResourceName, WorldApi.EntityPrefix + Prefix + "anchor")[0]
-                .PositionAndOrientation.Value.GetMatrix();
+            // (by the planet the anchor is on, or on the largest one when this world has none there: the stand with the prod's world)
+            var anchorM = WorldApi.PlanetAnchor(WorldApi.EntityPrefix + Prefix + "anchor");
             var planet = MyGamePruningStructure.GetClosestPlanet(anchorM.Translation);
             Check(planet != null, "no planet");
             var up = Vector3D.Normalize(anchorM.Translation - planet.PositionComp.GetPosition());

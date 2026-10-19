@@ -90,14 +90,16 @@ namespace SentisTests.Scenarios
         public override IEnumerator Run()
         {
             WorldApi.EnsureUnpaused(Name);
-            var anchorM = WorldApi.LoadAuthoredGroup(WheelPerfScenario.ResourceName, WorldApi.EntityPrefix + Prefix + "anchor")[0]
-                .PositionAndOrientation.Value.GetMatrix();
+            // (by the planet the anchor is on, or on the largest one when this world has none there: the stand with the prod's world)
+            var anchorM = WorldApi.PlanetAnchor(WorldApi.EntityPrefix + Prefix + "anchor");
             _planet = MyGamePruningStructure.GetClosestPlanet(anchorM.Translation);
             Check(_planet != null, "no planet");
             _ground = new PlanetGround(_planet);
             var planetCentre = _planet.PositionComp.GetPosition();
             var up = Vector3D.Normalize(anchorM.Translation - planetCentre);
-            var east = Vector3D.Normalize(anchorM.Forward - up * Vector3D.Dot(anchorM.Forward, up));
+            var flat = anchorM.Forward - up * Vector3D.Dot(anchorM.Forward, up);
+            // (an anchor moved onto another planet has no turn of its own: its forward may stand straight up)
+            var east = flat.LengthSquared() > 1e-4 ? Vector3D.Normalize(flat) : Vector3D.CalculatePerpendicularVector(up);
             var north = Vector3D.Cross(up, east);
             var planetSite = anchorM.Translation + east * 600;
             var spaceSite = planetCentre + up * ((anchorM.Translation - planetCentre).Length() + SpaceHeightM);
@@ -247,7 +249,15 @@ namespace SentisTests.Scenarios
             {
                 var now = DateTime.UtcNow;
                 if ((now - thawStart).TotalSeconds > WaitStateSeconds + KickWatchSeconds)
-                    throw new ScenarioFailedException(when + ": not thawed: " + string.Join(", ", _rigs.Where(r => r.ThawedAt == null).Select(r => r.Name)));
+                {
+                    // which of each rig's grids stayed frozen, where, and how far from the nearest character
+                    var characters = MyEntities.GetEntities().OfType<Sandbox.Game.Entities.Character.MyCharacter>().Where(c => !c.IsDead).ToList();
+                    string Stuck(Rig r) => r.Name + " [" + string.Join("; ", r.Grids.Select((g, i) => (g, i)).Where(x => !x.g.Closed && FreezerState.IsFrozen(x.g)).Take(4).Select(x =>
+                        "grid " + x.i + " '" + x.g.DisplayName + "' " + x.g.BlocksCount + " blocks, " +
+                        (characters.Count == 0 ? "no character" : characters.Min(c => Vector3D.Distance(c.PositionComp.GetPosition(), x.g.PositionComp.WorldAABB.Center)).ToString("F0") + " m from a character") +
+                        ", " + (_planet != null ? (_planet.GetClosestSurfacePointGlobal(x.g.PositionComp.GetPosition()) - x.g.PositionComp.GetPosition()).Length().ToString("F0") + " m from the surface" : ""))) + "]";
+                    throw new ScenarioFailedException(when + ": not thawed: " + string.Join(", ", _rigs.Where(r => r.ThawedAt == null).Select(Stuck)));
+                }
                 foreach (var rig in _rigs)
                 {
                     if (rig.ThawedAt == null && rig.Grids.All(g => g.Closed || !FreezerState.IsFrozen(g)))
@@ -435,16 +445,33 @@ namespace SentisTests.Scenarios
         {
             var group = WorldApi.LoadAuthoredGroup(ResourceName, WorldApi.EntityPrefix + Prefix + name.Replace(' ', '-').Replace(",", ""));
             var shift = site - authored;
+            // (built by a planet that is not in this world - the stand with the prod's world, its anchor moved onto another
+            // planet: the ground under where it was built is that other planet's from hundreds of kilometres off, and the
+            // copies were put 300 km up. Then the group is turned for its first grid's up to stand up here, and set down)
+            var turn = MatrixD.Identity;
             if (onPlanet)
             {
                 var up = Vector3D.Normalize(site - _planet.PositionComp.GetPosition());
-                shift += up * (Vector3D.Dot(_ground.Ground(site) - _ground.Ground(authored), up) - Vector3D.Dot(site - authored, up) + 0.3);
+                var authoredHere = Vector3D.Distance(_ground.Ground(authored), authored) < 200;
+                if (authoredHere)
+                    shift += up * (Vector3D.Dot(_ground.Ground(site) - _ground.Ground(authored), up) - Vector3D.Dot(site - authored, up) + 0.3);
+                else
+                {
+                    var builtUp = group[0].PositionAndOrientation.Value.GetMatrix().Up;
+                    turn = MatrixD.CreateFromQuaternion(QuaternionD.CreateFromTwoVectors(Vector3D.Normalize(builtUp), up));
+                    shift = _ground.Ground(site) + up * 0.3 - authored;
+                }
             }
             var rig = new Rig { Name = name, Site = site, OnPlanet = onPlanet };
             foreach (var ob in group)
             {
                 if (ob.IsStatic && !withStatic) continue;
                 var m = ob.PositionAndOrientation.Value.GetMatrix();
+                if (turn != MatrixD.Identity)
+                {
+                    var offset = Vector3D.TransformNormal(m.Translation - authored, turn);
+                    m = MatrixD.CreateWorld(authored + offset, Vector3D.TransformNormal(m.Forward, turn), Vector3D.TransformNormal(m.Up, turn));
+                }
                 m.Translation += shift;
                 ob.PositionAndOrientation = new MyPositionAndOrientation(m);
                 foreach (var gear in ob.CubeBlocks.OfType<Sandbox.Common.ObjectBuilders.MyObjectBuilder_LandingGear>())
