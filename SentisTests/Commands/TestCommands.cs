@@ -69,7 +69,7 @@ namespace SentisTests.Commands
                     var skipped = ScenarioRegistry.Unavailable;
                     var queued = TestRunner.EnqueueAll(origin, inspectDelay);
                     Context.Respond("queued " + queued + " scenarios: " +
-                                    string.Join(", ", ScenarioRegistry.AvailableNames) +
+                                    string.Join(", ", ScenarioRegistry.All.Where(i => i.Available && i.InAll).Select(i => i.Name)) +
                                     (interactive
                                         ? string.Format(" (at your position; structures stay ~{0:F0}s for inspection)", inspectDelay)
                                         : "") +

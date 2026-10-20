@@ -13,6 +13,9 @@ namespace SentisTests.Core
         /// <summary>Optional plugins this scenario drives; empty when the game and Torch are enough.</summary>
         public string[] Requires = new string[0];
 
+        /// <summary>False for a scenario "run all" leaves out because another one runs it (a regression check: the suite runs them all).</summary>
+        public bool InAll = true;
+
         /// <summary>Why it cannot run here, or null when it can.</summary>
         public string UnavailableReason => Integrations.MissingReason(Requires);
 
@@ -61,6 +64,13 @@ namespace SentisTests.Core
         }
 
         public static void Needs(string plugin, params string[] names) => Needs(new[] { plugin }, names);
+
+        /// <summary>Leaves the named scenarios out of "run all": another scenario runs them (the regression suite its checks).</summary>
+        public static void OutOfAll(params string[] names)
+        {
+            foreach (var name in names)
+                if (_scenarios.TryGetValue(name, out var info)) info.InAll = false;
+        }
 
         public static IReadOnlyList<string> Names
         {

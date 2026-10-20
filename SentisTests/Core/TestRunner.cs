@@ -111,6 +111,7 @@ namespace SentisTests.Core
             var queued = 0;
             foreach (var info in ScenarioRegistry.All)
             {
+                if (!info.InAll) continue;
                 if (info.Available)
                 {
                     _queue.Enqueue(info.Name);
@@ -141,6 +142,27 @@ namespace SentisTests.Core
             }
 
             Log.Warn("[TEST] SKIPPED {0} - {1}", name, reason);
+            WriteReport(result);
+        }
+
+        /// <summary>
+        /// A result of a scenario run inside another one (a check of the regression suite): recorded and written to the
+        /// log as the runner writes its own, so it is found by its name like any scenario's.
+        /// </summary>
+        public static void Record(TestResult result)
+        {
+            lock (_historyLock)
+            {
+                _history.Add(result);
+            }
+
+            var line = "[TEST] " + result;
+            if (result.Verdict == TestVerdict.Passed)
+                Log.Info(line);
+            else if (result.Verdict == TestVerdict.Skipped)
+                Log.Warn(line);
+            else
+                Log.Error(line);
             WriteReport(result);
         }
 

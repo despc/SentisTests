@@ -116,6 +116,8 @@ namespace SentisTests.Game
             public double AngularSpeed;
             // a path of its own (seconds -> where), instead of the circle in the world's XZ plane
             public Func<double, Vector3D> Path;
+            /// <summary>The character is left to its own controls (walks, flies, sits): not held at its point, the client's position follows it.</summary>
+            public bool Free;
 
             public readonly ConcurrentQueue<ServerMessage> Incoming = new ConcurrentQueue<ServerMessage>();
             public readonly List<ServerMessage> Downlink = new List<ServerMessage>();
@@ -279,6 +281,24 @@ namespace SentisTests.Game
 
         /// <summary>Seconds since the clients started, as the paths take them.</summary>
         public static double Seconds => _frames / 60.0;
+
+        /// <summary>
+        /// Lets the client's character go (it walks, flies, sits in a seat on its own controls; the client's place follows
+        /// it), or holds it again where it stands.
+        /// </summary>
+        public static void SetFree(int index, bool free)
+        {
+            var client = _clients[index];
+            if (!free && client.Free)
+            {
+                var character = client.Player?.Character;
+                if (character != null && !character.MarkedForClose) client.Center = character.PositionComp.GetPosition();
+                client.Radius = 0;
+                client.AngularSpeed = 0;
+                client.Path = null;
+            }
+            client.Free = free;
+        }
 
         public static void MoveTo(int index, Vector3D center)
         {
@@ -823,6 +843,12 @@ namespace SentisTests.Game
 
         private static Vector3D TargetPosition(FakeClient client, double seconds)
         {
+            if (client.Free)
+            {
+                var character = client.Player?.Character;
+                if (character != null && !character.MarkedForClose) return character.PositionComp.GetPosition();
+                return client.Center;
+            }
             if (client.Path != null) return client.Path(seconds);
             var angle = client.Phase + client.AngularSpeed * seconds;
             return client.Center + new Vector3D(Math.Cos(angle), 0, Math.Sin(angle)) * client.Radius;
@@ -830,6 +856,7 @@ namespace SentisTests.Game
 
         private static void SteerCharacter(FakeClient client, double seconds)
         {
+            if (client.Free) return;
             var character = client.Player?.Character;
             var physics = character?.Physics;
             if (physics == null || character.MarkedForClose || character.IsDead) return;

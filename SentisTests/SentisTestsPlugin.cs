@@ -290,6 +290,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(MixedWeldScenario.ScenarioName, () => new MixedWeldScenario());
                 ScenarioRegistry.Register(HandWeldScenario.ScenarioName, () => new HandWeldScenario());
                 ScenarioRegistry.Register(ProductionScenario.ScenarioName, () => new ProductionScenario());
+                Regression.Registry.RegisterAll();
                 ScenarioRegistry.Register(ProductionFreezerStressScenario.ScenarioName,
                     () => new ProductionFreezerStressScenario());
 
