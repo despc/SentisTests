@@ -27,13 +27,16 @@ namespace SentisTests.Regression
             Add(() => new PlaceBlockCheck());
             Add(() => new PlaceGridCheck());
             Add(() => new HandWeldCheck());
+            Add(() => new WeldWithoutComponentsCheck());
             Add(() => new HandGrindCheck());
             Add(() => new ShipWeldCheck());
             Add(() => new ShipGrindCheck());
             Add(() => new ShipWeldCheck(VRage.Game.MyCubeSize.Small));
+            Add(() => new WelderConveyorCheck());
             Add(() => new ShipGrindCheck(VRage.Game.MyCubeSize.Small));
             Add(() => new HandToolTiersCheck());
             Add(() => new ProjectorCheck());
+            Add(() => new SubgridProjectionCheck());
             Add(() => new PaintCheck());
             Add(() => new HandDrillCheck());
             Add(() => new ShipDrillCheck());
@@ -41,8 +44,12 @@ namespace SentisTests.Regression
             // terminal, inventories
             Add(() => new TerminalCheck());
             Add(() => new InventoryTransferCheck());
+            Add(() => new CargoCapacityCheck());
             Add(() => new OwnershipCheck());
+            Add(() => new FactionMembershipCheck());
+            Add(() => new SaveRoundTripCheck());
             Add(() => new ProgrammableBlockCheck());
+            Add(() => new ProgrammableSelfRunCheck());
             Add(() => new ButtonPanelCheck());
             Add(() => new ConveyorCheck());
             Add(() => new SorterCheck());
@@ -58,15 +65,29 @@ namespace SentisTests.Regression
             Add(() => new WindCheck());
             Add(() => new HydrogenCheck());
             Add(() => new HydrogenThrustCheck());
+            Add(() => new TankStockpileCheck());
+            Add(() => new ThrusterFlameCheck());
             Add(() => new BottleCheck());
             Add(() => new RefineryCheck());
             Add(() => new AssemblerCheck());
             Add(() => new SurvivalKitCheck());
+            Add(() => new RefineryCheck("Blast Furnace"));
+            Add(() => new UpgradeModulesCheck());
+            Add(() => new AssemblerRepeatCheck());
+            Add(() => new CooperativeAssemblyCheck());
+            Add(() => new SurvivalKitStoneCheck());
+            Add(() => new GeneratorPullsIceCheck());
+            Add(() => new TankRefillCheck());
+            Add(() => new OxygenFarmCheck());
+            Add(() => new GasTanksFillCheck());
             // movement
             Add(() => new JetpackCheck());
             Add(() => new LifeSupportCheck());
             Add(() => new WalkCheck());
+            Add(() => new LadderCheck());
+            Add(() => new ParachuteCheck());
             Add(() => new ShipFlightCheck());
+            Add(() => new OverridesCheck());
             Add(() => new HoverCheck());
             Add(() => new RotorCheck());
             Add(() => new PistonCheck());
@@ -75,6 +96,11 @@ namespace SentisTests.Regression
             Add(() => new GravityGeneratorCheck());
             Add(() => new WheelsCheck());
             Add(() => new JumpDriveCheck());
+            Add(() => new JumpDriveChargeCheck());
+            Add(() => new LandingGearShipCheck());
+            Add(() => new ConnectorThrowOutCheck());
+            Add(() => new SmallConnectorThrowOutCheck());
+            Add(() => new ConvertGridCheck());
             // weapons, damage
             Add(() => new TurretCheck());
             Add(() => new RifleCheck());
@@ -85,7 +111,16 @@ namespace SentisTests.Regression
             Add(() => new CollisionCubesCheck());
             Add(() => new CollisionCharacterCheck());
             Add(() => new CollisionGroundCheck());
+            Add(() => new PlanetTunnelCheck());
             Add(() => new CollisionDockedCheck());
+            Add(() => new TurretRelationsCheck());
+            Add(() => new TurretControllerCheck());
+            Add(() => new FunctionalThresholdCheck());
+            Add(() => new HackCheck());
+            Add(() => new FallDamageCheck());
+            Add(() => new VacuumCheck());
+            Add(() => new DeathLootCheck());
+            Add(() => new CraterCheck());
             Add(() => new WeaponBlocksCheck());
             Add(() => new HandWeaponsCheck());
             Add(() => new SafeZoneCheck());
@@ -101,13 +136,34 @@ namespace SentisTests.Regression
             Add(() => new TimerCheck());
             Add(() => new SensorCheck());
             Add(() => new MedicalRoomCheck());
+            Add(() => new MedicalRechargeCheck());
+            Add(() => new SurvivalKitHealCheck());
+            Add(() => new AirtightDoorCheck());
             Add(() => new RespawnCheck());
+            Add(() => new RespawnCheck("SurvivalKit/SurvivalKitLarge"));
+            Add(() => new RespawnCheck("RespawnSpace"));
+            Add(() => new RespawnCheck("RespawnRover"));
+            Add(() => new CryoChamberCheck());
+            Add(() => new SeatRechargeCheck());
+            Add(() => new CameraRaycastCheck());
+            Add(() => new AntennaMessageCheck());
+            Add(() => new RemoteAutopilotCheck());
+            Add(() => new LaserAntennaCheck());
+            Add(() => new EventControllerCheck());
+            Add(() => new AiFlightCheck());
+            Add(() => new StoreCheck());
+            Add(() => new AtmCheck());
+            Add(() => new ContractCheck());
+            Add(() => new WeatherCheck());
+            Add(() => new MeteorCheck());
 
             foreach (var entry in All)
                 ScenarioRegistry.Register(entry.Name, () => entry.Make());
             // "run all" runs them in the suite, at once, not one by one as well
             ScenarioRegistry.OutOfAll(All.Select(e => e.Name).ToArray());
             ScenarioRegistry.Register(RegressionSuite.ScenarioName, () => new RegressionSuite());
+            // 100 ships into the planet at once: the load is its own, run alone
+            ScenarioRegistry.Register(PlanetTunnelCheck.MassName, () => new PlanetTunnelCheck(100));
         }
     }
 }

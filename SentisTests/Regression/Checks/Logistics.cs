@@ -154,7 +154,11 @@ namespace SentisTests.Regression.Checks
         }
     }
 
-    /// <summary>Two grids with merge blocks face to face, both on: they become one grid.</summary>
+    /// <summary>
+    /// Two grids touching only by their merge blocks, face to face, both on: they become one grid. A merge block switched
+    /// off, it parts in two again; the part that was the ship, static now as the station it joined, turned into a ship
+    /// again, moves.
+    /// </summary>
     public sealed class MergeCheck : RegressionCheck
     {
         public override string Name => Prefix + "merge";
@@ -162,26 +166,56 @@ namespace SentisTests.Regression.Checks
         protected override IEnumerator Check()
         {
             yield return Arrive(Site.At(6, 6, 0));
-            var station = Build("merge-station", Site.Origin, true,
-                new Part("MergeBlock/LargeShipMergeBlock", 0, 0, 0),
-                new Part("CubeBlock/LargeBlockArmorBlock", 0, -1, 0));
-            var merge = station.GetCubeBlock(Vector3I.Zero).FatBlock;
-            var forwardField = merge.GetType().GetField("m_forward", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            // which face of the merge block merges: read off one built out of the way
+            var probe = Build("merge-probe", Site.Origin + Site.Up * 40, true, new Part("MergeBlock/LargeShipMergeBlock", 0, 0, 0));
+            var probeMerge = probe.GetCubeBlock(Vector3I.Zero).FatBlock;
+            var forwardField = probeMerge.GetType().GetField("m_forward", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
             Check(forwardField != null, "MyShipMergeBlock.m_forward is not in this game");
+            var faceInGrid = Base6Directions.GetIntVector(probeMerge.Orientation.TransformDirection((Base6Directions.Direction)forwardField.GetValue(probeMerge)));
+            probe.Close();
+            // each grid's armor behind its merge block: the two touch by the merge blocks alone
+            Part[] Parts() => new[]
+            {
+                new Part("MergeBlock/LargeShipMergeBlock", 0, 0, 0),
+                new Part("CubeBlock/LargeBlockArmorBlock", -faceInGrid.X, -faceInGrid.Y, -faceInGrid.Z),
+            };
+            var station = Build("merge-station", Site.Origin, true, Parts());
+            var merge = station.GetCubeBlock(Vector3I.Zero).FatBlock;
             var face = merge.WorldMatrix.GetDirectionVector((Base6Directions.Direction)forwardField.GetValue(merge));
-            // the ship's merge block face to face: its grid the station's turned half round about an axis across the face
+            // the ship face to face: its grid the station's turned half round about an axis across the face
             var across = Math.Abs(Vector3D.Dot(face, Site.Up)) > 0.9 ? Site.Right : Site.Up;
             var turn = MatrixD.CreateFromAxisAngle(across, Math.PI);
             var shipAt = merge.PositionComp.GetPosition() + face * 2.5;
-            var ship = Build("merge-ship", shipAt, false, new[]
-            {
-                new Part("MergeBlock/LargeShipMergeBlock", 0, 0, 0),
-                new Part("CubeBlock/LargeBlockArmorBlock", 0, -1, 0),
-            }, forward: Vector3D.TransformNormal(Site.Forward, turn), up: Vector3D.TransformNormal(Site.Up, turn));
+            var ship = Build("merge-ship", shipAt, false, Parts(),
+                forward: Vector3D.TransformNormal(Site.Forward, turn), up: Vector3D.TransformNormal(Site.Up, turn));
             var blocks = station.BlocksCount;
             yield return Until(() => station.BlocksCount, v => v >= blocks + 2, "the ship's blocks in the station's grid", 30,
                 () => "ship " + (ship.MarkedForClose ? "closed" : "apart, " + F(Vector3D.Distance(ship.PositionComp.GetPosition(), merge.PositionComp.GetPosition())) + " m"));
-            Result("merged: the station's grid has " + station.BlocksCount + " blocks, the ship's grid is " + (ship.MarkedForClose ? "gone" : "still there"));
+            var merged = station.BlocksCount;
+
+            // the station's merge block off: the grid parts where the merge blocks met
+            Switch((MyCubeBlock)merge, false);
+            yield return Until(() => station.BlocksCount, v => v <= merged - 2, "the grid parted with the merge block off", 15, () => station.BlocksCount + " blocks in the station's grid");
+            var part = MyEntities.GetEntities().OfType<MyCubeGrid>().FirstOrDefault(g => g != station && !g.MarkedForClose &&
+                                                                                          Vector3D.Distance(g.PositionComp.WorldAABB.Center, shipAt) < 6 &&
+                                                                                          g.GetFatBlocks().Any(b => b.BlockDefinition.Id.SubtypeName == "LargeShipMergeBlock"));
+            Check(part != null, "no grid of the ship's merge block came off the station");
+            Track(part);
+            var wasStatic = part.IsStatic;
+            if (wasStatic)
+            {
+                var reason = typeof(MyCubeGrid).GetNestedType("MyTestDynamicReason", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+                Request(part, "OnConvertedToShipRequest", Enum.Parse(reason, "ConvertToShip"));
+                yield return Until(() => part.IsStatic ? 0 : 1, v => v > 0, "the part that came off a ship again", 5);
+            }
+            yield return null;
+            part.Physics.LinearVelocity = (Vector3)(face * 2);
+            var from = part.PositionComp.GetPosition();
+            yield return Seconds(1);
+            var moved = Vector3D.Distance(from, part.PositionComp.GetPosition());
+            Check(moved > 1, "the part that came off moved " + F(moved) + " m in 1 s pushed at 2 m/s");
+            Result("merged into " + merged + " blocks; the merge block off, parted in two" + (wasStatic ? ", the part off static and turned into a ship again" : "") +
+                   ", it moved " + F(moved) + " m");
         }
     }
 }

@@ -17,6 +17,11 @@ namespace SentisTests.Regression.Checks
             MyDefinitionManager.Static.GetBlueprintDefinition(new MyDefinitionId(typeof(MyObjectBuilder_BlueprintDefinition), subtype))
             ?? throw new Core.ScenarioSkippedException("no blueprint " + subtype + " in this game");
 
+        /// <summary>The blueprint of a production block that takes the item (its iron ore one).</summary>
+        public static MyBlueprintDefinitionBase Taking(MyProductionBlock block, MyDefinitionId item) =>
+            ((MyProductionBlockDefinition)block.BlockDefinition).BlueprintClasses.SelectMany(c => c).FirstOrDefault(b => Takes(b, item) > 0)
+            ?? throw new Core.ScenarioFailedException(block.BlockDefinition.Id.SubtypeName + " has no blueprint taking " + item.SubtypeName);
+
         /// <summary>How much of an item one run of the blueprint takes.</summary>
         public static double Takes(MyBlueprintDefinitionBase blueprint, MyDefinitionId item) =>
             blueprint.Prerequisites.Where(p => p.Id == item).Sum(p => (double)p.Amount);
@@ -28,35 +33,40 @@ namespace SentisTests.Regression.Checks
 
     /// <summary>
     /// A refinery, powered, turns iron ore into ingots at the yield of its blueprint and its own efficiency: what came out
-    /// is what the ore it took gives, no more, no less (within 2 %).
+    /// is what the ore it took gives, no more, no less (within 2 %). The large refinery, and the basic one (the blast
+    /// furnace).
     /// </summary>
     public sealed class RefineryCheck : RegressionCheck
     {
-        public override string Name => Prefix + "refinery";
+        private readonly string _subtype;
+
+        public RefineryCheck(string subtype = "LargeRefinery") { _subtype = subtype; }
+
+        public override string Name => Prefix + (_subtype == "LargeRefinery" ? "refinery" : "basic_refinery");
 
         protected override IEnumerator Check()
         {
             yield return Arrive(Site.At(0, 8, -8));
             var grid = Build("refinery", Site.Origin, true,
                 new Part("Reactor/LargeBlockSmallGenerator", 0, 0, 0),
-                new Part("Refinery/LargeRefinery", 2, 0, 0));
+                new Part("Refinery/" + _subtype, 2, 0, 0));
             Put(Inventory(Block<MyReactor>(grid)), "Ingot/Uranium", 5);
             var refinery = Block<MyRefinery>(grid);
             const double ore = 1000;
             Put(refinery.InputInventory, "Ore/Iron", ore);
 
-            yield return Until(() => Amount(refinery.OutputInventory, "Ingot/Iron"), v => v >= 50, "iron ingots out of the refinery", 120);
+            yield return Until(() => Amount(refinery.OutputInventory, "Ingot/Iron"), v => v >= 50, "iron ingots out of the refinery", 120, () => State(refinery));
             refinery.Enabled = false;
             yield return Seconds(1);
             var used = ore - Amount(refinery.InputInventory, "Ore/Iron");
             var made = Amount(refinery.OutputInventory, "Ingot/Iron");
-            var blueprint = Blueprints.Get("IronOreToIngot");
+            var blueprint = Blueprints.Taking(refinery, RegressionCheck.Item("Ore/Iron"));
             var perOre = Blueprints.Gives(blueprint, RegressionCheck.Item("Ingot/Iron")) / Blueprints.Takes(blueprint, RegressionCheck.Item("Ore/Iron"));
             var efficiency = ((MyRefineryDefinition)refinery.BlockDefinition).MaterialEfficiency * refinery.UpgradeValues["Effectiveness"];
             var expected = used * perOre * efficiency;
             Check(Math.Abs(made - expected) <= expected * 0.02 + 0.01,
                 "the refinery made " + F(made) + " kg of iron from " + F(used) + " kg of ore; its blueprint and efficiency give " + F(expected));
-            Result(F(used) + " kg of iron ore -> " + F(made) + " kg of ingots (" + F(perOre) + " x " + F(efficiency) + ", as it should)");
+            Result(_subtype + ": " + F(used) + " kg of iron ore -> " + F(made) + " kg of ingots (" + F(perOre) + " x " + F(efficiency) + ", as it should)");
         }
     }
 

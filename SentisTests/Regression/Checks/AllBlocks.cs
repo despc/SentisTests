@@ -57,7 +57,9 @@ namespace SentisTests.Regression.Checks
                 var placed = new List<(MyCubeBlockDefinition Definition, MyCubeGrid Grid, MyCubeBlock Block)>();
                 foreach (var (definition, i) in definitions.Skip(start).Take(batch).Select((d, i) => (d, i)))
                 {
-                    var at = Site.Origin + Site.Right * ((i % 6) * 30) + Site.Forward * ((i / 6) * 30);
+                    // each batch a layer of its own: the last batch's grids are closed but may not be gone yet (deletes wait
+                    // their turn under load), and a wheel is not put down where something stands
+                    var at = Site.Origin + Site.Right * ((i % 6) * 30) + Site.Forward * ((i / 6) * 30) + Site.Up * (start / batch * 40);
                     MyCubeGrid grid;
                     try
                     {
@@ -96,7 +98,9 @@ namespace SentisTests.Regression.Checks
                 foreach (var p in placed)
                     if (p.Block is Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase mechanical && mechanical.TopGrid == null)
                         Request(mechanical, "DoRecreateTop", Identity, Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase.MyTopBlockSize.Normal, true);
-                yield return Seconds(1);
+                // the heads are made as grids of their own a while later (longer under load): waited for, each
+                for (var f = Frames(15); f > 0 && placed.Any(p => p.Block is Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase m && m.TopGrid == null); f--)
+                    yield return null;
                 foreach (var p in placed)
                 {
                     if (p.Block is Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase mechanical && mechanical.TopGrid != null) Track(mechanical.TopGrid);
@@ -113,7 +117,7 @@ namespace SentisTests.Regression.Checks
                         var what = NeedMore.TryGetValue(p.Definition.Id.TypeId.ToString(), out var need) ? need
                             : p.Block is MyThrust && p.Definition.Id.SubtypeName.Contains("Hydrogen") ? "hydrogen (reg_hydrogen_thrust flies on it)" : null;
                         if (what != null) needing.Add(Short(p.Definition) + " (" + what + ")");
-                        else broken.Add(Short(p.Definition) + ": on and powered and not working (" + State(p.Block) + ")");
+                        else broken.Add(Short(p.Definition) + ": on and powered and not working (" + State(p.Block) + Around(p.Block) + ")");
                     }
                     else working++;
                 }
@@ -133,6 +137,16 @@ namespace SentisTests.Regression.Checks
             Note("blocks that need more than power: " + string.Join(", ", needing));
             Check(broken.Count == 0, broken.Count + " of " + definitions.Count + " blocks do not do what they should: " + string.Join(" | ", broken));
             Result(definitions.Count + " " + _size + " functional blocks: " + working + " work on power and stop when off, " + needing.Count + " need more than power");
+        }
+
+        /// <summary>For a mechanical block left without its head: what else is within 5 m of it (a head the game would not put down there).</summary>
+        private static string Around(MyCubeBlock block)
+        {
+            if (!(block is Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase m) || m.TopGrid != null) return "";
+            var at = block.PositionComp.GetPosition();
+            var sphere = new VRageMath.BoundingSphereD(at, 5);
+            var near = Sandbox.Game.Entities.MyEntities.GetTopMostEntitiesInSphere(ref sphere).Where(e => e != block.CubeGrid).ToList();
+            return "; within 5 m: " + (near.Count == 0 ? "nothing" : string.Join(", ", near.Take(5).Select(e => e.DisplayName ?? e.GetType().Name)));
         }
 
         private static string Short(MyCubeBlockDefinition definition) => definition.Id.TypeId.ToString().Replace("MyObjectBuilder_", "") + "/" + definition.Id.SubtypeName;

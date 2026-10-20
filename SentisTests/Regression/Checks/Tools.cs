@@ -50,10 +50,14 @@ namespace SentisTests.Regression.Checks
                 yield return null;
                 var head = Body.GetHeadMatrix(false).Translation - Body.PositionComp.GetPosition();
                 StandAt(spot - head, spot - head + Site.Forward);
-                yield return WaitForTicks(3);
+                // the tool looks for its target on its own update: a few frames, more under load
+                for (var f = 0; f < 10 && tool != null && tool.GetTargetBlock() != target; f++)
+                    yield return null;
                 if (tool == null || tool.GetTargetBlock() == target) yield break;
             }
-            Check(false, "the tool aims at no place in front of the block: it sees " + (tool?.GetTargetBlock()?.BlockDefinition.Id.SubtypeName ?? "nothing"));
+            var seen = tool?.GetTargetBlock();
+            Check(false, "the tool aims at no place in front of the block: it sees " + (seen == null ? "nothing" : seen.BlockDefinition.Id.SubtypeName + " at " + seen.Position +
+                                                                                  (seen.CubeGrid == target.CubeGrid ? " of the block's grid" : " of " + seen.CubeGrid.DisplayName) + ", the block at " + target.Position));
         }
 
         /// <summary>The trigger pulled (<c>MyCharacter.ShootBeginCallback</c>), straight ahead of the player's head.</summary>
@@ -81,13 +85,14 @@ namespace SentisTests.Regression.Checks
         protected IEnumerator Pull()
         {
             var seen = new List<string>();
-            var started = DateTime.UtcNow;
-            while ((DateTime.UtcNow - started).TotalSeconds < 15)
+            // 15 s of game time: a reload runs on it, and under load the game is slower than the clock
+            for (var frames = Frames(15); frames > 0; )
             {
                 Body.CurrentWeapon.CanShoot(MyShootActionEnum.PrimaryAction, Identity, out var status);
                 if (status == MyGunStatusEnum.OK)
                 {
                     Trigger();
+                    frames -= 5;
                     yield return WaitForTicks(5);
                     seen.Add("character " + Body.IsShooting(MyShootActionEnum.PrimaryAction) + ", " + GunState().Split(';')[0]);
                     // a tool holds on while the button is held; a rifle fires its burst and stops
@@ -96,11 +101,12 @@ namespace SentisTests.Regression.Checks
                 else
                 {
                     seen.Add("waiting: " + status);
+                    frames -= 10;
                     yield return WaitForTicks(10);
                 }
             }
             Note("the trigger: " + string.Join(" | ", seen.Distinct()));
-            Check(Body.IsShooting(MyShootActionEnum.PrimaryAction) || Body.CurrentWeapon.IsShooting, "the trigger did not take in 15 s: " + GunState());
+            Check(Body.IsShooting(MyShootActionEnum.PrimaryAction) || Body.CurrentWeapon.IsShooting, "the trigger did not take in 15 s of game time: " + GunState());
         }
 
         /// <summary>What the gun in the player's hands says of shooting now, for a failure.</summary>

@@ -9,6 +9,7 @@ using Sandbox.Game.World;
 using SentisTests.Game;
 using VRage;
 using VRage.Game;
+using Sandbox.ModAPI.Interfaces;
 using VRageMath;
 using Direction = VRageMath.Base6Directions.Direction;
 
@@ -16,7 +17,8 @@ namespace SentisTests.Regression.Checks
 {
     /// <summary>
     /// A six-wheeled rover (wheel_perf's) on a floor on a planet, driven by its pilot: forward on the keys, it rolls on
-    /// its wheels along the floor.
+    /// its wheels along the floor; forward and right, its wheels steer and it turns; on the handbrake the pilot puts on,
+    /// forward moves it nowhere.
     /// </summary>
     public sealed class WheelsCheck : RegressionCheck
     {
@@ -25,7 +27,7 @@ namespace SentisTests.Regression.Checks
 
         protected override IEnumerator Check()
         {
-            var pad = Pad("wheels-pad", Site.Origin, 9);
+            var pad = Pad("wheels-pad", Site.Origin, 14);
             var floor = pad.PositionComp.GetPosition() + Site.Up * 1.25;
             yield return Arrive(floor + Site.Up * 3 + Site.Right * 20);
             var group = WorldApi.LoadAuthoredGroup(Scenarios.WheelPerfScenario.ResourceName, WorldApi.EntityPrefix + "reg-rover");
@@ -60,6 +62,9 @@ namespace SentisTests.Regression.Checks
             // down on its wheels and still before the drive
             yield return Seconds(1);
             yield return Until(() => Motion.Speed(rover), v => v < 1, "the rover settling on the floor, m/s", 30);
+            // the wheels held to 20 km/h in their terminals: the drive, the stop and the turn all on the floor
+            foreach (var wheel in Blocks<MyMotorSuspension>(rover))
+                ((Sandbox.ModAPI.IMyTerminalBlock)wheel).SetValueFloat("Speed Limit", 20f);
             yield return Sit(seat);
             var from = rover.PositionComp.WorldAABB.Center;
             var standing = Vector3D.Dot(from - floor, Site.Up);
@@ -70,8 +75,36 @@ namespace SentisTests.Regression.Checks
                             string.Join("; ", Blocks<MyMotorSuspension>(rover).Select(w => State(w) + ", wheel " + (((Sandbox.ModAPI.Ingame.IMyMechanicalConnectionBlock)w).IsAttached ? "on" : "off"))) +
                             "; wheels in the seat " + ((Sandbox.ModAPI.Ingame.IMyShipController)seat).ControlWheels + ", handbrake " + ((Sandbox.ModAPI.Ingame.IMyShipController)seat).HandBrake + ")");
             Check(height > 0 && height > standing - 2, "the rover went through the floor: its middle " + F(height) + " m over it, from " + F(standing));
-            yield return HoldShip(3, seat, new Vector3(0, 0, 1));
-            Result("rover rolled " + F(gone) + " m on its wheels in 3 s, on the floor");
+            // braked to a stop: space puts the brakes on in the pilot's game (MyShipController.TryEnableBrakes), and each
+            // wheel's brake comes to the server in its own sync
+            Func<double> speed = () => { ShipKeys(seat, Vector3.Zero); seat.TryEnableBrakes(true); return Motion.Speed(rover); };
+            yield return Until(speed, v => v < 0.5, "the rover braking to a stop, m/s", 20, () => "its middle " + F(Vector3D.Dot(rover.PositionComp.WorldAABB.Center - floor, Site.Up)) + " m over the floor, brakes " + seat.AreBreaksOn);
+            seat.TryEnableBrakes(false);
+            // forward and right on the keys: the front wheels steer, the rover turns
+            var heading = Vector3D.Reject(rover.WorldMatrix.Forward, Site.Up);
+            var steer = 0.0;
+            for (var f = Frames(3); f > 0; f--)
+            {
+                ShipKeys(seat, new Vector3(1, 0, -1));
+                steer = Math.Max(steer, Blocks<MyMotorSuspension>(rover).Max(w => Math.Abs((double)((Sandbox.ModAPI.Ingame.IMyMotorSuspension)w).SteerAngle)));
+                yield return null;
+            }
+            var turned = Motion.Angle(heading, Vector3D.Reject(rover.WorldMatrix.Forward, Site.Up));
+            Check(steer > 0.05, "right on the keys steered no wheel (largest angle " + F(MathHelper.ToDegrees(steer)) + " degrees)");
+            Check(turned > 5, "3 s of forward and right turned the rover " + F(turned) + " degrees (wheels steered up to " + F(MathHelper.ToDegrees(steer)) + ")");
+            // stopped again, the handbrake on as the pilot puts it on: forward on the keys moves it nowhere
+            yield return Until(speed, v => v < 0.5, "the rover braking to a stop after the turn, m/s", 20, () => "its middle " + F(Vector3D.Dot(rover.PositionComp.WorldAABB.Center - floor, Site.Up)) + " m over the floor, brakes " + seat.AreBreaksOn);
+            seat.TryEnableBrakes(false);
+            Request(rover, "ToggleHandbrakeRequest");
+            Check(((Sandbox.ModAPI.Ingame.IMyShipController)seat).HandBrake, "the handbrake did not go on");
+            var parked = rover.PositionComp.WorldAABB.Center;
+            yield return HoldShip(3, seat, new Vector3(0, 0, -1));
+            var crept = Vector3D.Reject(rover.PositionComp.WorldAABB.Center - parked, Site.Up).Length();
+            Check(crept < 1, "with the handbrake on 3 s of forward rolled the rover " + F(crept) + " m");
+            Request(rover, "ToggleHandbrakeRequest");
+            Check(!((Sandbox.ModAPI.Ingame.IMyShipController)seat).HandBrake, "the handbrake did not come off");
+            Result("rover rolled " + F(gone) + " m on its wheels in 3 s, on the floor; steered " + F(turned) + " degrees (wheels up to " + F(MathHelper.ToDegrees(steer)) +
+                   "); on the handbrake it rolled " + F(crept) + " m");
         }
     }
 
@@ -99,20 +132,43 @@ namespace SentisTests.Regression.Checks
         }
     }
 
-    /// <summary>A player dies and asks to respawn at their medical room: a new astronaut of theirs stands at it.</summary>
+    /// <summary>
+    /// A player dies and asks to respawn: at their medical room or their survival kit a new astronaut of theirs stands at
+    /// it; in a respawn ship (in space, or a rover on the planet), a new astronaut sits in a ship of their own.
+    /// </summary>
     public sealed class RespawnCheck : RegressionCheck
     {
-        public override string Name => Prefix + "respawn";
+        private readonly string _at;
+
+        /// <param name="at">the block respawned at, or a respawn ship's id ("RespawnSpace", "RespawnRover" - on a planet)</param>
+        public RespawnCheck(string at = "MedicalRoom/LargeMedicalRoom") { _at = at; }
+
+        private bool Ship => !_at.Contains("/");
+
+        public override string Name => Prefix + "respawn" + (_at.StartsWith("MedicalRoom") ? "" : _at.StartsWith("SurvivalKit") ? "_survival_kit" : Rover ? "_rover" : "_ship");
+
+        private bool Rover => _at == "RespawnRover";
+
+        public override SiteKind Kind => Rover ? SiteKind.Planet : SiteKind.Space;
         protected override bool NeedsDamage => true;
 
         protected override IEnumerator Check()
         {
+            if (Ship)
+            {
+                SkipUnless(MySession.Static.Settings.EnableRespawnShips, "respawn ships are off in this world");
+                SkipUnless(Sandbox.Definitions.MyDefinitionManager.Static.GetRespawnShipDefinition(_at) != null, "no respawn ship " + _at + " in this game");
+            }
             yield return Arrive(Site.At(0, 6, -10));
-            var grid = Build("respawn", Site.Origin, true,
-                new Part("MedicalRoom/LargeMedicalRoom", 0, 0, 0),
-                new Part("BatteryBlock/LargeBlockBatteryBlock", 2, 0, 0).With(b => Motion.Charged(b)));
-            var room = Block<SpaceEngineers.Game.Entities.Blocks.MyMedicalRoom>(grid);
-            yield return Until(() => room.IsWorking ? 1 : 0, v => v > 0, "the medical room working", 10, () => State(room));
+            MyCubeBlock at = null;
+            if (!Ship)
+            {
+                var grid = Build("respawn", Site.Origin, true,
+                    new Part(_at, 0, 0, 0),
+                    new Part("BatteryBlock/LargeBlockBatteryBlock", 2, 0, 0).With(b => Motion.Charged(b)));
+                at = grid.GetCubeBlock(Vector3I.Zero).FatBlock;
+                yield return Until(() => at.IsWorking ? 1 : 0, v => v > 0, "the " + _at + " working", 10, () => State(at));
+            }
             var body = Body;
             body.DoDamage(1000f, MyDamageType.Suicide, true, attackerId: 0);
             yield return Until(() => body.IsDead ? 1 : 0, v => v > 0, "the player dead", 10);
@@ -120,16 +176,32 @@ namespace SentisTests.Regression.Checks
             {
                 JoinGame = false,
                 NewIdentity = false,
-                RespawnEntityId = room.EntityId,
+                // a rover is asked for on the planet chosen in the respawn screen
+                RespawnEntityId = at?.EntityId ?? (Rover ? Site.Planet.EntityId : 0),
+                RespawnShipId = Ship ? _at : null,
                 PlayerSerialId = 0,
                 Color = Color.Red,
             };
             Request(typeof(Sandbox.Game.Multiplayer.MyPlayerCollection), "OnRespawnRequest", message);
-            yield return Until(() => Body != null && Body != body && !Body.IsDead ? 1 : 0, v => v > 0, "a new astronaut", 20);
+            var pods = new HashSet<long>(MyEntities.GetEntities().OfType<MyCubeGrid>().Select(g => g.EntityId));
+            yield return Until(() => Body != null && Body != body && !Body.IsDead ? 1 : 0, v => v > 0, "a new astronaut", Ship ? 60 : 20,
+                () => "the player's character " + (Player.Character == null ? "none" : Player.Character == body ? "the dead one" : Player.Character.EntityId + (Player.Character.IsDead ? " dead" : "")) +
+                      ", identity dead " + Player.Identity.IsDead + ", grids of the player's " +
+                      MyEntities.GetEntities().OfType<MyCubeGrid>().Count(g => g.BigOwners.Contains(Identity)) + ", new grids " +
+                      string.Join(", ", MyEntities.GetEntities().OfType<MyCubeGrid>().Where(g => !pods.Contains(g.EntityId)).Select(g => g.DisplayName).Take(5)));
             Track(Body);
-            var off = Vector3D.Distance(Body.PositionComp.GetPosition(), room.PositionComp.GetPosition());
-            Check(off < 10, "the new astronaut is " + F(off) + " m from the medical room");
-            Result("died and respawned " + F(off) + " m from the medical room");
+            if (Ship)
+            {
+                yield return Until(() => Body.Parent is MyCockpit ? 1 : 0, v => v > 0, "the new astronaut in the ship's seat", 10);
+                var pod = ((MyCockpit)Body.Parent).CubeGrid;
+                Track(pod);
+                Check(pod.BigOwners.Contains(Identity), "the respawn ship is not the player's");
+                Result("died and respawned in " + _at + " (" + pod.DisplayName + ", " + pod.BlocksCount + " blocks)");
+                yield break;
+            }
+            var off = Vector3D.Distance(Body.PositionComp.GetPosition(), at.PositionComp.GetPosition());
+            Check(off < 10, "the new astronaut is " + F(off) + " m from the " + _at);
+            Result("died and respawned " + F(off) + " m from the " + _at);
         }
     }
 

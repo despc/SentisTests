@@ -126,14 +126,13 @@ namespace SentisTests.Regression.Checks
             Check(outside < 0.01, "gravity 500 m off the generator: " + F(outside));
             FakeClients.SetFree(Me, true);
             var fall = 0.0;
-            var started = DateTime.UtcNow;
-            while ((DateTime.UtcNow - started).TotalSeconds < 5 && fall <= 3)
+            // 5 s of game time: under load the game runs slower than the clock
+            for (var f = Frames(5); f > 0 && fall <= 3; f--)
             {
                 Keys(Vector3.Zero, jetpack: false);
                 fall = Math.Max(fall, Vector3D.Dot(Body.Physics.LinearVelocity, Vector3D.Normalize(g)));
                 yield return null;
             }
-            var took = (DateTime.UtcNow - started).TotalSeconds;
             Check(fall > 3, "an astronaut in the field with the jetpack off falls at most " + F(fall) + " m/s in 5 s (" + Body.GetCurrentMovementState() + ", jetpack " + Body.JetpackComp?.TurnedOn + ")");
             Result("gravity " + F(g.Length()) + " m/s2 in the field, none outside; the astronaut fell at " + F(fall) + " m/s");
         }

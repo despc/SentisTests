@@ -229,6 +229,10 @@ namespace SentisTests.Game
                 var name = NamePrefix + index.ToString("D3");
                 Sync.Clients.AddClient(client.Id.Value, name);
                 var identity = Sync.Players.CreateNewIdentity(name);
+                // a joining player gets a bank account when their player is made (MyPlayerCollection's new player request)
+                var bank = Sandbox.Game.GameSystems.BankingAndCurrency.MyBankingSystem.Static;
+                if (bank != null && !bank.TryGetAccountInfo(identity.IdentityId, out _))
+                    bank.CreateAccount(identity.IdentityId);
                 // (their ships weld projections: in the prod world what is not researched is not built, and PCU is limited per player)
                 WorldApi.PrepareTestIdentity(identity.IdentityId);
                 client.Player = Sync.Players.CreateNewPlayer(identity, new Sandbox.Game.World.MyPlayer.PlayerId(client.Id.Value, 0), name,

@@ -42,7 +42,8 @@ namespace SentisTests.Regression
             return Planet.GetClosestSurfacePointGlobal(ref point);
         }
 
-        public override string ToString() => Kind.ToString().ToLowerInvariant() + " site " + Index + " at " + Origin.ToString("F0");
+        public override string ToString() => Kind.ToString().ToLowerInvariant() + " site " + Index + " at " + Origin.ToString("F0") +
+                                             (Kind == SiteKind.Space ? ", natural gravity " + Sandbox.Game.GameSystems.MyGravityProviderSystem.CalculateNaturalGravityInPoint(Origin).Length().ToString("F3") : "");
     }
 
     /// <summary>

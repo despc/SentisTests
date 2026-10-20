@@ -88,6 +88,13 @@ namespace SentisTests.Regression
         /// </summary>
         protected virtual bool NeedsDamage => false;
 
+        /// <summary>
+        /// The check throws grids into a planet fast: where the planet has no physics yet one may go through the ground
+        /// (the game itself does it on the first fast fall on a place), and SentisGameplayImprovements' bringing back of
+        /// such grids (<c>AutoRestoreFromVoxel</c>) is on while the check runs (the suite does it once for all).
+        /// </summary>
+        protected virtual bool NeedsFallRestore => false;
+
         private Scenarios.ConfigOverride _gameplay;
 
         /// <summary>Where this run builds; the suite sets it, alone it is site 0.</summary>
@@ -111,12 +118,16 @@ namespace SentisTests.Regression
             WorldApi.EnsureUnpaused(Name);
             if (Site == null) Site = TestRunner.RunOrigin.HasValue ? Sites.InFrontOfPlayer(Kind, TestRunner.RunOrigin.Value) : Sites.Get(Kind, 0);
             if (!InSuite) FakeClients.RemoveAll();
-            if (!InSuite && NeedsDamage && Integrations.Missing(new[] { Integrations.Gameplay }).Count == 0)
+            if (!InSuite && (NeedsDamage || NeedsFallRestore) && Integrations.Missing(new[] { Integrations.Gameplay }).Count == 0)
             {
                 _gameplay = new Scenarios.ConfigOverride(Scenarios.ConfigOverride.Gameplay);
-                _gameplay.Set("DisableAnyDamageAfterStartTime", 0);
-                // every grid deals kinetic damage, however light (the server's 5 t keeps small ships from it)
-                _gameplay.Set("MinimumMassForKineticDamage", 1);
+                if (NeedsDamage)
+                {
+                    _gameplay.Set("DisableAnyDamageAfterStartTime", 0);
+                    // every grid deals kinetic damage, however light (the server's 5 t keeps small ships from it)
+                    _gameplay.Set("MinimumMassForKineticDamage", 1);
+                }
+                if (NeedsFallRestore) _gameplay.Set("AutoRestoreFromVoxel", true);
             }
             Note(Site.ToString());
             yield return Check();
@@ -256,8 +267,12 @@ namespace SentisTests.Regression
         /// MyMultiplayer.RaiseEvent calls on the server) run in the context of the check's fake client. The network's
         /// own validation (access, ownership) is not run; what the handler and the plugins' patches on it do is.
         /// </summary>
-        protected object Request(object target, string method, params object[] args)
+        protected object Request(object target, string method, params object[] args) => RequestAs(Me, target, method, args);
+
+        /// <summary>A client's request, as <see cref="Request(object,string,object[])"/>, from another fake client of the check.</summary>
+        protected object RequestAs(int client, object target, string method, params object[] args)
         {
+            if (target is Type staticType) return RequestStaticAs(client, staticType, method, args);
             System.Reflection.MethodInfo found = null;
             for (var type = target.GetType(); type != null && found == null; type = type.BaseType)
                 found = type.GetMethods(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static |
@@ -265,7 +280,7 @@ namespace SentisTests.Regression
                     .FirstOrDefault(m => m.Name == method && m.GetParameters().Length == args.Length);
             if (found == null) throw new ScenarioFailedException(target.GetType().Name + "." + method + " with " + args.Length + " arguments is not in this game");
             object result = null;
-            AsMe(() =>
+            FakeClients.AsClient(client, () =>
             {
                 try { result = found.Invoke(found.IsStatic ? null : target, args); }
                 catch (System.Reflection.TargetInvocationException e) { throw e.InnerException ?? e; }
@@ -274,13 +289,15 @@ namespace SentisTests.Regression
         }
 
         /// <summary><see cref="Request(object,string,object[])"/> for a static event handler of a type.</summary>
-        protected object Request(Type type, string method, params object[] args)
+        protected object Request(Type type, string method, params object[] args) => RequestStaticAs(Me, type, method, args);
+
+        private object RequestStaticAs(int client, Type type, string method, object[] args)
         {
             var found = type.GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic)
                             .FirstOrDefault(m => m.Name == method && m.GetParameters().Length == args.Length)
                         ?? throw new ScenarioFailedException(type.Name + "." + method + " with " + args.Length + " arguments is not in this game");
             object result = null;
-            AsMe(() =>
+            FakeClients.AsClient(client, () =>
             {
                 try { result = found.Invoke(null, args); }
                 catch (System.Reflection.TargetInvocationException e) { throw e.InnerException ?? e; }
@@ -412,7 +429,23 @@ namespace SentisTests.Regression
         /// the way, the conveyor system is given a few frames to join what it joins, and the first pair that connects is
         /// given back (<paramref name="found"/>).
         /// </summary>
-        protected IEnumerator ConveyorNeighbour(Part first, string second, Func<Part, bool> allowed, Action<Part> found)
+        protected IEnumerator ConveyorNeighbour(Part first, string second, Func<Part, bool> allowed, Action<Part> found) =>
+            Neighbour(first, second, allowed, "on its conveyors", (probe, place) =>
+            {
+                var one = probe.GetCubeBlock(first.Min)?.FatBlock as Sandbox.Game.GameSystems.Conveyors.IMyConveyorEndpointBlock;
+                var two = probe.GetCubeBlock(place.Min)?.FatBlock as Sandbox.Game.GameSystems.Conveyors.IMyConveyorEndpointBlock;
+                return one != null && two != null && one != two &&
+                       Sandbox.Game.GameSystems.MyGridConveyorSystem.Reachable(one.ConveyorEndpoint, two.ConveyorEndpoint);
+            }, found);
+
+        /// <summary>
+        /// Where a block goes next to another for the two to work together the way <paramref name="joined"/> tells (on one
+        /// conveyor line, an upgrade module on its machine): each place touching the first block, each way the second can
+        /// face, is built as a pair of its own (with a charged battery) high over the site, and the first pair that is
+        /// joined after <paramref name="ticks"/> frames is given back.
+        /// </summary>
+        protected IEnumerator Neighbour(Part first, string second, Func<Part, bool> allowed, string what, Func<MyCubeGrid, Part, bool> joined, Action<Part> found,
+            int ticks = 10)
         {
             var taken = Cells(first);
             var size = Definition(second).Size;
@@ -440,7 +473,7 @@ namespace SentisTests.Regression
                     candidates.Add(part);
                 }
             }
-            // the pairs in a row high over the site, 20 m apart
+            // the pairs in rows of 20 high over the site, 20 m apart
             var probes = new List<KeyValuePair<Part, MyCubeGrid>>();
             var row = Site.Up * 80 - Site.Forward * 80;
             for (var i = 0; i < candidates.Count; i++)
@@ -450,23 +483,35 @@ namespace SentisTests.Regression
                 var free = taken.SelectMany(c => Base6Directions.IntDirections.Select(d => c + d)).First(c => !used.Contains(c));
                 var battery = new Part("BatteryBlock/LargeBlockBatteryBlock", free.X, free.Y, free.Z)
                     .With(b => ((Sandbox.Common.ObjectBuilders.MyObjectBuilder_BatteryBlock)b).CurrentStoredPower = 1f);
-                try { probes.Add(new KeyValuePair<Part, MyCubeGrid>(candidates[i], Build("conveyor-probe", Site.Origin + row + Site.Right * (i * 20), true, new[] { first, candidates[i], battery }))); }
+                try { probes.Add(new KeyValuePair<Part, MyCubeGrid>(candidates[i], Build("neighbour-probe", Site.Origin + row + Site.Right * (i % 20 * 20) - Site.Forward * (i / 20 * 20), true, new[] { first, candidates[i], battery }))); }
                 catch (ScenarioFailedException) { }
             }
-            yield return WaitForTicks(10);
+            yield return WaitForTicks(ticks);
             Part connected = null;
             foreach (var probe in probes)
             {
-                var one = probe.Value.GetCubeBlock(first.Min)?.FatBlock as Sandbox.Game.GameSystems.Conveyors.IMyConveyorEndpointBlock;
-                var two = probe.Value.GetCubeBlock(probe.Key.Min)?.FatBlock as Sandbox.Game.GameSystems.Conveyors.IMyConveyorEndpointBlock;
-                if (connected == null && one != null && two != null && one != two &&
-                    Sandbox.Game.GameSystems.MyGridConveyorSystem.Reachable(one.ConveyorEndpoint, two.ConveyorEndpoint))
+                if (connected == null && joined(probe.Value, probe.Key))
                     connected = probe.Key;
                 probe.Value.Close();
             }
             if (connected == null)
-                throw new ScenarioFailedException("no place next to " + first.Id + " puts " + second + " on its conveyors (" + probes.Count + " tried)");
+                throw new ScenarioFailedException("no place next to " + first.Id + " puts " + second + " " + what + " (" + probes.Count + " tried)");
             found(connected);
+        }
+
+        private static readonly System.Reflection.MethodInfo EndpointMapping =
+            typeof(Sandbox.Game.GameSystems.MyGridConveyorSystem).GetMethod("GetConveyorEndpointMapping", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        /// <summary>
+        /// Whether the grid's conveyor system has worked out what the block can pull from (it does so on parallel tasks,
+        /// some time after the grid is built or changed). Until then a pull by the block (<c>MyGridConveyorSystem.PullItem</c>)
+        /// moves nothing and still reports success.
+        /// </summary>
+        protected static bool ConveyorsReady(MyCubeBlock block)
+        {
+            if (EndpointMapping == null) throw new ScenarioFailedException("MyGridConveyorSystem.GetConveyorEndpointMapping is not in this game");
+            var mapping = EndpointMapping.Invoke(block.CubeGrid.GridSystems.ConveyorSystem, new object[] { block });
+            return mapping?.GetType().GetField("pullElements")?.GetValue(mapping) != null;
         }
 
         /// <summary>Switches a block on or off as its terminal switch does.</summary>
@@ -589,6 +634,8 @@ namespace SentisTests.Regression
                 var activated = type.GetField("m_isActivated", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
                 if (activated != null) { text += ", activated " + activated.GetValue(block); break; }
             }
+            if (block is MyMechanicalConnectionBlockBase mechanical)
+                text += ", head " + (mechanical.TopGrid == null ? "none" : ((Sandbox.ModAPI.Ingame.IMyMechanicalConnectionBlock)mechanical).IsAttached ? "attached" : "not attached");
             return text;
         }
 

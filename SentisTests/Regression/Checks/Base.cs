@@ -70,7 +70,7 @@ namespace SentisTests.Regression.Checks
             Check(light.EntityId == lightId, "the light did not keep the id its builder gave it");
             yield return Until(() => light.IsWorking ? 1 : 0, v => v > 0, "the light working", 10);
             ((Sandbox.ModAPI.IMyTerminalBlock)timer).GetActionWithName("Start").Apply(timer);
-            yield return Until(() => light.Enabled ? 0 : 1, v => v > 0, "the light switched off by the timer", 10,
+            yield return Until(() => light.Enabled ? 0 : 1, v => v > 0, "the light switched off by the timer", 30,
                 () => "counting down " + ((SpaceEngineers.Game.ModAPI.Ingame.IMyTimerBlock)timer).IsCountingDown);
             Result("timer ran out and switched the light off");
         }

@@ -200,7 +200,59 @@ namespace SentisTests.Regression.Checks
             var angle = ((Sandbox.ModAPI.Ingame.IMyMotorStator)stator).Angle;
             ((Sandbox.ModAPI.IMyTerminalBlock)stator).SetValueFloat("Velocity", -10f);
             yield return Until(() => MathHelper.ToDegrees(angle - ((Sandbox.ModAPI.Ingame.IMyMotorStator)stator).Angle), v => Math.Abs(v) > 20, "the rotor turning back, degrees", 15);
-            Result("rotor head added and turned both ways");
+            // detached, as a player detaches it, the head is a grid of its own; attached again, it is on the rotor
+            var rotor = (Sandbox.ModAPI.Ingame.IMyMotorStator)stator;
+            ((Sandbox.ModAPI.IMyTerminalBlock)stator).SetValueFloat("Velocity", 0f);
+            rotor.Detach();
+            yield return Until(() => rotor.IsAttached ? 0 : 1, v => v > 0, "the head detached", 5);
+            Check(!head.MarkedForClose, "the head was gone when it was detached");
+            rotor.Attach();
+            yield return Until(() => rotor.IsAttached ? 1 : 0, v => v > 0, "the head attached again", 10,
+                () => "the head " + F(Vector3D.Distance(head.PositionComp.GetPosition(), stator.PositionComp.GetPosition())) + " m off");
+            Result("rotor head added, turned both ways, detached and attached again");
+        }
+    }
+}
+
+namespace SentisTests.Regression.Checks
+{
+    /// <summary>
+    /// A ladder of six sections standing on a floor on a planet: the player gets on its bottom (as with F on it) and holds
+    /// forward - they climb up it, on the ladder all the way.
+    /// </summary>
+    public sealed class LadderCheck : RegressionCheck
+    {
+        public override string Name => Prefix + "ladder";
+        public override SiteKind Kind => SiteKind.Planet;
+
+        protected override IEnumerator Check()
+        {
+            var pad = Pad("ladder-pad", Site.Origin, 2);
+            var floor = pad.PositionComp.GetPosition() + Site.Up * 1.25;
+            yield return Arrive(floor + Site.Up * 1.5 - Site.Forward * 3);
+            var parts = new System.Collections.Generic.List<Part>();
+            for (var y = 0; y < 6; y++) parts.Add(new Part("Ladder2/LadderShaft", 0, y, 0));
+            var ladder = Build("ladder", floor + Site.Up * 1.25, true, parts, forward: pad.WorldMatrix.Forward, up: pad.WorldMatrix.Up);
+            var bottom = ladder.GetCubeBlock(Vector3I.Zero).FatBlock;
+            FakeClients.SetFree(Me, true);
+            var body = Body;
+            var component = body.Components.Get<Sandbox.Game.Entities.Character.Components.MyCharacterLadderComponent>()
+                            ?? throw new Core.ScenarioFailedException("the character has no ladder component");
+            Request(component, "GetOnLadder_Request", bottom.EntityId);
+            yield return Until(() => body.IsOnLadder ? 1 : 0, v => v > 0, "the player on the ladder", 5, () => body.GetCurrentMovementState().ToString());
+            var from = Vector3D.Dot(body.PositionComp.GetPosition() - floor, Site.Up);
+            var top = from;
+            var climbing = false;
+            for (var f = Frames(6); f > 0; f--)
+            {
+                Keys(new Vector3(0, 0, -1));
+                top = Math.Max(top, Vector3D.Dot(body.PositionComp.GetPosition() - floor, Site.Up));
+                climbing |= body.GetCurrentMovementState() == VRage.Game.MyCharacterMovementEnum.LadderUp;
+                yield return null;
+            }
+            Check(climbing, "forward on the ladder never climbed (" + body.GetCurrentMovementState() + ", on the ladder " + body.IsOnLadder + ")");
+            Check(top - from > 3, "6 s of climbing took the player " + F(top - from) + " m up the ladder");
+            Result("on the ladder and up it " + F(top - from) + " m in 6 s");
         }
     }
 }

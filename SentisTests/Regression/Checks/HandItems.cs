@@ -7,6 +7,7 @@ using Sandbox.Game.Entities;
 using Sandbox.Game.Weapons;
 using SentisTests.Game;
 using VRage.Game;
+using VRage.Game.ModAPI;
 using VRageMath;
 
 namespace SentisTests.Regression.Checks
@@ -34,7 +35,8 @@ namespace SentisTests.Regression.Checks
                     var hand = MyDefinitionManager.Static.TryGetHandItemForPhysicalItem(Item("PhysicalGunObject/" + item));
                     if (hand == null) { times.Add(item + " not in this game"); continue; }
                     var weld = kind == "Welder";
-                    var grid = Build("tier", Site.Origin, true, new Part("CubeBlock/LargeBlockArmorBlock", 0, 0, 0).At(weld ? 0.05f : 1f));
+                    // each tool's block a place of its own along the line: the last one's grid may not be gone yet
+                    var grid = Build("tier", Site.Origin + Site.Right * (5 * times.Count), true, new Part("CubeBlock/LargeBlockArmorBlock", 0, 0, 0).At(weld ? 0.05f : 1f));
                     var block = grid.GetCubeBlock(Vector3I.Zero);
                     if (weld) Put(Inventory(Body), "Component/SteelPlate", 30);
                     yield return Equip(item);
@@ -92,6 +94,8 @@ namespace SentisTests.Regression.Checks
                 Inventory(Body).AddItems(3, (MyObjectBuilder_PhysicalObject)VRage.ObjectBuilders.MyObjectBuilderSerializer.CreateNewObject(magazine));
                 yield return Equip(gun.Item.Id.SubtypeName);
                 var spot = Site.Origin - Site.Forward * 15;
+                // the astronaut left where they are put, not steered on their client's circle
+                FakeClients.SetFree(Me, true);
                 StandAt(spot, spot + Site.Forward);
                 yield return null;
                 var head = Body.GetHeadMatrix(false).Translation - Body.PositionComp.GetPosition();
@@ -100,8 +104,23 @@ namespace SentisTests.Regression.Checks
                 yield return WaitForTicks(3);
                 var whole = integrity();
                 yield return Pull();
-                yield return Until(() => whole - integrity(), v => v > 0, gun.Item.Id.SubtypeName + " hitting the wall", 20,
-                    () => GunState() + ", magazines " + F((double)Inventory(Body).GetItemAmount(magazine)));
+                // a burst ends on its own (the gun waits at its burst limit for the trigger to be let go): while the wall
+                // stands whole the trigger is let go and pressed again every 1.5 s of game time, as a player fires bursts
+                var bursts = 1;
+                var frames = 0;
+                yield return Until(() =>
+                {
+                    if (++frames % Frames(1.5) == 0 && whole - integrity() <= 0)
+                    {
+                        Release();
+                        Trigger();
+                        bursts++;
+                    }
+                    return whole - integrity();
+                }, v => v > 0, gun.Item.Id.SubtypeName + " hitting the wall", 20,
+                    () => GunState() + ", magazines " + F((double)Inventory(Body).GetItemAmount(magazine)) + ", " + bursts + " bursts, " +
+                          F(Vector3D.Distance(Body.PositionComp.GetPosition(), spot - head)) + " m from where the astronaut was put, looking " +
+                          F(Motion.Angle(Body.GetHeadMatrix(false).Forward, Site.Forward)) + " degrees off the wall");
                 Release();
                 fired.Add(gun.Item.Id.SubtypeName);
                 wall.Close();

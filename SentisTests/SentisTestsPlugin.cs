@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using NLog;
 using SentisTests.Core;
@@ -74,6 +74,7 @@ namespace SentisTests
                 ResolveReportDirectory();
 
                 ScenarioRegistry.Register(SmokeScenario.ScenarioName, () => new SmokeScenario());
+                ScenarioRegistry.Register(PlayerStoreRaceScenario.ScenarioName, () => new PlayerStoreRaceScenario());
                 ScenarioRegistry.Register(FatalExceptionScenario.ScenarioName, () => new FatalExceptionScenario());
                 ScenarioRegistry.Register(BotRadiationScenario.ScenarioName, () => new BotRadiationScenario());
                 ScenarioRegistry.Register(BotRefuelScenario.ScenarioName, () => new BotRefuelScenario());

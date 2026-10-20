@@ -74,3 +74,104 @@ namespace SentisTests.Regression.Checks
         }
     }
 }
+
+namespace SentisTests.Regression.Checks
+{
+    /// <summary>
+    /// A player's custom turret (a blueprint known to work on the server: a turret controller with its AI on, rotors for
+    /// azimuth and elevation, a rocket launcher and a camera) and a station of another player 150 m off, out of its line,
+    /// the player himself 2 km away (the turret shoots characters too): the controller takes the station for its target,
+    /// turns onto it and the rockets damage it.
+    /// </summary>
+    public sealed class TurretControllerCheck : RegressionCheck
+    {
+        public override string Name => Prefix + "turret_controller";
+        public override int TimeoutSeconds => 150;
+        protected override bool NeedsDamage => true;
+
+        internal const string ResourceName = "SentisTests.Resources.CustomTurret.xml";
+
+        protected override IEnumerator Check()
+        {
+            yield return Arrive(Site.At(-15, 10, -15));
+            var enemy = -1;
+            // the other player himself far out of the turret's reach: it shoots characters too
+            yield return Join(Site.At(15, 10, 2000), i => enemy = i);
+            var group = WorldApi.LoadAuthoredGroup(ResourceName, WorldApi.EntityPrefix + "custom-turret");
+            // the blueprint moved to the site as it stands, the player's
+            var base0 = group[0].PositionAndOrientation.Value.GetMatrix();
+            var move = MatrixD.Invert(base0) * MatrixD.CreateWorld(Site.Origin, Site.Forward, Site.Up);
+            foreach (var ob in group)
+            {
+                ob.PositionAndOrientation = new VRage.MyPositionAndOrientation(ob.PositionAndOrientation.Value.GetMatrix() * move);
+                foreach (var block in ob.CubeBlocks)
+                {
+                    block.Owner = Identity;
+                    block.BuiltBy = Identity;
+                }
+            }
+            var grids = group.Select(WorldApi.SpawnGrid).ToList();
+            foreach (var grid in grids) Track(grid);
+            foreach (var grid in grids) WorldApi.ChargeBatteries(grid);
+            var controller = grids.SelectMany(g => g.GetFatBlocks()).First(b => b.BlockDefinition.Id.TypeId.ToString().EndsWith("TurretControlBlock"));
+            var launcher = grids.SelectMany(g => g.GetFatBlocks()).FirstOrDefault(b => b.BlockDefinition.Id.SubtypeName == "LargeMissileLauncher");
+            Check(launcher != null, "the blueprint has no rocket launcher");
+            Put(Inventory(launcher), "AmmoMagazine/Missile200mm", 4);
+            var turret = (SpaceEngineers.Game.ModAPI.Ingame.IMyTurretControlBlock)controller;
+            yield return Until(() => controller.IsWorking && turret.AzimuthRotor != null && turret.ElevationRotor != null ? 1 : 0, v => v > 0,
+                "the turret controller working with its rotors", 15, () => State(controller) + "; azimuth " + (turret.AzimuthRotor != null) + ", elevation " + (turret.ElevationRotor != null));
+
+            // the other player's station 100 m off, off to the side of where the turret looks: a wall of 7 x 7 blocks,
+            // as big as a ship - the controller shoots once it is within its angle deviation (5 degrees in the
+            // blueprint), 9 m off at 100 m
+            var wall = new System.Collections.Generic.List<Part> { new Part("BatteryBlock/LargeBlockBatteryBlock", 0, 0, -1).With(b => Motion.Charged(b)) };
+            for (var x = -3; x <= 3; x++)
+            for (var y = -3; y <= 3; y++)
+                wall.Add(new Part("CubeBlock/LargeBlockArmorBlock", x, y, 0));
+            var station = Build("custom-turret-target", Site.At(10, 7, 100), true, wall, ownedBy: FakeClients.PlayerOf(enemy).Identity.IdentityId);
+            Func<double> integrity = () => station.MarkedForClose ? 0 : station.GetBlocks().Sum(b => (double)b.Integrity);
+            var whole = integrity();
+            yield return Until(() => turret.HasTarget ? 1 : 0, v => v > 0, "the turret controller taking the enemy for its target", 30,
+                () => State(controller) + "; " + ((Sandbox.ModAPI.IMyTerminalBlock)controller).DetailedInfo.Trim().Replace("\n", " "));
+            var target = turret.GetTargetedEntity();
+            if (target.EntityId != station.EntityId)
+            {
+                var other = MyEntities.GetEntityById(target.EntityId) as MyCubeGrid;
+                Check(false, "the turret controller targets " + target.Name + " (" + target.Relationship + ", " + F(Vector3D.Distance(target.Position, controller.PositionComp.GetPosition())) +
+                             " m off, owned by " + (other == null ? "?" : string.Join(",", other.BigOwners.Select(o => Sandbox.Game.World.MySession.Static.Players.TryGetIdentity(o)?.DisplayName ?? o.ToString()))) +
+                             ", " + (other?.BlocksCount ?? 0) + " blocks), not the enemy station");
+            }
+            yield return Until(() => turret.IsAimed ? 1 : 0, v => v > 0, "the turret aimed at the enemy", 30,
+                () => "the target " + Describe(turret.GetTargetedEntity(), launcher) + "; azimuth " + F(MathHelper.ToDegrees(turret.AzimuthRotor.Angle)) + ", elevation " +
+                      F(MathHelper.ToDegrees(turret.ElevationRotor.Angle)) + " (limits " + F(MathHelper.ToDegrees(turret.ElevationRotor.LowerLimitRad)) + ".." +
+                      F(MathHelper.ToDegrees(turret.ElevationRotor.UpperLimitRad)) + ")");
+            var tools = new System.Collections.Generic.List<Sandbox.ModAPI.Ingame.IMyFunctionalBlock>();
+            turret.GetTools(tools);
+            // where the rockets go: the nearest each came to the station, and how far off the line to it they set out
+            var closest = new System.Collections.Generic.Dictionary<long, double>();
+            var setOff = new System.Collections.Generic.Dictionary<long, double>();
+            var stationAt = station.PositionComp.WorldAABB.Center;
+            yield return Until(() =>
+                {
+                    foreach (var missile in MyEntities.GetEntities().Where(e => e.GetType().Name == "MyMissile" && !e.MarkedForClose))
+                    {
+                        var at = missile.PositionComp.GetPosition();
+                        var d = Vector3D.Distance(at, stationAt);
+                        closest[missile.EntityId] = closest.TryGetValue(missile.EntityId, out var was) ? Math.Min(was, d) : d;
+                        if (!setOff.ContainsKey(missile.EntityId) && missile.Physics != null && missile.Physics.LinearVelocity.LengthSquared() > 1)
+                            setOff[missile.EntityId] = Motion.Angle(missile.Physics.LinearVelocity, stationAt - at);
+                    }
+                    return whole - integrity();
+                }, v => v > 0, "the rockets damaging the enemy station", 30,
+                () => "the target now " + Describe(turret.GetTargetedEntity(), launcher) + ", the launcher " + F(Motion.Angle(launcher.WorldMatrix.Forward, stationAt - launcher.PositionComp.GetPosition())) +
+                      " degrees off the station; rockets seen " + closest.Count + ", nearest to the station " + string.Join(", ", closest.Values.Select(F)) + " m, set out " +
+                      string.Join(", ", setOff.Values.Select(F)) + " degrees off the line to it; " + State(launcher) + "; rockets left " + F(Amount(Inventory(launcher), "AmmoMagazine/Missile200mm")) + " of 4, the controller's tools: " +
+                      string.Join(", ", tools.Select(x => x.CustomName)) + ", aimed " + turret.IsAimed + ", shooting " + ((Sandbox.Game.Weapons.MySmallMissileLauncher)launcher).IsShooting);
+            Result("the custom turret took the other player's station for its target, aimed and hit it (" + F(whole - integrity()) + " damage)");
+        }
+
+        private static string Describe(Sandbox.ModAPI.Ingame.MyDetectedEntityInfo target, MyCubeBlock launcher) =>
+            target.IsEmpty() ? "none" : target.Name + " " + target.EntityId + " at " + F(Vector3D.Distance(target.Position, launcher.PositionComp.GetPosition())) + " m, the launcher " +
+                                        F(Motion.Angle(launcher.WorldMatrix.Forward, target.Position - launcher.PositionComp.GetPosition())) + " degrees off it";
+    }
+}

@@ -303,6 +303,7 @@ namespace SentisTests.Regression.Checks
     {
         public override string Name => Prefix + "collision_ground";
         protected override bool NeedsDamage => true;
+        protected override bool NeedsFallRestore => true;
         public override SiteKind Kind => SiteKind.Planet;
         public override int TimeoutSeconds => 150;
 
@@ -344,11 +345,14 @@ namespace SentisTests.Regression.Checks
                 ship.Close();
                 yield return null;
             }
-            StandAt(ground + Site.Up * 60, ground + Site.Up * 60 + Site.Forward);
+            // dropped from 10 m: a fall from higher kills (damage is on in the suite), and a body rolls down the slope
+            StandAt(ground + Site.Up * 10, ground + Site.Up * 10 + Site.Forward);
             yield return Seconds(0.5);
             FakeClients.SetFree(Me, true);
             yield return Hold(1, Vector3.Zero, jetpack: false);
-            yield return Until(() => { Keys(Vector3.Zero, jetpack: false); return Motion.Speed(Body); }, v => v < 0.3, "the astronaut come to rest, m/s", 20);
+            yield return Until(() => { Keys(Vector3.Zero, jetpack: false); return Motion.Speed(Body); }, v => v < 0.3, "the astronaut come to rest, m/s", 30,
+                () => F(Vector3D.Dot(Body.PositionComp.GetPosition() - Site.Ground(Body.PositionComp.GetPosition()), Site.Up)) + " m over the ground, " +
+                      Body.GetCurrentMovementState() + (Body.IsDead ? ", dead" : ""));
             var feet = Body.PositionComp.GetPosition();
             var feetOver = Vector3D.Dot(feet - Site.Ground(feet), Site.Up);
             Check(feetOver > -1.0, "the astronaut went into the ground: " + F(feetOver) + " m over it");

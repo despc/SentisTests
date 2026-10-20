@@ -77,6 +77,9 @@ namespace SentisTests.Regression
                 _gameplay = new ConfigOverride(ConfigOverride.Gameplay);
                 _gameplay.Set("DisableAnyDamageAfterStartTime", 0);
                 _gameplay.Set("MinimumMassForKineticDamage", 1);
+                // a fast fall through the ground where the planet has no physics yet happens in the game itself; the
+                // server's answer is to bring such a grid back (off in the stand's config)
+                _gameplay.Set("AutoRestoreFromVoxel", true);
             }
 
             var next = new Dictionary<SiteKind, int>();
