@@ -24,7 +24,8 @@ namespace SentisTests.Scenarios
     /// a steel plate assembled from its ingots, ingots refined from ore, the bags a dead character and a destroyed
     /// container leave, a suit refilled from a bottle (an item changed in place), algae out of an algae farm (the
     /// source "farm"), and SentisOptimisations taking apart for a frozen assembler no more plates than it holds
-    /// (it gave the ingots of six for three) - no alert. Not honest:
+    /// (it gave the ingots of six for three), a prototech gyroscope ground down to prototech scrap, a ship fixed by
+    /// ALE ShipFixer (its blocks made again under new ids with what they held) - no alert. Not honest:
     ///
     ///  - an assembler finishing a steel plate with no ingots in it (production_without_input);
     ///  - an assembler taking apart a steel plate it does not have (production_without_input, disassemble);
@@ -42,7 +43,7 @@ namespace SentisTests.Scenarios
         private const BindingFlags Any = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
 
         public override string Name => ScenarioName;
-        public override int TimeoutSeconds => 150;
+        public override int TimeoutSeconds => 240;
 
         private static readonly MyDefinitionId IronOre = new MyDefinitionId(typeof(MyObjectBuilder_Ore), "Iron");
         private static readonly MyDefinitionId IronIngot = new MyDefinitionId(typeof(MyObjectBuilder_Ingot), "Iron");
@@ -136,6 +137,23 @@ namespace SentisTests.Scenarios
             Check(third.OutputInventory.GetItemAmount(SteelPlate) == 0, "the three plates were not taken apart");
             Check(Math.Abs((double)third.InputInventory.GetItemAmount(IronIngot) - 3 * perPlate) < 0.001, "three plates did not give the ingots of three");
 
+            // a prototech block ground down: its prototech components come out as Ingot/PrototechScrap, one for one
+            // (DeconstructId in the block's definition) - not more than it is built of (it was "grind_excess")
+            var proto = Spawn("prototech", centre + side * 220, up, side, identity, "LargeBlockPrototechGyro", "LargeBlockLargeContainer");
+            var gyro = proto.GetCubeBlock(Vector3I.Zero);
+            var scrapBin = (MyInventory)proto.GetFatBlocks().First(x => x.BlockDefinition.Id.SubtypeName == "LargeBlockLargeContainer").GetInventory(0);
+            // as a grinder does: a cut into the block's stockpile, then the stockpile into the grinder's inventory
+            for (var cut = 0; cut < 10000 && !gyro.IsFullyDismounted; cut++)
+            {
+                gyro.DecreaseMountLevel(gyro.MaxIntegrity * 0.0005f, scrapBin, false, identity);
+                gyro.MoveItemsFromConstructionStockpile(scrapBin);
+            }
+            gyro.SpawnConstructionStockpile();
+            proto.RazeBlock(gyro.Min);
+            var prototechScrap = new MyDefinitionId(typeof(MyObjectBuilder_Ingot), "PrototechScrap");
+            Note($"prototech gyroscope ground: {scrapBin.GetItemAmount(prototechScrap)} prototech scrap; the container holds {string.Join(", ", scrapBin.GetItems().Select(x => x.Content.SubtypeName + " " + x.Amount))}");
+            Check(scrapBin.GetItemAmount(prototechScrap) > 0, "the prototech gyroscope gave no prototech scrap");
+
             // ------------------------------------------------------------- not honest
             Invoke(dishonest, "FinishAssembling", plate);                // no ingots in it
             Check(dishonest.OutputInventory.GetItemAmount(SteelPlate) == 1, "the game did not make the plate from nothing (did it change?)");
@@ -152,6 +170,66 @@ namespace SentisTests.Scenarios
             stack.Amount += 500;
             items[0] = stack;
             Note("container b holds " + b.GetItemAmount(IronOre) + " ore after the edit");
+
+            // ------------------------------------------------------------- honest: a ship fixed
+            // ALE ShipFixer, the server's fixship, closes the grid and makes it again from its builders on worker
+            // threads, no plugin on the stack: the blocks come back under new ids, their inventories loaded from what
+            // they held. It refuses a grid with a cockpit under control, but a pilot who controls a searchlight from
+            // the cockpit leaves it not under control: the pilot in the cockpit's builder is loaded again too. On the
+            // server that was "unknown_source" ("load:unknown:MyComponentBase.SetContainer gave ...", 18.10 22:56,
+            // "USS Footameida", its pilot on a searchlight); no more than they held before - no alert. The pilot is
+            // a second player, the ship its own (what the fixer does to it is noted), the first stays near (a grid nobody is near is
+            // frozen, and the fixer finds no grid without a body)
+            var seatName = WorldApi.EntityPrefix + Prefix + "seat";
+            FakeClients.Add(1, Network, p => (centre + side * 20 + up * 5, 0, 0), withCharacters: true);
+            var second = WaitForSeconds(5, "the pilot arrives");
+            while (second.MoveNext()) yield return second.Current;
+            var pilot = FakeClients.Character(1);
+            Check(pilot != null, "the pilot has no character");
+            var pilotIdentity = pilot.GetPlayerIdentityId();
+            // the pilot's own ship (a cockpit takes no pilot it does not let in)
+            var seatGrid = Spawn("seat", centre + side * 20, up, side, pilotIdentity, "LargeBlockCockpitSeat", "LargeSearchlight");
+            var seat = seatGrid.GetFatBlocks().OfType<MyCockpit>().First();
+            var searchlight = seatGrid.GetFatBlocks().OfType<SpaceEngineers.Game.Entities.Blocks.MySearchlight>().First();
+            var stone = new MyDefinitionId(typeof(MyObjectBuilder_Ore), "Stone");
+            ((MyInventory)seat.GetInventory(0)).AddItems(5, new MyObjectBuilder_Ore { SubtypeName = "Stone" });    // from this plugin
+            ((MyInventory)pilot.GetInventory(0)).AddItems(3, new MyObjectBuilder_Ore { SubtypeName = "Stone" });   // from this plugin
+            ((Sandbox.ModAPI.IMyCockpit)seat).AttachPilot(pilot);
+            for (var tick = 0; tick < 300 && seat.Pilot == null; tick++) yield return null;
+            Note($"fixship: the pilot {pilot.EntityId} (dead {pilot.IsDead}, using {pilot.UsingEntity?.GetType().Name}, at {Vector3D.Distance(pilot.PositionComp.GetPosition(), seat.PositionComp.GetPosition()):0.#} m), the cockpit's pilot {seat.Pilot?.EntityId}, the client's character {FakeClients.Character(1)?.EntityId}");
+            Check(seat.Pilot != null, "the pilot did not sit in the cockpit");
+            pilot = seat.Pilot;
+            var pilotPlayer = MySession.Static.Players.GetControllingPlayer(seat);
+            Check(pilotPlayer != null, "no player controls the cockpit");
+            pilotPlayer.Controller.TakeControl(searchlight);        // the pilot takes the searchlight over from the cockpit
+            pass = Pass(sweep);
+            while (pass.MoveNext()) yield return pass.Current;
+            var fixerCore = AppDomain.CurrentDomain.GetAssemblies().Select(x => x.GetType("ALE_ShipFixer.ShipFixerCore")).FirstOrDefault(x => x != null);
+            SkipUnless(fixerCore != null, "ALE ShipFixer is not loaded");
+            var fixer = fixerCore.GetField("Instance", Any)?.GetValue(null) ?? fixerCore.GetProperty("Instance", Any)?.GetValue(null);
+            Check(fixer != null, "ALE ShipFixer has no instance");
+            Note($"fixship: before, the cockpit under control {((Sandbox.ModAPI.IMyShipController)seat).IsUnderControl}, its pilot {seat.Pilot?.EntityId} with {pilot.GetInventory(0).GetItemAmount(stone)} stone");
+            var fixResult = fixerCore.GetMethods().First(m => m.Name == "FixShip" && m.GetParameters().Length == 3)
+                .Invoke(fixer, new object[] { pilotIdentity, seat.CubeGrid.EntityId, "nogrid" });             // the owner's own request
+            Note($"fixship: {fixResult}");
+            Check(fixResult.ToString() == "SHIP_FIXED", "ALE ShipFixer did not fix the ship");
+            MyCockpit remade = null;
+            for (var tick = 0; tick < 600 && remade == null; tick++)
+            {
+                remade = MyEntities.GetEntities().OfType<MyCubeGrid>().Where(g => g.DisplayName == seatName && !g.MarkedForClose && g.EntityId != seatGrid.EntityId)
+                    .SelectMany(g => g.GetFatBlocks()).OfType<MyCockpit>().FirstOrDefault();
+                if (remade == null) yield return null;
+            }
+            Check(remade != null, "the fixed ship did not come back");
+            Track(remade.CubeGrid);
+            var settled = WaitForSeconds(3, "the fixed ship settles");
+            while (settled.MoveNext()) yield return settled.Current;
+            var pilotNow = MyEntities.GetEntityById(pilot.EntityId) as Sandbox.Game.Entities.Character.MyCharacter;
+            Note($"fixship: the cockpit {seat.EntityId} made again as {remade.EntityId}, {remade.GetInventory(0).GetItemAmount(stone)} stone in it; " +
+                 $"its pilot {remade.Pilot?.EntityId}; the old pilot {pilotNow?.EntityId} (the same object {ReferenceEquals(pilotNow, pilot)}, dead {pilotNow?.IsDead}, stone {pilotNow?.GetInventory(0)?.GetItemAmount(stone)})");
+            Check(remade.GetInventory(0).GetItemAmount(stone) == 5, "the fixed ship's cockpit did not keep its stone");
+            pass = Pass(sweep);
+            while (pass.MoveNext()) yield return pass.Current;
 
             // ------------------------------------------------------------- honest: bags
             // What comes into a bag came from what left it, past the ledger's hooks: no alert. Two kinds:
@@ -221,6 +299,10 @@ namespace SentisTests.Scenarios
                 "an honest inventory raised a bypass alert");
             Check(!alerts.Any(x => (string)x["kind"] == "dupe_transfer"), "an honest transfer raised a dupe alert");
             Check(!alerts.Any(x => (string)x["kind"] == "unknown_source"), "an item came from a path the ledger does not know");
+            var pilotAlerts = ((List<Dictionary<string, object>>)anomalies["alerts"]).Where(x => x["actor"] as string == pilotIdentity.ToString()).ToList();
+            foreach (var alert in pilotAlerts) Note($"pilot's alert {alert["kind"]}: {alert["detail"]}");
+            Check(!pilotAlerts.Any(x => (string)x["kind"] == "unknown_source"), "the fixed ship's pilot got items from a path the ledger does not know");
+            Check(!alerts.Any(x => (string)x["kind"] == "grind_excess"), "the prototech gyroscope ground down gave more than it is built of");
             Check(alerts.Count(x => (string)x["kind"] == "production_without_input") == 3, "honest production raised an alert");
             // a bag has no owner of its own: its alerts are found by the entity
             var bags = new[] { backpack.EntityId.ToString(), cargoBag.EntityId.ToString() };
