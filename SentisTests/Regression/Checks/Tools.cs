@@ -172,80 +172,112 @@ namespace SentisTests.Regression.Checks
         }
     }
 
-    /// <summary>A player on a planet drills the ground at their feet with a hand drill: ore goes into their inventory.</summary>
+    /// <summary>
+    /// A player drills an asteroid with a hand drill, floating by its face and looking straight at it: ore goes
+    /// into their inventory. (A hand drill cuts a metre ahead of the player's head: it drills what is in front of them, a
+    /// wall of rock, not the flat ground under their feet. The asteroid is one of the game's own, put there for the check
+    /// and taken away after it.)
+    /// </summary>
     public sealed class HandDrillCheck : HandCheck
     {
         public override string Name => Prefix + "hand_drill";
-        public override SiteKind Kind => SiteKind.Planet;
-
-        /// <summary>
-        /// A place of bare ground near the site: straight down from over it the first thing met is the planet's voxels
-        /// (not a boulder, a tree, a grid), and it lies flat enough to stand on.
-        /// </summary>
-        private Vector3D? BareGround(Vector3D centre)
-        {
-            for (var ring = 0; ring < 4; ring++)
-            for (var x = -ring; x <= ring; x++)
-            for (var z = -ring; z <= ring; z++)
-            {
-                if (Math.Max(Math.Abs(x), Math.Abs(z)) != ring) continue;
-                var over = Site.Ground(centre + Site.Right * (x * 6) + Site.Forward * (z * 6)) + Site.Up * 6;
-                var hit = Sandbox.Engine.Physics.MyPhysics.CastRay(over, over - Site.Up * 12);
-                if (hit == null || !(Sandbox.Engine.Physics.MyPhysicsExtensions.GetHitEntity(hit.Value.HkHitInfo) is MyVoxelBase)) continue;
-                if (Vector3D.Dot(hit.Value.HkHitInfo.Normal, Site.Up) < 0.95) continue;
-                return hit.Value.Position;
-            }
-            return null;
-        }
-
-        private Vector3D _dug;
-
-        /// <summary>Each run drills a fresh spot along the site: what an earlier one dug is not always put back at once.</summary>
-        private static int _runs;
 
         protected override IEnumerator Check()
         {
-            // the player there first: the planet's voxels have physics (what a ray meets) only near something
-            var centre = Site.Origin + Site.Right * (8 * (_runs++ % 6) - 20);
-            yield return Arrive(Site.Ground(centre) + Site.Up * 2);
+            var asteroid = Sandbox.Game.World.MyWorldGenerator.AddAsteroidPrefabCentered("Asteroid128-001", Site.Origin, MatrixD.Identity, WorldApi.EntityPrefix + "hand-drill-asteroid");
+            Check(asteroid != null, "the asteroid was not made");
+            Track(asteroid);
+            yield return Arrive(Site.Origin + Site.Up * 90);
+            yield return Seconds(2);
+            // its face straight below the player, found in the asteroid's own voxels (it has physics only where something
+            // is near it, so a ray from afar meets nothing)
+            // the middle of the rock, from a coarse look at the asteroid (its rock is not round, nor in the middle of it)
+            var middle = RockMiddle(asteroid);
+            StandAt(middle + Site.Up * 90, middle);
             yield return Seconds(1);
-            var bare = BareGround(centre);
-            Check(bare.HasValue, "no bare flat ground near the site to drill");
-            var ground = bare.Value;
-            _dug = ground;
-            StandAt(ground + Site.Up * 1.0, ground + Site.Up * 1.0 + Site.Forward);
-            yield return Seconds(0.5);
-            yield return Equip("HandDrillItem");
-            // on their feet on the ground (let go, the jetpack off), crouched and looking down at it - the hand drill
-            // reaches a metre or so off the head
-            FakeClients.SetFree(Me, true);
-            yield return Hold(3, Vector3.Zero, jetpack: false, face: Site.Forward);
-            for (var i = 0; i < 30; i++)
+            var from = Body.PositionComp.GetPosition();
+            var normal = Vector3D.Normalize(from - middle);
+            var face = Vector3D.Zero;
+            var cache = new VRage.Voxels.MyStorageData();
+            cache.Resize(Vector3I.One);
+            for (var d = 90.0; d > 0; d -= 0.5)
             {
-                Body.SetHeadLocalXAngle(-60);
-                Keys(Vector3.Zero, jetpack: false, face: Site.Forward, crouch: true);
-                yield return null;
+                var point = middle + normal * d;
+                VRage.Voxels.MyVoxelCoordSystems.WorldPositionToVoxelCoord(asteroid.PositionLeftBottomCorner, ref point, out Vector3I voxel);
+                voxel += asteroid.StorageMin;
+                if (voxel.X < 0 || voxel.Y < 0 || voxel.Z < 0 || voxel.X >= asteroid.Storage.Size.X || voxel.Y >= asteroid.Storage.Size.Y || voxel.Z >= asteroid.Storage.Size.Z) continue;
+                asteroid.Storage.ReadRange(cache, VRage.Voxels.MyStorageDataTypeFlags.Content, 0, voxel, voxel);
+                if (cache.Content(0) > 127) { face = point; break; }
             }
-            // half a metre into the ground the feet stand on, just ahead of them (wherever that ground is: a pit an
-            // earlier run dug is ground too)
-            var feet = Body.PositionComp.GetPosition();
-            AimPoint = feet + Site.Forward * 0.6 - Site.Up * 0.5;
+            if (face == Vector3D.Zero)
+            {
+                // what the asteroid is, for the failure: where, how big, how much rock in it (a coarse look)
+                var lod = 3;
+                var size = asteroid.Storage.Size >> lod;
+                var coarse = new VRage.Voxels.MyStorageData();
+                coarse.Resize(size);
+                asteroid.Storage.ReadRange(coarse, VRage.Voxels.MyStorageDataTypeFlags.Content, lod, Vector3I.Zero, size - 1);
+                long full = 0;
+                for (var k = 0; k < size.X * size.Y * size.Z; k++) if (coarse.Content(k) > 127) full++;
+                Check(false, "no face of the asteroid under the player: the asteroid at " + asteroid.PositionComp.GetPosition().ToString("F0") + " (the site at " +
+                             Site.Origin.ToString("F0") + "), its storage " + asteroid.Storage.Size + ", " + full + " of " + (size.X * size.Y * size.Z) + " coarse cells rock");
+            }
+            // the head 0.6 m off the face, looking at it: the drill cuts a metre ahead, into the rock
+            StandAt(face + normal * 3, face);
+            yield return Seconds(2);
+            var head = Body.GetHeadMatrix(false).Translation - Body.PositionComp.GetPosition();
+            StandAt(face + normal * 0.6 - head, face - head);
+            yield return WaitForTicks(5);
+            yield return Equip("HandDrillItem");
+            AimPoint = face - normal * 0.3;
             yield return Pull();
             var started = DateTime.UtcNow;
-            Func<double> ore = () => Inventory(Body).GetItems().Where(i => i.Content is MyObjectBuilder_Ore).Sum(i => (double)i.Amount);
-            while (ore() <= 1 && (DateTime.UtcNow - started).TotalSeconds < 30)
+            // a hand drill drops what it cuts as pieces of ore floating by the hole (the player picks them up), some
+            // straight into the inventory: both count
+            Func<double> ore = () => Inventory(Body).GetItems().Where(i => i.Content is MyObjectBuilder_Ore).Sum(i => (double)i.Amount) +
+                                     MyEntities.GetEntities().OfType<MyFloatingObject>()
+                                         .Where(f => !f.MarkedForClose && f.Item.Content is MyObjectBuilder_Ore && Vector3D.Distance(f.PositionComp.GetPosition(), face) < 10)
+                                         .Sum(f => (double)f.Item.Amount);
+            // a hand drill gives ore in crumbs (0.009 of the rock it cuts, times the world's harvest ratio): any is enough
+            while (ore() <= 0 && (DateTime.UtcNow - started).TotalSeconds < 30)
             {
-                Body.SetHeadLocalXAngle(-60);
-                Keys(Vector3.Zero, jetpack: false, face: Site.Forward, crouch: true);
                 Look();
                 yield return null;
             }
-            Check(ore() > 1, "no ore drilled in 30 s: " + GunState() + "; " + F(Vector3D.Dot(Body.PositionComp.GetPosition() - ground, Site.Up)) + " m over the bare ground, " +
-                             Body.GetCurrentMovementState() + "; " + DrillSensor(ground));
+            Check(ore() > 0, "no ore drilled from the asteroid in 30 s: " + GunState() + "; " + DrillSensor(face));
             Release();
-            var kinds = Inventory(Body).GetItems().Where(i => i.Content is MyObjectBuilder_Ore).GroupBy(i => i.Content.SubtypeName)
-                .Select(g => g.Key + " " + F(g.Sum(i => (double)i.Amount)));
-            Result("hand drill: " + string.Join(", ", kinds));
+            var floating = MyEntities.GetEntities().OfType<MyFloatingObject>()
+                .Where(f => !f.MarkedForClose && f.Item.Content is MyObjectBuilder_Ore && Vector3D.Distance(f.PositionComp.GetPosition(), face) < 10).ToList();
+            foreach (var piece in floating) Track(piece);
+            Result("hand drill into an asteroid: " + F(ore()) + " kg of ore, " + floating.Count + " pieces floating by the hole (" +
+                   string.Join(", ", floating.GroupBy(f => f.Item.Content.SubtypeName).Select(g => g.Key)) + ")");
+        }
+
+        /// <summary>The middle of an asteroid's rock, in the world: the mean of its full cells, looked at coarsely.</summary>
+        private static Vector3D RockMiddle(MyVoxelBase asteroid)
+        {
+            const int lod = 3;
+            var size = asteroid.Storage.Size >> lod;
+            var coarse = new VRage.Voxels.MyStorageData();
+            coarse.Resize(size);
+            asteroid.Storage.ReadRange(coarse, VRage.Voxels.MyStorageDataTypeFlags.Content, lod, Vector3I.Zero, size - 1);
+            var sum = Vector3D.Zero;
+            var count = 0;
+            for (var x = 0; x < size.X; x++)
+            for (var y = 0; y < size.Y; y++)
+            for (var z = 0; z < size.Z; z++)
+            {
+                var cell = new Vector3I(x, y, z);
+                if (coarse.Content(ref cell) > 127)
+                {
+                    sum += new Vector3D(x + 0.5, y + 0.5, z + 0.5) * (1 << lod);
+                    count++;
+                }
+            }
+            if (count == 0) return asteroid.PositionComp.WorldAABB.Center;
+            var voxel = Vector3I.Round(sum / count) - asteroid.StorageMin;
+            VRage.Voxels.MyVoxelCoordSystems.VoxelCoordToWorldPosition(asteroid.PositionLeftBottomCorner, ref voxel, out Vector3D world);
+            return world;
         }
 
         /// <summary>Where the hand drill's sensor is against the ground, and whether it says it has something in range.</summary>
@@ -258,7 +290,7 @@ namespace SentisTests.Regression.Checks
             var inRange = typeof(MyHandDrill).GetField("m_objectInDrillingRange", any)?.GetValue(drill);
             if (drillBase == null) return "no drill base";
             var sensor = drillBase.Sensor;
-            Func<Vector3D, double> over = p => Vector3D.Dot(p - Site.Ground(p), Site.Up);
+            Func<Vector3D, double> over = p => Vector3D.Distance(p, ground);
             var cutOut = typeof(MyDrillBase).GetField("m_cutOut", any)?.GetValue(drillBase);
             var sphere = cutOut?.GetType().GetProperty("Sphere", any)?.GetValue(cutOut);
             var cutAt = sphere is BoundingSphereD round ? "cut-out " + F(over(round.Center)) + " m over the ground r " + F(round.Radius) : "no cut-out";
@@ -268,31 +300,32 @@ namespace SentisTests.Regression.Checks
                    " m looking " + F(Vector3D.Dot(Body.WeaponPosition.LogicalOrientationWorld, Site.Up));
         }
 
-        public override void CleanupLeftovers()
-        {
-            if (_dug != Vector3D.Zero) RevertGround(_dug, 8);
-        }
     }
 
     /// <summary>A ship drill, switched on and powered, bores into a planet's ground and fills its inventory with ore.</summary>
     public sealed class ShipDrillCheck : RegressionCheck
     {
-        public override string Name => Prefix + "ship_drill";
+        private readonly MyCubeSize _size;
+
+        public ShipDrillCheck(MyCubeSize size = MyCubeSize.Large) { _size = size; }
+
+        public override string Name => Prefix + "ship_drill" + (_size == MyCubeSize.Small ? "_small" : "");
         public override SiteKind Kind => SiteKind.Planet;
 
         /// <summary>Each run bores a fresh spot along the site: what an earlier one dug is not always put back at once.</summary>
         private static int _runs;
         private Vector3D _bored;
+        private bool Large => _size == MyCubeSize.Large;
 
         protected override IEnumerator Check()
         {
             var ground = Site.Ground(Site.Origin + Site.Right * (10 * (_runs++ % 6) - 25));
             _bored = ground;
             yield return Arrive(ground + Site.Up * 12 + Site.Forward * 6);
-            var rig = ToolRig("drill", "Drill/LargeBlockDrill", ground - Site.Up * 0.5, -Site.Up);
+            var rig = ToolRig("drill", Large ? "Drill/LargeBlockDrill" : "Drill/SmallBlockDrill", ground - Site.Up * (Large ? 0.5 : 0.2), -Site.Up);
             var drill = Block<MyShipDrill>(rig);
             Switch(drill, true);
-            yield return Until(() => Inventory(drill).GetItems().Where(i => i.Content is MyObjectBuilder_Ore).Sum(i => (double)i.Amount), v => v > 10,
+            yield return Until(() => Inventory(drill).GetItems().Where(i => i.Content is MyObjectBuilder_Ore).Sum(i => (double)i.Amount), v => v > (Large ? 10 : 2),
                 "ore in the drill, kg", 60, () => State(drill));
             var ore = Inventory(drill).GetItems().Where(i => i.Content is MyObjectBuilder_Ore).GroupBy(i => i.Content.SubtypeName)
                 .Select(g => g.Key + " " + F(g.Sum(i => (double)i.Amount)));

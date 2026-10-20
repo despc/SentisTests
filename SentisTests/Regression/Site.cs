@@ -64,6 +64,32 @@ namespace SentisTests.Regression
 
         public static Site Get(SiteKind kind, int index) => kind == SiteKind.Space ? Space(index) : Planet(index);
 
+        /// <summary>
+        /// A site to watch a check at: 40 m in front of the real player nearest to the point (a run from the field), its
+        /// forward across that player's view - what moves along it moves past their eyes. On a planet the site sits on the
+        /// ground there. Without a player near, at the point itself.
+        /// </summary>
+        public static Site InFrontOfPlayer(SiteKind kind, Vector3D point)
+        {
+            var watcher = MyEntities.GetEntities().OfType<Sandbox.Game.Entities.Character.MyCharacter>()
+                .Where(c => !c.IsDead && !c.MarkedForClose && c.ControllerInfo?.Controller?.Player != null &&
+                            !FakeClients.IsFake(c.ControllerInfo.Controller.Player.Id.SteamId) && !(c.DisplayName ?? "").StartsWith("[BOT]"))
+                .OrderBy(c => Vector3D.DistanceSquared(c.PositionComp.GetPosition(), point)).FirstOrDefault();
+            var planet = MyGamePruningStructure.GetClosestPlanet(point);
+            var gravity = MyGravityProviderSystem.CalculateNaturalGravityInPoint(point);
+            var up = gravity.LengthSquared() > 0.01 ? -Vector3D.Normalize(gravity) : (Vector3D)(watcher?.WorldMatrix.Up ?? Vector3D.Up);
+            var look = watcher != null ? (Vector3D)watcher.WorldMatrix.Forward : Vector3D.CalculatePerpendicularVector(up);
+            look = Vector3D.Normalize(Vector3D.Reject(look, up));
+            var origin = watcher != null ? watcher.PositionComp.GetPosition() + look * 40 : point;
+            var hasGround = kind == SiteKind.Planet && planet != null;
+            if (hasGround) origin = planet.GetClosestSurfacePointGlobal(ref origin);
+            else if (watcher != null) origin += up * 1.5;
+            // forward across the view: from the watcher's left to their right
+            var across = Vector3D.Normalize(Vector3D.Cross(look, up));
+            WorldApi.Log.Info("regression: a site in front of {0} at {1}", watcher?.DisplayName ?? "nobody", origin.ToString("F0"));
+            return new Site { Kind = kind, Index = 0, Planet = hasGround ? planet : null, Frame = MatrixD.CreateWorld(origin, across, up) };
+        }
+
         public static Site Space(int index)
         {
             if (!_space.HasValue) _space = FindSpace();

@@ -116,15 +116,20 @@ namespace SentisTests.Regression.Checks
     /// </summary>
     public sealed class ShipWeldCheck : RegressionCheck
     {
-        public override string Name => Prefix + "ship_weld";
+        private readonly MyCubeSize _size;
+
+        public ShipWeldCheck(MyCubeSize size = MyCubeSize.Large) { _size = size; }
+
+        public override string Name => Prefix + "ship_weld" + (_size == MyCubeSize.Small ? "_small" : "");
 
         protected override IEnumerator Check()
         {
             yield return Arrive(Site.At(0, 8, 8));
-            var target = Build("weld-target", Site.Origin, true, new Part("CubeBlock/LargeBlockArmorBlock", 0, 0, 0).At(0.05f));
+            var large = _size == MyCubeSize.Large;
+            var target = Build("weld-target", Site.Origin, true, new[] { new Part(large ? "CubeBlock/LargeBlockArmorBlock" : "CubeBlock/SmallBlockArmorBlock", 0, 0, 0).At(0.05f) }, _size);
             var block = target.GetCubeBlock(Vector3I.Zero);
             Check(!block.IsFullIntegrity, "the frame came out finished");
-            var rig = ToolRig("welder", "ShipWelder/LargeShipWelder", Site.Origin - Site.Forward * 1.5, Site.Forward);
+            var rig = ToolRig("welder", large ? "ShipWelder/LargeShipWelder" : "ShipWelder/SmallShipWelder", Site.Origin - Site.Forward * (large ? 1.5 : 0.5), Site.Forward);
             var welder = Block<SpaceEngineers.Game.Entities.Blocks.MyShipWelder>(rig);
             Put(Inventory(welder), "Component/SteelPlate", 60);
             var start = block.Integrity / block.MaxIntegrity;
@@ -133,7 +138,8 @@ namespace SentisTests.Regression.Checks
 
             yield return Until(() => block.Integrity / block.MaxIntegrity, v => v >= 0.999, "the frame's integrity", 90, () => State(welder));
             var spent = plates - Amount(Inventory(welder), "Component/SteelPlate");
-            Check(spent > 0, "the frame was welded and the welder's plates are all there");
+            // a small armor block is one plate, and its frame holds it already
+            Check(spent > 0 || !large, "the frame was welded and the welder's plates are all there");
             Result("frame welded " + (start * 100).ToString("F0") + " -> 100 %, " + spent + " plates from the welder");
         }
     }
@@ -144,16 +150,22 @@ namespace SentisTests.Regression.Checks
     /// </summary>
     public sealed class ShipGrindCheck : RegressionCheck
     {
-        public override string Name => Prefix + "ship_grind";
+        private readonly MyCubeSize _size;
+
+        public ShipGrindCheck(MyCubeSize size = MyCubeSize.Large) { _size = size; }
+
+        public override string Name => Prefix + "ship_grind" + (_size == MyCubeSize.Small ? "_small" : "");
         protected override bool NeedsDamage => true;
 
         protected override IEnumerator Check()
         {
             yield return Arrive(Site.At(0, 8, 8));
-            var target = Build("grind-target", Site.Origin, true, new Part("CubeBlock/LargeBlockArmorBlock", 0, 0, 0));
-            var rig = ToolRig("grinder", "ShipGrinder/LargeShipGrinder", Site.Origin - Site.Forward * 1.0, Site.Forward);
+            var large = _size == MyCubeSize.Large;
+            var armor = large ? "CubeBlock/LargeBlockArmorBlock" : "CubeBlock/SmallBlockArmorBlock";
+            var target = Build("grind-target", Site.Origin, true, new[] { new Part(armor, 0, 0, 0) }, _size);
+            var rig = ToolRig("grinder", large ? "ShipGrinder/LargeShipGrinder" : "ShipGrinder/SmallShipGrinder", Site.Origin - Site.Forward * (large ? 1.0 : 0.3), Site.Forward);
             var grinder = Block<MyShipGrinder>(rig);
-            var definition = Definition("CubeBlock/LargeBlockArmorBlock");
+            var definition = Definition(armor);
             var plates = definition.Components.Where(c => c.Definition.Id.SubtypeName == "SteelPlate").Sum(c => c.Count);
             Switch(grinder, true);
 

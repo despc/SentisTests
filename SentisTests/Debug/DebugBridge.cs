@@ -475,7 +475,9 @@ namespace SentisTests.Debug
                         break;
                     case "/test":
                         Core.TestRunner.Focus = body.Value<string>("focus");
-                        Core.TestRunner.Enqueue(new[] { body.Value<string>("name") });
+                        // with x, y, z: built there (a regression check: in front of the real player nearest to it), kept a minute to look at
+                        Vector3D? origin = body["x"] != null ? new Vector3D(body.Value<double>("x"), body.Value<double>("y"), body.Value<double>("z")) : (Vector3D?)null;
+                        Core.TestRunner.Enqueue(new[] { body.Value<string>("name") }, origin, origin.HasValue ? 60 : 0);
                         SendJson(ctx, 200, JObject.FromObject(new { queued = body.Value<string>("name") }));
                         break;
                     default:

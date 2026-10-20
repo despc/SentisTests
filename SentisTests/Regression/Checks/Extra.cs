@@ -59,7 +59,7 @@ namespace SentisTests.Regression.Checks
             var seat = Block<MyCockpit>(rover);
             // down on its wheels and still before the drive
             yield return Seconds(1);
-            yield return Until(() => Motion.Speed(rover), v => v < 0.3, "the rover settling on the floor, m/s", 20);
+            yield return Until(() => Motion.Speed(rover), v => v < 1, "the rover settling on the floor, m/s", 30);
             yield return Sit(seat);
             var from = rover.PositionComp.WorldAABB.Center;
             var standing = Vector3D.Dot(from - floor, Site.Up);

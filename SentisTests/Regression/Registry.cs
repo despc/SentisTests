@@ -30,10 +30,14 @@ namespace SentisTests.Regression
             Add(() => new HandGrindCheck());
             Add(() => new ShipWeldCheck());
             Add(() => new ShipGrindCheck());
+            Add(() => new ShipWeldCheck(VRage.Game.MyCubeSize.Small));
+            Add(() => new ShipGrindCheck(VRage.Game.MyCubeSize.Small));
+            Add(() => new HandToolTiersCheck());
             Add(() => new ProjectorCheck());
             Add(() => new PaintCheck());
             Add(() => new HandDrillCheck());
             Add(() => new ShipDrillCheck());
+            Add(() => new ShipDrillCheck(VRage.Game.MyCubeSize.Small));
             // terminal, inventories
             Add(() => new TerminalCheck());
             Add(() => new InventoryTransferCheck());
@@ -76,7 +80,21 @@ namespace SentisTests.Regression
             Add(() => new RifleCheck());
             Add(() => new WarheadCheck());
             Add(() => new CollisionCheck());
+            Add(() => new CollisionWallCheck());
+            Add(() => new CollisionShipsCheck());
+            Add(() => new CollisionCubesCheck());
+            Add(() => new CollisionCharacterCheck());
+            Add(() => new CollisionGroundCheck());
+            Add(() => new CollisionDockedCheck());
+            Add(() => new WeaponBlocksCheck());
+            Add(() => new HandWeaponsCheck());
             Add(() => new SafeZoneCheck());
+            Add(() => new SafeZoneForbidsCheck());
+            Add(() => new SafeZoneAllowsCheck());
+            Add(() => new SafeZoneAccessCheck());
+            // every functional block
+            Add(() => new AllBlocksCheck(VRage.Game.MyCubeSize.Large));
+            Add(() => new AllBlocksCheck(VRage.Game.MyCubeSize.Small));
             // the rest of a base
             Add(() => new DoorCheck());
             Add(() => new AirVentCheck());

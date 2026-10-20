@@ -76,6 +76,7 @@ namespace SentisTests.Regression
             {
                 _gameplay = new ConfigOverride(ConfigOverride.Gameplay);
                 _gameplay.Set("DisableAnyDamageAfterStartTime", 0);
+                _gameplay.Set("MinimumMassForKineticDamage", 1);
             }
 
             var next = new Dictionary<SiteKind, int>();

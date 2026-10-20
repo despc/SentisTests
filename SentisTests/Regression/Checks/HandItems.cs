@@ -1,0 +1,113 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using Sandbox.Definitions;
+using Sandbox.Game.Entities;
+using Sandbox.Game.Weapons;
+using SentisTests.Game;
+using VRage.Game;
+using VRageMath;
+
+namespace SentisTests.Regression.Checks
+{
+    /// <summary>
+    /// The hand welders and grinders of every tier: each welds a frame to the end and grinds a block away, and a tier
+    /// is not slower than the one below it.
+    /// </summary>
+    public sealed class HandToolTiersCheck : HandCheck
+    {
+        public override string Name => Prefix + "hand_tool_tiers";
+        public override int TimeoutSeconds => 400;
+        protected override bool NeedsDamage => true;
+
+        protected override IEnumerator Check()
+        {
+            yield return Arrive(Site.At(0, 0, -4));
+            var times = new List<string>();
+            foreach (var kind in new[] { "Welder", "AngleGrinder" })
+            {
+                var last = double.MaxValue;
+                for (var tier = 1; tier <= 4; tier++)
+                {
+                    var item = kind + (tier == 1 ? "" : tier.ToString()) + "Item";
+                    var hand = MyDefinitionManager.Static.TryGetHandItemForPhysicalItem(Item("PhysicalGunObject/" + item));
+                    if (hand == null) { times.Add(item + " not in this game"); continue; }
+                    var weld = kind == "Welder";
+                    var grid = Build("tier", Site.Origin, true, new Part("CubeBlock/LargeBlockArmorBlock", 0, 0, 0).At(weld ? 0.05f : 1f));
+                    var block = grid.GetCubeBlock(Vector3I.Zero);
+                    if (weld) Put(Inventory(Body), "Component/SteelPlate", 30);
+                    yield return Equip(item);
+                    yield return AimAt(block);
+                    var started = MySandboxGameTime();
+                    yield return Pull();
+                    if (weld)
+                        yield return Until(() => block.Integrity / block.MaxIntegrity, v => v >= 0.999, item + " welding the frame", 120, () => GunState());
+                    else
+                        yield return Until(() => grid.MarkedForClose || grid.GetCubeBlock(Vector3I.Zero) == null ? 1 : 0, v => v > 0, item + " grinding the block away", 120, () => GunState());
+                    var took = MySandboxGameTime() - started;
+                    Release();
+                    Check(took <= last * 1.15 + 0.5, item + " took " + F(took) + " s, slower than the tier below (" + F(last) + " s)");
+                    last = took;
+                    times.Add(item + " " + F(took) + " s");
+                    grid.Close();
+                    // what grinding gave back out of the way: the next tool starts on an empty pocket
+                    Inventory(Body).Clear();
+                    yield return Seconds(0.5);
+                }
+            }
+            Result("every tier worked, none slower than the one below: " + string.Join(", ", times));
+        }
+
+        /// <summary>Game time in seconds.</summary>
+        private static double MySandboxGameTime() => Sandbox.MySandboxGame.TotalGamePlayTimeInMilliseconds / 1000.0;
+    }
+
+    /// <summary>
+    /// Every hand weapon of the game - pistols, rifles, rocket launchers - with its own magazine: aimed at a wall 15 m
+    /// off and fired, the wall takes damage.
+    /// </summary>
+    public sealed class HandWeaponsCheck : HandCheck
+    {
+        public override string Name => Prefix + "hand_weapons";
+        public override int TimeoutSeconds => 300;
+        protected override bool NeedsDamage => true;
+
+        protected override IEnumerator Check()
+        {
+            yield return Arrive(Site.At(0, 0, -15));
+            var guns = MyDefinitionManager.Static.GetAllDefinitions().OfType<MyWeaponItemDefinition>()
+                .Where(d => d.Public && d.Id.TypeId == typeof(VRage.Game.MyObjectBuilder_PhysicalGunObject))
+                .Select(d => new { Item = d, Hand = MyDefinitionManager.Static.TryGetHandItemForPhysicalItem(d.Id), Weapon = MyDefinitionManager.Static.GetWeaponDefinition(d.WeaponDefinitionId) })
+                .Where(g => g.Hand != null && g.Weapon?.AmmoMagazinesId != null && g.Weapon.AmmoMagazinesId.Length > 0)
+                .OrderBy(g => g.Item.Id.SubtypeName).ToList();
+            Check(guns.Count > 0, "no hand weapons in this game");
+            var fired = new List<string>();
+            foreach (var gun in guns)
+            {
+                var wall = Build("hand-gun-wall", Site.Origin, true, Bodies.Wall("CubeBlock/LargeHeavyBlockArmorBlock", 2, 1));
+                Func<double> integrity = () => wall.MarkedForClose ? 0 : wall.GetBlocks().Sum(b => (double)b.Integrity);
+                var magazine = gun.Weapon.AmmoMagazinesId[0];
+                Inventory(Body).Clear();
+                Inventory(Body).AddItems(3, (MyObjectBuilder_PhysicalObject)VRage.ObjectBuilders.MyObjectBuilderSerializer.CreateNewObject(magazine));
+                yield return Equip(gun.Item.Id.SubtypeName);
+                var spot = Site.Origin - Site.Forward * 15;
+                StandAt(spot, spot + Site.Forward);
+                yield return null;
+                var head = Body.GetHeadMatrix(false).Translation - Body.PositionComp.GetPosition();
+                StandAt(spot - head, spot - head + Site.Forward);
+                Body.SetHeadLocalXAngle(0);
+                yield return WaitForTicks(3);
+                var whole = integrity();
+                yield return Pull();
+                yield return Until(() => whole - integrity(), v => v > 0, gun.Item.Id.SubtypeName + " hitting the wall", 20,
+                    () => GunState() + ", magazines " + F((double)Inventory(Body).GetItemAmount(magazine)));
+                Release();
+                fired.Add(gun.Item.Id.SubtypeName);
+                wall.Close();
+                yield return Seconds(0.5);
+            }
+            Result(guns.Count + " hand weapons fired and hit: " + string.Join(", ", fired));
+        }
+    }
+}

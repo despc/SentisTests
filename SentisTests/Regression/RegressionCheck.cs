@@ -109,12 +109,14 @@ namespace SentisTests.Regression
         public sealed override IEnumerator Run()
         {
             WorldApi.EnsureUnpaused(Name);
-            if (Site == null) Site = Sites.Get(Kind, 0);
+            if (Site == null) Site = TestRunner.RunOrigin.HasValue ? Sites.InFrontOfPlayer(Kind, TestRunner.RunOrigin.Value) : Sites.Get(Kind, 0);
             if (!InSuite) FakeClients.RemoveAll();
             if (!InSuite && NeedsDamage && Integrations.Missing(new[] { Integrations.Gameplay }).Count == 0)
             {
                 _gameplay = new Scenarios.ConfigOverride(Scenarios.ConfigOverride.Gameplay);
                 _gameplay.Set("DisableAnyDamageAfterStartTime", 0);
+                // every grid deals kinetic damage, however light (the server's 5 t keeps small ships from it)
+                _gameplay.Set("MinimumMassForKineticDamage", 1);
             }
             Note(Site.ToString());
             yield return Check();
@@ -137,6 +139,19 @@ namespace SentisTests.Regression
             yield return Wait(() => FakeClients.HasLiveCharacter(Me), "the fake player's character", 30);
             Track(Body);
             Body.PositionComp.SetWorldMatrix(MatrixD.CreateWorld(at, Site.Forward, Site.Up));
+        }
+
+        /// <summary>
+        /// One more fake player standing at a point (a part of the check far from its own player needs someone by it, or
+        /// the freezer takes it); the index of their client.
+        /// </summary>
+        protected IEnumerator Join(Vector3D at, Action<int> joined)
+        {
+            var index = FakeClients.Count;
+            FakeClients.Add(1, Network, i => (at, 0, 0), withCharacters: true);
+            yield return Wait(() => FakeClients.HasLiveCharacter(index), "a fake player's character", 30);
+            Track(FakeClients.Character(index));
+            joined(index);
         }
 
         /// <summary>Moves the player's character (held there from then on), facing the point.</summary>
@@ -351,14 +366,15 @@ namespace SentisTests.Regression
             direction.Normalize();
             var up = Vector3D.CalculatePerpendicularVector(direction);
             // the reactor right behind the tool, whatever its length
-            var behind = Definition(toolId).Size.Z;
-            var parts = new[] { new Part(toolId, 0, 0, 0), new Part("Reactor/LargeBlockSmallGenerator", 0, 0, behind) };
+            var tool = Definition(toolId);
+            var behind = tool.Size.Z;
+            var reactor = tool.CubeSize == MyCubeSize.Large ? "Reactor/LargeBlockSmallGenerator" : "Reactor/SmallBlockSmallGenerator";
+            var parts = new[] { new Part(toolId, 0, 0, 0), new Part(reactor, 0, 0, behind) };
             var probeAt = sensorAt - direction * 40 + up * 40;
-            var probe = Build(name + "-probe", probeAt, true, parts, forward: direction, up: up);
-            var tool = probe.GetCubeBlock(Vector3I.Zero).FatBlock;
-            var offset = WorldApi.SensorSphere(tool).Center - probeAt;
+            var probe = Build(name + "-probe", probeAt, true, parts, tool.CubeSize, forward: direction, up: up);
+            var offset = WorldApi.SensorSphere(probe.GetCubeBlock(Vector3I.Zero).FatBlock).Center - probeAt;
             probe.Close();
-            var rig = Build(name, sensorAt - offset, isStatic, parts, forward: direction, up: up);
+            var rig = Build(name, sensorAt - offset, isStatic, parts, tool.CubeSize, forward: direction, up: up);
             Put(Inventory(rig.GetCubeBlock(new Vector3I(0, 0, behind)).FatBlock), "Ingot/Uranium", 5);
             return rig;
         }
