@@ -41,10 +41,13 @@ namespace SentisTests.Core
         /// <summary>SentisAnomalyZone: king of the hill zones, driven through its AnomalyZoneApi.</summary>
         public const string AnomalyZone = "SentisAnomalyZone";
 
+        /// <summary>SentisTranslator: RU/EN chat translation by a local model (llama-server).</summary>
+        public const string Translator = "SentisTranslator";
+
         /// <summary>Every optional plugin, in the order of the start-up log line.</summary>
         public static readonly IReadOnlyList<string> Known = new List<string>
         {
-            Optimisations, Gameplay, Ai, Watcher, Adventures, Garage, Profiler, AnomalyZone,
+            Optimisations, Gameplay, Ai, Watcher, Adventures, Garage, Profiler, AnomalyZone, Translator,
         };
 
         // Types are resolved once per session and kept; a plugin that is not loaded yet is looked

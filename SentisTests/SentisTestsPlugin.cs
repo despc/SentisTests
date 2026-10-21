@@ -292,6 +292,8 @@ namespace SentisTests
                 ScenarioRegistry.Register(StructThisGcScenario.ScenarioName, () => new StructThisGcScenario());
                 ScenarioRegistry.Register(MixedWeldScenario.ScenarioName, () => new MixedWeldScenario());
                 ScenarioRegistry.Register(HandWeldScenario.ScenarioName, () => new HandWeldScenario());
+                ScenarioRegistry.Register(TranslatorChatScenario.ScenarioName, () => new TranslatorChatScenario());
+                ScenarioRegistry.Register(TranslatorChatScenario.RestartName, () => new TranslatorChatScenario(restart: true));
                 ScenarioRegistry.Register(ProductionScenario.ScenarioName, () => new ProductionScenario());
                 Regression.Registry.RegisterAll();
                 ScenarioRegistry.Register(ProductionFreezerStressScenario.ScenarioName,
@@ -407,6 +409,7 @@ namespace SentisTests
 
             ScenarioRegistry.Needs(Integrations.Adventures, NpcSpawnScenario.ScenarioName);
             ScenarioRegistry.Needs(Integrations.Garage, GarageRoundtripScenario.ScenarioName);
+            ScenarioRegistry.Needs(Integrations.Translator, TranslatorChatScenario.ScenarioName, TranslatorChatScenario.RestartName);
 
             // One pass over the world per plugin that sweeps it: the scenario needs all three.
             ScenarioRegistry.Needs(new[] { Integrations.Adventures, Integrations.Gameplay, Integrations.Optimisations },
