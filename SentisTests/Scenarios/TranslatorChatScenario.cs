@@ -25,14 +25,20 @@ namespace SentisTests.Scenarios
     ///
     /// Four fake players: A and D read Russian, B and C English. Their messages go through Torch's chat pipeline as a
     /// player's do (ChatManagerServer.RaiseMessageRecieved, what Torch calls for every chat message the server gets), and
-    /// what the plugin sends (MyVisualScriptLogicProvider.SendChatMessage) is taken down by player:
+    /// what the plugin sends (MyVisualScriptLogicProvider.SendChatMessage, and ChatHook.SendAsPlayer: a message under the
+    /// author's own name, as the game sends a player's) is taken down by player:
     /// - global chat, Russian: the translation, in English, to B and C only; English: in Russian, to A and D only;
-    /// - "!st off": C gets no more translations, "!st on" again; "!status" and the like are not "!st" (no reply);
+    /// - "!st off": C gets no more translations, "!st on" again; "!st help": the commands to A in a window (Torch's client mod) and a line in the chat, no admin ones; "!status" and the like are not "!st" (no reply);
     /// - commands, "ok", a link alone, a message of the server itself: nothing;
     /// - the language a player writes in becomes theirs: C writes Russian, C reads Russian;
+    /// - "!st lang ru": C's language chosen, kept when C writes English; "!st lang auto": detected again;
+    ///   "!st setlang" from a player who is not an admin: refused;
     /// - faction chat: the translation to the members of the faction who need it, not to the author; private chat: to
     ///   the addressee if they need it;
     /// - inline mode: the message held, the readers who need it get "text (translation)", the others the original at once;
+    /// - Discord (SEDiscordBridge, a stand-in of it here): a message in the chat channel translated for everyone who
+    ///   needs it, under the Discord author's name; one in a faction's channel (the bridge sends it to each member) to
+    ///   the member it went to, translated once;
     /// - "!st disable" from a player who is not an admin: refused.
     /// The plugin's settings are changed in memory and put back (the players' languages too), real players online are
     /// left out of it (taken as having translations off while it runs).
@@ -64,13 +70,15 @@ namespace SentisTests.Scenarios
         }
 
         private static readonly ConcurrentQueue<Sent> Captured = new ConcurrentQueue<Sent>();
+        // the windows the plugin opens through Torch's client mod (DialogMessage): to whom (Steam id), what in them
+        private static readonly ConcurrentQueue<KeyValuePair<ulong, string>> Dialogs = new ConcurrentQueue<KeyValuePair<ulong, string>>();
         private static volatile bool _capturing;
         // what goes to the fake players, and to identity 0 (everyone): real players online are not this scenario's
         private static volatile HashSet<long> _fakes = new HashSet<long>();
         private static Harmony _harmony;
 
         private static readonly string[] Settings =
-            { "AutoRestartServer", "Enabled", "TranslateGlobal", "TranslateFaction", "TranslatePrivate", "InlineMode", "OptedOutReceivers", "NativeLanguages" };
+            { "AutoRestartServer", "Enabled", "TranslateGlobal", "TranslateFaction", "TranslatePrivate", "InlineMode", "OptedOutReceivers", "NativeLanguages", "ChosenLanguages" };
 
         private readonly Dictionary<string, object> _saved = new Dictionary<string, object>();
         private readonly List<long> _factions = new List<long>();
@@ -145,6 +153,17 @@ namespace SentisTests.Scenarios
             while (step.MoveNext()) yield return step.Current;
             Check(!OptedOut().Contains(_steam[C].ToString()), "C is still among those with translations off after \"!st on\"");
 
+            // --- !st help: the player's commands in a window, to the player only, no admin ones for a player who is not an admin
+            while (Dialogs.TryDequeue(out _)) { }
+            step = StReply("!st help", A, "window");
+            while (step.MoveNext()) yield return step.Current;
+            var windows = Dialogs.ToList();
+            var admin = MySession.Static.IsUserAdmin(_steam[A]);
+            Check(windows.Count == 1 && windows[0].Key == _steam[A] && windows[0].Value.Contains("!st lang ru") && admin == windows[0].Value.Contains("setlang"),
+                "!st help opened " + windows.Count + " windows: " + string.Join(" / ", windows.Select(w => w.Key + ": " + w.Value.Replace("\n", " | "))) +
+                (admin ? "" : "; not one to A with the player's commands alone"));
+            Note("!st help: a window to A, " + windows[0].Value.Split('\n').Length + " lines");
+
             // --- other plugins' commands are not !st, and what is not to be translated is not
             foreach (var text in new[] { "!status", "!stats", "!stuck" })
             {
@@ -169,6 +188,22 @@ namespace SentisTests.Scenarios
             while (step.MoveNext()) yield return step.Current;
             Check(Native(C) == "en", "C wrote English and reads " + Native(C));
 
+            // --- a language chosen by a command is kept from detection, "auto" gives it back
+            step = StReply("!st lang ru", C, "your native language: ru (chosen)");
+            while (step.MoveNext()) yield return step.Current;
+            step = WaitForSeconds(1.2, "past the plugin's one second between language changes");
+            while (step.MoveNext()) yield return step.Current;
+            step = Translated("C, Russian by choice, writes English", C, "Anyone selling ice? I need about a thousand.", ChatChannel.Global, 0, new[] { A, D }, english: false);
+            while (step.MoveNext()) yield return step.Current;
+            Check(Native(C) == "ru", "C chose Russian, wrote English and reads " + Native(C));
+            step = StReply("!st lang auto", C, "your native language: ru (detected)");
+            while (step.MoveNext()) yield return step.Current;
+            step = WaitForSeconds(1.2, "past the plugin's one second between language changes");
+            while (step.MoveNext()) yield return step.Current;
+            step = Translated("C, detected again, writes English", C, "Thanks, I got the ice already.", ChatChannel.Global, 0, new[] { A, D }, english: false);
+            while (step.MoveNext()) yield return step.Current;
+            Check(Native(C) == "en", "C's language is detected again, C wrote English and reads " + Native(C));
+
             // --- faction chat: A's faction with B and D in it, C outside
             var suffix = (DateTime.UtcNow.Ticks % 900 + 100).ToString();
             var factions = MySession.Static.Factions;
@@ -192,6 +227,21 @@ namespace SentisTests.Scenarios
             step = Nothing("Russian in private to D (reads Russian)", A, "Можешь прислать мне координаты своей базы?", ChatChannel.Private, _identity[D], false);
             while (step.MoveNext()) yield return step.Current;
 
+            // --- Discord: the chat channel to everyone, a faction's channel to each member
+            step = FromDiscord("Discord, Russian, to everyone", "[D] Vasya", "Всем привет из дискорда, кто сегодня играет?", 0, new[] { B, C }, english: true);
+            while (step.MoveNext()) yield return step.Current;
+            step = FromDiscord("Discord, English, to everyone", "[D] John", "Hello from Discord, is the server up?", 0, new[] { A, D }, english: false);
+            while (step.MoveNext()) yield return step.Current;
+            const string factionText = "Сбор фракции в восемь вечера у главной базы.";
+            step = FromDiscord("Discord, Russian, a faction channel to B", "[D] Vasya", factionText, _steam[B], new[] { B }, english: true);
+            while (step.MoveNext()) yield return step.Current;
+            // D reads Russian: nothing for D
+            SEDiscordBridge.DiscordBridge.Discord_MessageCreated((IChatManagerServer)_chat, "[D] Vasya", factionText, _steam[D]);
+            step = WaitForSeconds(QuietSeconds + 1, "Discord, a faction channel to D: nothing sent");
+            while (step.MoveNext()) yield return step.Current;
+            var toD = Drain();
+            Check(toD.Count == 0, "Discord, Russian, a faction channel to D (reads Russian): the plugin sent " + string.Join(" / ", toD));
+
             // --- inline mode: held, combined to those who need it, the original to the others at once
             Set("InlineMode", true);
             step = Inline();
@@ -205,18 +255,37 @@ namespace SentisTests.Scenarios
                 step = StReply("!st disable " + FakeClients.PlayerOf(B).DisplayName, A, "admin only");
                 while (step.MoveNext()) yield return step.Current;
                 Check(Equals(Get("OptedOutReceivers"), before), "\"!st disable\" from a player who is not an admin changed who has translations off");
+                var languages = Get("NativeLanguages");
+                step = StReply("!st setlang " + FakeClients.PlayerOf(B).DisplayName + " ru", A, "admin only");
+                while (step.MoveNext()) yield return step.Current;
+                Check(Equals(Get("NativeLanguages"), languages), "\"!st setlang\" from a player who is not an admin changed a language");
             }
             else Note("A is an admin on this server: the refusal of \"!st disable\" is not checked");
 
-            Note("TRANSLATOR CHAT RESULT | global both ways, !st off/on, other commands and untranslatable text left, the writer's language learnt, faction, private, inline, admin command refused");
+            Note("TRANSLATOR CHAT RESULT | global both ways, !st off/on, !st help, other commands and untranslatable text left, the writer's language learnt, !st lang chosen and auto, faction, private, Discord, inline, admin commands refused");
         }
 
         // ------------------------------------------------------------------ steps
 
         /// <summary>The message is said and translated to exactly <paramref name="to"/>, in the language expected, and nothing more.</summary>
-        private IEnumerator Translated(string what, int from, string text, ChatChannel channel, long target, int[] to, bool english)
+        private IEnumerator Translated(string what, int from, string text, ChatChannel channel, long target, int[] to, bool english) =>
+            Translated(what, () => Say(from, text, channel, target), to, english);
+
+        /// <summary>A message from Discord as SEDiscordBridge shows it (to everyone, or to one player: <paramref name="target"/>), translated for <paramref name="to"/>.</summary>
+        private IEnumerator FromDiscord(string what, string author, string text, ulong target, int[] to, bool english)
         {
-            var consumed = Say(from, text, channel, target);
+            var step = Translated(what, () =>
+            {
+                Drain();
+                SEDiscordBridge.DiscordBridge.Discord_MessageCreated((IChatManagerServer)_chat, author, text, target);
+                return false;
+            }, to, english, author);
+            while (step.MoveNext()) yield return step.Current;
+        }
+
+        private IEnumerator Translated(string what, Func<bool> say, int[] to, bool english, string author = null)
+        {
+            var consumed = say();
             Check(!consumed, what + ": the message was held (only inline mode does that, and it is off)");
             var want = to.Select(i => _identity[i]).OrderBy(x => x).ToArray();
             var got = Wait(() => Translations().Select(s => s.To).Distinct().Count() >= want.Length, what + ": translated to " + string.Join(",", to.Select(Letter)), TranslateSeconds);
@@ -233,6 +302,8 @@ namespace SentisTests.Scenarios
                 what + ": translations went to " + string.Join(",", translations.Select(s => Who(s.To))) + ", not " + string.Join(",", to.Select(Letter)));
             var translation = translations[0].Text;
             Check(translations.All(s => s.Text == translation), what + ": the readers got different translations");
+            if (author != null)
+                Check(translations.All(s => s.Author.Contains(" " + author + " ")), what + ": the translations are not under " + author + ": " + string.Join(" / ", translations));
             Check(english ? Cyrillic(translation) < 0.05 : Cyrillic(translation) > 0.5, what + ": \"" + translation + "\" is not " + (english ? "English" : "Russian"));
             Note(what + ": \"" + translation + "\" to " + string.Join(",", to.Select(Letter)) + " in " + took.ToString("F1") + " s");
         }
@@ -271,7 +342,7 @@ namespace SentisTests.Scenarios
             Check(consumed, what + ": the message was not held");
             // D reads Russian: the original, at once (in the same call)
             var first = Drain();
-            Check(first.Count == 1 && first[0].To == _identity[D] && first[0].Text == RuText && !first[0].Author.Contains("→"),
+            Check(first.Count == 1 && first[0].To == _identity[D] && first[0].Text == RuText && !first[0].Author.EndsWith((string)Get("TranslationSuffix")),
                 what + ": at once sent " + string.Join(" / ", first) + ", not the original to D");
             var got = Wait(() => Captured.Select(s => s.To).Distinct().Count() >= 2, what + ": combined to B and C", TranslateSeconds);
             while (got.MoveNext()) yield return got.Current;
@@ -354,7 +425,8 @@ namespace SentisTests.Scenarios
 
         private IEnumerable<Sent> Translations() => Captured.Where(IsTranslation);
 
-        private static bool IsTranslation(Sent s) => s.Font == "Green" && s.Author.EndsWith("→");
+        // a translation goes coloured as the original's name (SendChatMessageColored), under "name »"
+        private bool IsTranslation(Sent s) => s.Font.StartsWith("Colored") && s.Author.EndsWith((string)Get("TranslationSuffix"));
 
         private static List<Sent> Drain()
         {
@@ -386,6 +458,37 @@ namespace SentisTests.Scenarios
                          ?? throw new MissingMethodException("MyVisualScriptLogicProvider", "SendChatMessage");
             _harmony = new Harmony("SentisTests.TranslatorChat");
             _harmony.Patch(target, prefix: new HarmonyMethod(typeof(TranslatorChatScenario).GetMethod(nameof(SendPrefix), BindingFlags.Static | BindingFlags.NonPublic)));
+            var colored = typeof(MyVisualScriptLogicProvider).GetMethod("SendChatMessageColored", new[] { typeof(string), typeof(Color), typeof(string), typeof(long), typeof(string) });
+            if (colored != null)
+                _harmony.Patch(colored, prefix: new HarmonyMethod(typeof(TranslatorChatScenario).GetMethod(nameof(SendColoredPrefix), BindingFlags.Static | BindingFlags.NonPublic)));
+            var dialog = typeof(Torch.Mod.ModCommunication).GetMethod("SendMessageTo", new[] { typeof(Torch.Mod.Messages.MessageBase), typeof(ulong) });
+            if (dialog != null)
+                _harmony.Patch(dialog, prefix: new HarmonyMethod(typeof(TranslatorChatScenario).GetMethod(nameof(DialogPrefix), BindingFlags.Static | BindingFlags.NonPublic)));
+            var asPlayer = Integrations.TypeOf(PluginName, "SentisTranslator.ChatHook")?.GetMethod("SendAsPlayer", Any);
+            if (asPlayer != null)
+                _harmony.Patch(asPlayer, prefix: new HarmonyMethod(typeof(TranslatorChatScenario).GetMethod(nameof(SendAsPlayerPrefix), BindingFlags.Static | BindingFlags.NonPublic)));
+        }
+
+        private static void SendColoredPrefix(string message, Color color, string author, long playerId, string font)
+        {
+            if (_capturing && (playerId == 0 || _fakes.Contains(playerId)))
+                Captured.Enqueue(new Sent { Text = message ?? "", Author = author ?? "", To = playerId, Font = "Colored " + font + " " + color });
+        }
+
+        private static void DialogPrefix(Torch.Mod.Messages.MessageBase message, ulong target)
+        {
+            if (_capturing && message is Torch.Mod.Messages.DialogMessage dialog) Dialogs.Enqueue(new KeyValuePair<ulong, string>(target, dialog.Content ?? ""));
+        }
+
+        private static void SendAsPlayerPrefix(System.Collections.IEnumerable readers, string text, object author)
+        {
+            if (!_capturing || readers == null) return;
+            var name = author?.GetType().GetField("Name")?.GetValue(author) as string ?? "";
+            foreach (var reader in readers)
+            {
+                var identity = (long)reader.GetType().GetField("Identity").GetValue(reader);
+                if (_fakes.Contains(identity)) Captured.Enqueue(new Sent { Text = text ?? "", Author = name, To = identity, Font = "Player" });
+            }
         }
 
         private static void SendPrefix(string message, string author, long playerId, string font)
