@@ -178,17 +178,16 @@ namespace SentisTests.Regression.Checks
         }
     }
 
-    /// <summary>
-    /// A projector shows a blueprint of two blocks next to itself; a welder over the hologram builds them: they become
-    /// blocks of the projector's grid, finished.
-    /// </summary>
-    public sealed class ProjectorCheck : RegressionCheck
+    /// <summary>A projector by a reactor with uranium, showing a blueprint of two blocks of armor right next to itself.</summary>
+    public abstract class ProjectorRigCheck : RegressionCheck
     {
-        public override string Name => Prefix + "projector";
+        protected MyCubeGrid Grid;
+        protected MyProjectorBase Projector;
+        /// <summary>The hologram's cells in the projector's grid, along its X.</summary>
+        protected List<Vector3I> Cells;
 
-        protected override IEnumerator Check()
+        protected IEnumerator Project(string name, Vector3D at, long? owner = null)
         {
-            yield return Arrive(Site.At(0, 10, 10));
             var blueprint = new MyObjectBuilder_CubeGrid
             {
                 GridSizeEnum = MyCubeSize.Large,
@@ -198,7 +197,7 @@ namespace SentisTests.Regression.Checks
                     new MyObjectBuilder_CubeBlock { SubtypeName = "LargeBlockArmorBlock", Min = new Vector3I(1, 0, 0) },
                 },
             };
-            var grid = Build("projector", Site.Origin, true,
+            var parts = new[] {
                 new Part("Reactor/LargeBlockSmallGenerator", 0, 0, 0),
                 new Part("MyObjectBuilder_Projector/LargeProjector", 1, 0, 0).With(b =>
                 {
@@ -207,7 +206,8 @@ namespace SentisTests.Regression.Checks
                     projector.ProjectionOffset = new Vector3I(1, 0, 0);
                     projector.ProjectionsRemaining = 1;
                     projector.Scale = 1;
-                }));
+                }) };
+            var grid = owner.HasValue ? BuildFor(owner.Value, name, at, parts) : Build(name, at, true, parts);
             Put(Inventory(Block<MyReactor>(grid)), "Ingot/Uranium", 5);
             var projectorBlock = Block<MyProjectorBase>(grid);
             yield return Until(() => projectorBlock.IsWorking && projectorBlock.ProjectedGrid != null ? 1 : 0, v => v > 0, "the projection up", 30);
@@ -232,6 +232,27 @@ namespace SentisTests.Regression.Checks
                 yield return Seconds(2);
                 cells = cellsNow();
             }
+            Grid = grid;
+            Projector = projectorBlock;
+            Cells = cells;
+        }
+    }
+
+    /// <summary>
+    /// A projector shows a blueprint of two blocks next to itself; a welder over the hologram builds them: they become
+    /// blocks of the projector's grid, finished.
+    /// </summary>
+    public sealed class ProjectorCheck : ProjectorRigCheck
+    {
+        public override string Name => Prefix + "projector";
+
+        protected override IEnumerator Check()
+        {
+            yield return Arrive(Site.At(0, 10, 10));
+            yield return Project("projector", Site.Origin);
+            var grid = Grid;
+            var projectorBlock = Projector;
+            var cells = Cells;
             var hologram = projectorBlock.ProjectedGrid;
             var buildable = hologram.CubeBlocks.Count(b => projectorBlock.CanBuild(b, true) == BuildCheckResult.OK);
             Note("the hologram is at cells " + string.Join(" ", cells) + " of the projector's grid, " + buildable + " of its blocks buildable now");

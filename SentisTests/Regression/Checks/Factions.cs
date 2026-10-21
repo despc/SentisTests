@@ -138,6 +138,8 @@ namespace SentisTests.Regression.Checks
 
         protected override IEnumerator Check()
         {
+            // at the game's low quality (its own under load) bullets check what they hit a third as often and fly through walls
+            HoldHighQuality();
             yield return Arrive(Site.At(0, 10, 20));
             int mate = -1, ally = -1, stranger = -1;
             yield return Join(Site.At(10, 10, 20), i => mate = i);

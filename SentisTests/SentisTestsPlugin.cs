@@ -255,6 +255,8 @@ namespace SentisTests
                 ScenarioRegistry.Register(WarheadMassScenario.AllScenarioName, () => new WarheadMassScenario(all: true));
                 ScenarioRegistry.Register(FreezeProductionScenario.ScenarioName, () => new FreezeProductionScenario());
                 ScenarioRegistry.Register(LongFreezeProductionScenario.ScenarioName, () => new LongFreezeProductionScenario());
+                ScenarioRegistry.Register(LongFreezeProductionScenario.RepeatName, () => new LongFreezeProductionScenario(LongFreezeProductionScenario.RepeatName, 3, true));
+                ScenarioRegistry.Register(LongFreezeProductionScenario.RepeatDisassemblyName, () => new LongFreezeProductionScenario(LongFreezeProductionScenario.RepeatDisassemblyName, 3, true, true));
                 ScenarioRegistry.Register(FreezeDisassemblyScenario.ScenarioName, () => new FreezeDisassemblyScenario());
                 ScenarioRegistry.Register(PbStaticInitScenario.ScenarioName, () => new PbStaticInitScenario());
                 ScenarioRegistry.Register(RotorPlaceScenario.ScenarioName, () => new RotorPlaceScenario());
@@ -374,7 +376,7 @@ namespace SentisTests
 
             ScenarioRegistry.Needs(Integrations.Optimisations,
                 FreezeProductionScenario.ScenarioName,
-                LongFreezeProductionScenario.ScenarioName,
+                LongFreezeProductionScenario.ScenarioName, LongFreezeProductionScenario.RepeatName, LongFreezeProductionScenario.RepeatDisassemblyName,
                 FreezeDisassemblyScenario.ScenarioName,
                 FreezePowerScenario.ScenarioName,
                 FreezerPhysicsScenario.ScenarioName,

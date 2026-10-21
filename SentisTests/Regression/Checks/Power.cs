@@ -99,14 +99,14 @@ namespace SentisTests.Regression.Checks
                 var grid = Build("solar", Site.Origin, true, new[] { new Part("SolarPanel/LargeBlockSolarPanel", 0, 0, 0) },
                     forward: facing, up: up);
                 var panel = Block<SpaceEngineers.Game.Entities.Blocks.MySolarPanel>(grid);
-                var started = DateTime.UtcNow;
-                while ((DateTime.UtcNow - started).TotalSeconds < 15)
+                var within = Within(15);
+                while (within())
                 {
                     best = Math.Max(best, ((PowerProducer)panel).MaxOutput);
                     if (best > 0.01) break;
                     yield return null;
                 }
-                grid.Close();
+                yield return CloseAndWait(grid);
                 if (best > 0.01) break;
             }
             Check(best > 0.01, "no power from a solar panel turned to the sun either way");

@@ -89,8 +89,7 @@ namespace SentisTests.Regression.Checks
                         new Sandbox.ModAPI.Ingame.MyInventoryItemFilter(new MyDefinitionId(typeof(MyObjectBuilder_Ore)), true),
                     });
                 ((Sandbox.ModAPI.IMyTerminalBlock)sorter).SetValueBool("DrainAll", true);
-                var started = DateTime.UtcNow;
-                while ((DateTime.UtcNow - started).TotalSeconds < 20 && Amount(b, "Ore/Iron") < 100)
+                for (var f = Frames(20); f > 0 && Amount(b, "Ore/Iron") < 100; f--)
                     yield return null;
                 if (Amount(b, "Ore/Iron") >= 100)
                 {
@@ -99,7 +98,8 @@ namespace SentisTests.Regression.Checks
                     Result("sorter facing " + facing + " drained 100 kg of ore from A to B, the plates stayed in A (" + Amount(a, "Component/SteelPlate") + ")");
                     yield break;
                 }
-                Note("facing " + facing + ": in B ore " + F(Amount(b, "Ore/Iron")) + ", left in A " + F(Amount(a, "Ore/Iron")) + "; " + State(sorter));
+                Note("facing " + facing + ": in B ore " + F(Amount(b, "Ore/Iron")) + ", left in A " + F(Amount(a, "Ore/Iron")) + ", in the sorter "
+                     + F(sorter.InventoryCount > 0 ? Amount(Inventory(sorter), "Ore/Iron") : 0) + "; " + State(sorter));
                 grid.Close();
                 yield return null;
             }

@@ -179,6 +179,46 @@ namespace SentisTests.Regression.Checks
     }
 
     /// <summary>
+    /// A player with a hand grinder and a suit full of stone grinds a block away all the same: what does not fit stays in
+    /// the block, and when it is gone falls out by it as loose items (<c>MySlimBlock.SpawnConstructionStockpile</c>) -
+    /// every plate it was built of, none in the suit.
+    /// </summary>
+    public sealed class HandGrindFullCheck : HandCheck
+    {
+        public override string Name => Prefix + "hand_grind_full";
+        protected override bool NeedsDamage => true;
+
+        protected override IEnumerator Check()
+        {
+            yield return Arrive(Site.At(0, 0, -4));
+            var grid = Build("hand-grind-full", Site.Origin, true, new Part("CubeBlock/LargeBlockArmorBlock", 0, 0, 0));
+            var block = grid.GetCubeBlock(Vector3I.Zero);
+            var plates = Definition("CubeBlock/LargeBlockArmorBlock").Components.Where(c => c.Definition.Id.SubtypeName == "SteelPlate").Sum(c => c.Count);
+            yield return Equip("AngleGrinderItem");
+            var suit = Inventory(Body);
+            var fits = suit.ComputeAmountThatFits(Item("Ore/Stone"));
+            Put(suit, "Ore/Stone", (double)fits);
+            Check(suit.ComputeAmountThatFits(Item("Component/SteelPlate")) == 0, "the suit full of stone still takes " + suit.ComputeAmountThatFits(Item("Component/SteelPlate")) + " plates");
+            var before = new HashSet<long>(MyEntities.GetEntities().OfType<MyFloatingObject>().Select(f => f.EntityId));
+            yield return AimAt(block);
+            yield return Pull();
+            yield return Until(() => grid.MarkedForClose || grid.GetCubeBlock(Vector3I.Zero) == null ? 1 : 0, v => v > 0, "the block ground away with a full suit", 120,
+                () => "integrity " + F(block.Integrity) + "; " + GunState());
+            Release();
+            // the game puts loose items in a queue and spawns them a few a frame
+            double Loose() => MyEntities.GetEntities().OfType<MyFloatingObject>()
+                .Where(f => !before.Contains(f.EntityId) && f.Item.Content.SubtypeName == "SteelPlate" && Vector3D.Distance(f.PositionComp.GetPosition(), Site.Origin) < 15)
+                .Sum(f => (double)f.Item.Amount);
+            yield return Until(() => Loose() >= plates - 0.01 ? 1 : 0, v => v > 0, "the block's plates falling out by it", 15, () => F(Loose()) + " of " + plates);
+            foreach (var item in MyEntities.GetEntities().OfType<MyFloatingObject>().Where(f => !before.Contains(f.EntityId) && Vector3D.Distance(f.PositionComp.GetPosition(), Site.Origin) < 15).ToList())
+                Track(item);
+            var inSuit = Amount(suit, "Component/SteelPlate");
+            Check(inSuit == 0, "the full suit got " + inSuit + " plates");
+            Result("ground away with the suit full of stone: " + F(Loose()) + " of " + plates + " plates fell out by the block, " + inSuit + " in the suit");
+        }
+    }
+
+    /// <summary>
     /// A player drills an asteroid with a hand drill, floating by its face and looking straight at it: ore goes
     /// into their inventory. (A hand drill cuts a metre ahead of the player's head: it drills what is in front of them, a
     /// wall of rock, not the flat ground under their feet. The asteroid is one of the game's own, put there for the check
@@ -237,7 +277,7 @@ namespace SentisTests.Regression.Checks
             yield return Equip("HandDrillItem");
             AimPoint = face - normal * 0.3;
             yield return Pull();
-            var started = DateTime.UtcNow;
+            var within = Within(30);
             // a hand drill drops what it cuts as pieces of ore floating by the hole (the player picks them up), some
             // straight into the inventory: both count
             Func<double> ore = () => Inventory(Body).GetItems().Where(i => i.Content is MyObjectBuilder_Ore).Sum(i => (double)i.Amount) +
@@ -245,7 +285,7 @@ namespace SentisTests.Regression.Checks
                                          .Where(f => !f.MarkedForClose && f.Item.Content is MyObjectBuilder_Ore && Vector3D.Distance(f.PositionComp.GetPosition(), face) < 10)
                                          .Sum(f => (double)f.Item.Amount);
             // a hand drill gives ore in crumbs (0.009 of the rock it cuts, times the world's harvest ratio): any is enough
-            while (ore() <= 0 && (DateTime.UtcNow - started).TotalSeconds < 30)
+            while (ore() <= 0 && within())
             {
                 Look();
                 yield return null;
@@ -352,6 +392,8 @@ namespace SentisTests.Regression.Checks
 
         protected override IEnumerator Check()
         {
+            // at the game's low quality (its own under load) bullets check what they hit a third as often and fly through walls
+            HoldHighQuality();
             yield return Arrive(Site.At(0, 0, -10));
             var wall = new System.Collections.Generic.List<Part>();
             for (var x = -1; x <= 1; x++)

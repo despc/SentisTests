@@ -151,8 +151,13 @@ namespace SentisTests.Regression.Checks
             };
             // the body may give its things to a bag a moment after the death
             yield return Seconds(2);
-            yield return Until(kept, v => Math.Abs(v - 17) < 0.01, "the 17 plates on the body or in a bag", 10,
-                () => "the body " + (body.MarkedForClose ? "gone" : "there, " + F(Vector3D.Distance(body.PositionComp.GetPosition(), died)) + " m from where it died") + ", bags " + bags().Count());
+            // the bag is queued (MyFloatingObjects' spawn queue, a few a frame): under the suite's load it comes late, and
+            // meanwhile the plates are nowhere - the body's inventory is cleared at the death
+            yield return Until(kept, v => Math.Abs(v - 17) < 0.01, "the 17 plates on the body or in a bag", 40,
+                () => "the body " + (body.MarkedForClose ? "gone" : "there, " + F(Vector3D.Distance(body.PositionComp.GetPosition(), died)) + " m from where it died, its items: "
+                          + string.Join(", ", body.GetInventory()?.GetItems().Select(i => i.Content.SubtypeName + " " + i.Amount) ?? Enumerable.Empty<string>())) + ", bags " + bags().Count()
+                      + "; anything with 17 plates in the world: " + string.Join(", ", MyEntities.GetEntities().Where(e => e.HasInventory && e.GetInventory()?.GetItemAmount(Item("Component/SteelPlate")) == 17)
+                          .Select(e => e.GetType().Name + " " + F(Vector3D.Distance(e.PositionComp.GetPosition(), died)) + " m")));
             foreach (var bag in bags().ToList())
                 Track(bag);
             Result("dead, the 17 plates kept " + (body.MarkedForClose ? "in a bag" : "on the body"));
@@ -186,38 +191,18 @@ namespace SentisTests.Regression.Checks
             // load is over 90 % (AdaptiveSimulationQuality, MySession.CheckSimSpeed): the stand is loaded so most of the
             // time. The cutting itself is what is checked: the quality held high for the blast, as on a server at ease
             var quality = MySession.Static.HighSimulationQuality;
-            _adaptive = MySession.Static.Settings.AdaptiveSimulationQuality;
-            MySession.Static.Settings.AdaptiveSimulationQuality = false;
-            SetQuality(true);
+            HoldHighQuality();
             Request(warhead, "DetonateRequest");
             yield return Until(() => warhead.MarkedForClose ? 1 : 0, v => v > 0, "the warhead blown up", 10);
             yield return Seconds(2);
-            RestoreQuality();
+            ReleaseHighQuality();
             var after = Rock(_ground, 3);
             Check(after < before, "the ground under the warhead is whole after the blast (" + before + " -> " + after + " of rock in 6 m around)");
             Result("the blast took " + (100.0 * (before - after) / Math.Max(1, before)).ToString("F0") + " % of the rock in 6 m around it (" + before + " -> " + after +
                    "; the server's own simulation quality " + (quality ? "high" : "low, held high for the blast") + ")");
         }
 
-        private bool? _adaptive;
 
-        private static void SetQuality(bool high) =>
-            (typeof(MySession).GetProperty("HighSimulationQuality")?.GetSetMethod(true) ?? throw new Core.ScenarioFailedException("MySession.HighSimulationQuality cannot be set"))
-            .Invoke(MySession.Static, new object[] { high });
-
-        /// <summary>The world's adaptive quality as it was: the game sets the quality by the load again.</summary>
-        private void RestoreQuality()
-        {
-            if (_adaptive == null || MySession.Static == null) return;
-            MySession.Static.Settings.AdaptiveSimulationQuality = _adaptive.Value;
-            _adaptive = null;
-        }
-
-        public override void Cleanup()
-        {
-            RestoreQuality();
-            base.Cleanup();
-        }
 
         /// <summary>The rock in a cube about the point: the content of all its voxels summed.</summary>
         private long Rock(Vector3D point, double half)

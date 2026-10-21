@@ -21,7 +21,7 @@ namespace SentisTests.Regression.Checks
     public sealed class WeaponBlocksCheck : RegressionCheck
     {
         public override string Name => Prefix + "weapon_blocks";
-        public override int TimeoutSeconds => 200;
+        public override int TimeoutSeconds => 320;
         protected override bool NeedsDamage => true;
 
         private sealed class Lane
@@ -38,6 +38,8 @@ namespace SentisTests.Regression.Checks
 
         protected override IEnumerator Check()
         {
+            // at the game's low quality (its own under load) bullets check what they hit a third as often and fly through walls
+            HoldHighQuality();
             var weapons = MyDefinitionManager.Static.GetAllDefinitions().OfType<MyWeaponBlockDefinition>()
                 .Where(d => d.Public && !(d.Id.TypeId.ToString().EndsWith("Searchlight")))
                 .OrderBy(d => d.Id.SubtypeName).ToList();
@@ -91,8 +93,10 @@ namespace SentisTests.Regression.Checks
                 if (!(lane.Gun is Sandbox.Game.Weapons.MyLargeTurretBase))
                     ((Sandbox.ModAPI.IMyTerminalBlock)lane.Gun).GetActionWithName("Shoot_On")?.Apply(lane.Gun);
             }
+            // 90 s of game time (a railgun charges first), up to three times that by the clock
             var started = DateTime.UtcNow;
-            while (lanes.Any(l => l.Done == null) && (DateTime.UtcNow - started).TotalSeconds < 90)
+            var frames = 0;
+            while (lanes.Any(l => l.Done == null) && frames++ < Frames(90) && (DateTime.UtcNow - started).TotalSeconds < 270)
             {
                 foreach (var lane in lanes.Where(l => l.Done == null))
                 {

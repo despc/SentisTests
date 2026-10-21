@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Sandbox.Definitions;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Weapons;
@@ -77,6 +78,8 @@ namespace SentisTests.Regression.Checks
 
         protected override IEnumerator Check()
         {
+            // at the game's low quality (its own under load) bullets check what they hit a third as often and fly through walls
+            HoldHighQuality();
             yield return Arrive(Site.At(0, 0, -15));
             var guns = MyDefinitionManager.Static.GetAllDefinitions().OfType<MyWeaponItemDefinition>()
                 .Where(d => d.Public && d.Id.TypeId == typeof(VRage.Game.MyObjectBuilder_PhysicalGunObject))
@@ -117,16 +120,63 @@ namespace SentisTests.Regression.Checks
                         bursts++;
                     }
                     return whole - integrity();
-                }, v => v > 0, gun.Item.Id.SubtypeName + " hitting the wall", 20,
+                }, v => v > 0, gun.Item.Id.SubtypeName + " hitting the wall", 40,
                     () => GunState() + ", magazines " + F((double)Inventory(Body).GetItemAmount(magazine)) + ", " + bursts + " bursts, " +
                           F(Vector3D.Distance(Body.PositionComp.GetPosition(), spot - head)) + " m from where the astronaut was put, looking " +
-                          F(Motion.Angle(Body.GetHeadMatrix(false).Forward, Site.Forward)) + " degrees off the wall");
+                          F(Motion.Angle(Body.GetHeadMatrix(false).Forward, Site.Forward)) + " degrees off the wall; " + Sight(wall));
                 Release();
                 fired.Add(gun.Item.Id.SubtypeName);
-                wall.Close();
-                yield return Seconds(0.5);
+                yield return CloseAndWait(wall);
             }
             Result(guns.Count + " hand weapons fired and hit: " + string.Join(", ", fired));
+        }
+
+        /// <summary>The grid's own update state: the freezer's mark, its update needs, its queued callbacks, its pending damage.</summary>
+        private static string Updates(MyCubeGrid grid)
+        {
+            var flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+            object Get(string name) => typeof(MyCubeGrid).GetField(name, flags)?.GetValue(grid);
+            var queues = Get("m_updateQueues") as System.Collections.IEnumerable;
+            var queued = new List<string>();
+            if (queues != null)
+                foreach (var queue in queues)
+                    if (queue is System.Collections.ICollection list) queued.Add(list.Count.ToString());
+            return "frozen mark " + (((int)grid.Flags & 4) != 0) + ", needs update " + grid.NeedsUpdate + ", queued after " + Get("m_totalQueuedSynchronousUpdatesAfter") +
+                   " before " + Get("m_totalQueuedSynchronousUpdatesBefore") + ", queues [" + string.Join(" ", queued) + "], update in progress " + Get("m_updateInProgress") +
+                   ", delayed " + Get("m_hasDelayedUpdate") + ", damage dirty " + Get("m_blocksForDamageApplicationDirty") + ", in scene " + grid.InScene + "; " + Orchestrator(grid);
+        }
+
+        /// <summary>What the game's update orchestrator knows of the grid: its lists, its record of the grid's flags, its pending changes.</summary>
+        private static string Orchestrator(MyCubeGrid grid)
+        {
+            var orchestrator = MyEntities.Orchestrator;
+            if (orchestrator == null) return "no orchestrator";
+            var flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+            object Get(string name) => orchestrator.GetType().GetField(name, flags)?.GetValue(orchestrator);
+            bool In(string name) => Get(name) is HashSet<VRage.Game.Entity.MyEntity> set && set.Contains(grid);
+            var record = Get("m_lastUpdateRecord") is System.Collections.IDictionary records && records.Contains(grid) ? records[grid].ToString() : "none";
+            return "orchestrator " + orchestrator.GetType().Name + ": in after " + In("m_entitiesForUpdateAfter") + ", in each frame " + In("m_entitiesForUpdate") +
+                   ", to add " + In("m_entitiesToAdd") + ", to remove " + In("m_entitiesToRemove") + ", record " + record + ", grid's flags " + grid.UpdateFlags;
+        }
+
+        /// <summary>What the player's eye meets ahead, the wall's state and the game's simulation quality.</summary>
+        private string Sight(MyCubeGrid wall)
+        {
+            var eye = Body.GetHeadMatrix(false);
+            var hit = Sandbox.Engine.Physics.MyPhysics.CastRay(eye.Translation, eye.Translation + eye.Forward * 40, 15);
+            var hitEntity = hit.HasValue ? ((VRage.Game.ModAPI.IHitInfo)hit.Value).HitEntity as VRage.Game.Entity.MyEntity : null;
+            string Count(string field)
+            {
+                var set = typeof(MyEntities).GetField(field, BindingFlags.Static | BindingFlags.NonPublic)?.GetValue(null);
+                return set?.GetType().GetProperty("Count")?.GetValue(set)?.ToString() ?? "?";
+            }
+            var met = hit.HasValue ? hitEntity?.DisplayName + " " + hitEntity?.EntityId + (hitEntity == wall ? " (this wall)" : " (not this wall " + wall.EntityId + ")") +
+                                     ", closed " + hitEntity?.Closed + ", marked for close " + hitEntity?.MarkedForClose + ", in scene " + hitEntity?.InScene +
+                                     " at " + F(Vector3D.Distance(eye.Translation, hit.Value.Position)) + " m" : "nothing";
+            met += "; it is pinned " + hitEntity?.Pinned + "; entities waiting to be deleted " + Count("m_entitiesToDelete") + ", for the next frame " + Count("m_entitiesToDeleteNextFrame");
+            var updates = Updates(wall);
+            return "the eye meets " + met + "; the wall " + wall.BlocksCount + " blocks, physics " + (wall.Physics?.Enabled == true) + ", closed " + wall.MarkedForClose +
+                   "; " + updates + "; high simulation quality " + Sandbox.Game.World.MySession.Static.HighSimulationQuality;
         }
     }
 }

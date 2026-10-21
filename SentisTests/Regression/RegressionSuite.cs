@@ -35,6 +35,8 @@ namespace SentisTests.Regression
             public RegressionCheck Check;
             public readonly Stack<IEnumerator> Stack = new Stack<IEnumerator>();
             public readonly Stopwatch Watch = new Stopwatch();
+            /// <summary><see cref="RegressionCheck.DeletingSeconds"/> when the check started: the cleanups' long frames are not its time.</summary>
+            public double DeletingAtStart;
             public TestVerdict? Verdict;
             public string Message;
 
@@ -92,11 +94,13 @@ namespace SentisTests.Regression
                 check.InSuite = true;
                 var run = new Running { Check = check };
                 run.Stack.Push(check.Run());
+                run.DeletingAtStart = RegressionCheck.DeletingSeconds;
                 run.Watch.Start();
                 _runs.Add(run);
             }
             Note(_runs.Count + " checks: " + string.Join(", ", next.Select(p => p.Value + " " + p.Key.ToString().ToLowerInvariant())));
 
+            DispatchWatch.Start();
             var watch = Stopwatch.StartNew();
             var told = 0.0;
             while (_runs.Any(r => r.Verdict == null))
@@ -104,7 +108,7 @@ namespace SentisTests.Regression
                 foreach (var run in _runs)
                 {
                     if (run.Verdict != null) continue;
-                    if (run.Watch.Elapsed.TotalSeconds > run.Check.TimeoutSeconds)
+                    if (run.Watch.Elapsed.TotalSeconds - (RegressionCheck.DeletingSeconds - run.DeletingAtStart) > run.Check.TimeoutSeconds)
                     {
                         run.Verdict = TestVerdict.Timeout;
                         run.Message = "timeout after " + run.Check.TimeoutSeconds + " s at: " + run.Check.Progress;
@@ -133,12 +137,16 @@ namespace SentisTests.Regression
                 yield return null;
             }
 
+            DispatchWatch.Stop();
+            var thrown = DispatchWatch.Report();
+            foreach (var line in thrown) Log.Error("[TEST] REGRESSION | the entities' update pass threw (it stops there for the frame): " + line);
             var bad = Bad();
             var skipped = _runs.Where(r => r.Verdict == TestVerdict.Skipped).ToList();
             Note("REGRESSION RESULT | " + (_runs.Count - bad.Count - skipped.Count) + " passed, " + bad.Count + " not, " + skipped.Count + " skipped of " +
                  _runs.Count + " in " + watch.Elapsed.TotalSeconds.ToString("F0") + " s" +
                  (bad.Count > 0 ? " | " + string.Join(" | ", bad.Select(r => r.Check.Name + ": " + r.Message)) : ""));
             Check(bad.Count == 0, bad.Count + " of " + _runs.Count + " checks did not pass: " + string.Join(", ", bad.Select(r => r.Check.Name)));
+            Check(thrown.Count == 0, "the entities' update pass threw " + thrown.Count + " kinds of exceptions during the run (see the log): " + string.Join(" | ", thrown.Take(3)));
         }
 
         private List<Running> Bad() => _runs.Where(r => r.Verdict != null && r.Verdict != TestVerdict.Passed && r.Verdict != TestVerdict.Skipped).ToList();
@@ -162,6 +170,10 @@ namespace SentisTests.Regression
             }
             try { check.Cleanup(); }
             catch (Exception e) { Log.Warn("cleanup of {0} failed: {1}", check.Name, e.Message); }
+            // what the check built, deleted now: closed grids left waiting stand in the scene with their physics, in the
+            // way of the checks still running (RegressionCheck.DeleteClosed)
+            try { RegressionCheck.DeleteClosed(); }
+            catch (Exception e) { Log.Warn("deleting what {0} closed failed: {1}", check.Name, e.Message); }
             TestRunner.Record(new TestResult
             {
                 Scenario = check.Name,

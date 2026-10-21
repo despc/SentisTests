@@ -136,7 +136,9 @@ public void Main(string argument)
             Check(MySessionComponentSafeZones.IsActionAllowed(inside, MySafeZoneAction.Damage), "damage is forbidden there before any safe zone");
             Request(zone, "OnSafezoneCreateRemove", true);
             var definition = (SpaceEngineers.Game.Definitions.SafeZone.MySafeZoneBlockDefinition)block.BlockDefinition;
-            yield return Until(() => zone.IsSafeZoneEnabled() ? 1 : 0, v => v > 0, "the safe zone up after the countdown", (int)definition.SafeZoneActivationTimeS + 30);
+            // the countdown is game time: under load it takes longer by the clock
+            yield return Seconds(definition.SafeZoneActivationTimeS);
+            yield return Until(() => zone.IsSafeZoneEnabled() ? 1 : 0, v => v > 0, "the safe zone up after the countdown", 30);
             Check(!MySessionComponentSafeZones.IsActionAllowed(inside, MySafeZoneAction.Damage), "the safe zone is up and damage is allowed in it");
             Check(Amount(Inventory(block), "Component/ZoneChip") < 3, "the safe zone took no zone chip");
             Request(zone, "OnSafezoneCreateRemove", false);

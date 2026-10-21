@@ -158,8 +158,8 @@ namespace SentisTests.Regression.Checks
             var health = Body.StatComp.Health;
             health.Value = health.MaxValue * 0.4f;
             var hurt = health.Value;
-            var started = DateTime.UtcNow;
-            while (health.Value < hurt + 5 && (DateTime.UtcNow - started).TotalSeconds < 15)
+            var within = Within(15);
+            while (health.Value < hurt + 5 && within())
             {
                 Request(room, "RequestSupport", Body.EntityId);
                 yield return null;

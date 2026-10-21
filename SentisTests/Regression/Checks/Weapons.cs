@@ -22,6 +22,8 @@ namespace SentisTests.Regression.Checks
 
         protected override IEnumerator Check()
         {
+            // at the game's low quality (its own under load) bullets check what they hit a third as often and fly through walls
+            HoldHighQuality();
             yield return Arrive(Site.At(0, 10, 20));
             var grid = Build("turret", Site.Origin, true,
                 new Part("LargeGatlingTurret/", 0, 0, 0),
@@ -93,6 +95,8 @@ namespace SentisTests.Regression.Checks
 
         protected override IEnumerator Check()
         {
+            // at the game's low quality (its own under load) bullets check what they hit a third as often and fly through walls
+            HoldHighQuality();
             yield return Arrive(Site.At(-15, 10, -15));
             var enemy = -1;
             // the other player himself far out of the turret's reach: it shoots characters too

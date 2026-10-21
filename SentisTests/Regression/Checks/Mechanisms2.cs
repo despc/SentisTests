@@ -39,9 +39,9 @@ namespace SentisTests.Regression.Checks
                     yield return null;
                 if (gear.LockMode == GearMode.Unlocked)
                 {
-                    small.Close();
                     big.Close();
-                    yield return null;
+                    yield return CloseAndWait(small);
+                    yield return CloseAndWait(big);
                     continue;
                 }
                 gear.Lock();

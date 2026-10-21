@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections;
 using Sandbox.Game.Entities.Blocks;
 using Sandbox.Game.Entities.Cube;
@@ -74,17 +75,17 @@ namespace SentisTests.Regression.Checks
             foreach (var face in new[] { Direction.Down, Direction.Forward, Direction.Backward, Direction.Up, Direction.Left, Direction.Right })
             {
                 var up = Base6Directions.GetPerpendicular(face);
-                var at = floor + Site.Up * (1.25 + 0.3);
+                // just over the floor: in the suite every grid takes kinetic damage, and a drop of 0.3 m hurt the gear past its red line
+                var at = floor + Site.Up * (1.25 + 0.05);
                 var ship = Build("gear", at, false, new[] { new Part("LandingGear/LargeBlockLandingGear", 0, 0, 0).Facing(face, up) });
                 var gear = Block<SpaceEngineers.Game.Entities.Blocks.MyLandingGear>(ship);
                 var ingame = (SpaceEngineers.Game.ModAPI.Ingame.IMyLandingGear)gear;
-                var started = DateTime.UtcNow;
-                while ((DateTime.UtcNow - started).TotalSeconds < 4 && ingame.LockMode == GearMode.Unlocked)
+                var within = Within(4);
+                while (within() && ingame.LockMode == GearMode.Unlocked)
                     yield return null;
                 if (ingame.LockMode == GearMode.Unlocked)
                 {
-                    ship.Close();
-                    yield return null;
+                    yield return CloseAndWait(ship);
                     continue;
                 }
                 ingame.Lock();
@@ -93,8 +94,17 @@ namespace SentisTests.Regression.Checks
                 yield return Seconds(2);
                 var moved = Vector3D.Distance(held, ship.PositionComp.GetPosition());
                 Check(moved < 0.1, "a locked gear let the ship go " + F(moved) + " m");
-                ingame.Unlock();
-                yield return Until(() => ingame.IsLocked ? 0 : 1, v => v > 0, "the gear unlocked", 5);
+                // pressed again each second, as a player does when the first press does not take
+                var pressed = 0;
+                yield return Until(() =>
+                {
+                    if (!ingame.IsLocked) return 1;
+                    if (pressed++ % 60 == 0) ingame.Unlock();
+                    return 0;
+                }, v => v > 0, "the gear unlocked", 5, () => State(gear) + ", mode " + ingame.LockMode + ", autolock " + ingame.AutoLock + ", pressed " + (pressed + 59) / 60 + " times, integrity "
+                    + F(gear.SlimBlock.Integrity / gear.SlimBlock.MaxIntegrity * 100) + " %; grids about: " + string.Join(", ", Sandbox.Game.Entities.MyEntities.GetEntities().OfType<Sandbox.Game.Entities.MyCubeGrid>()
+                        .Where(g => g != ship && g != pad && Vector3D.Distance(g.PositionComp.GetPosition(), gear.PositionComp.GetPosition()) < 150)
+                        .Select(g => g.DisplayName + " " + F(Vector3D.Distance(g.PositionComp.GetPosition(), gear.PositionComp.GetPosition())) + " m " + F(g.Physics?.LinearVelocity.Length() ?? 0) + " m/s")));
                 Result("gear facing " + face + " locked on the floor (moved " + F(moved) + " m in 2 s) and unlocked");
                 yield break;
             }

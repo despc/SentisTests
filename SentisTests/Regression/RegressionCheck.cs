@@ -227,6 +227,63 @@ namespace SentisTests.Regression
         /// <summary>Game frames in a span of game time: the simulation runs slower than the clock when the server is loaded.</summary>
         protected static int Frames(double seconds) => (int)Math.Round(seconds * 60);
 
+        /// <summary>
+        /// Closes an entity and deletes it at once, with everything else closed and waiting: a closed one waits to be
+        /// deleted, its physics still in the world, and something built at its place meanwhile overlaps it (bullets hit
+        /// the old one, it shades the new). SentisOptimisations spreads the deleting over frames (EntityDeleteBudget, one
+        /// a frame on a loaded server: after the suite's cleanup closed grids stood for over a minute); the checks do not
+        /// wait for that (<see cref="DeleteClosed"/>). A pinned one goes later: waited for.
+        /// </summary>
+        protected IEnumerator CloseAndWait(VRage.Game.Entity.MyEntity entity, int seconds = 10)
+        {
+            if (entity == null) yield break;
+            if (!entity.MarkedForClose) entity.Close();
+            DeleteClosed();
+            if (entity.InScene) yield return Until(() => entity.InScene ? 0 : 1, v => v > 0, entity.DisplayName + " closed out of the scene", seconds);
+        }
+
+        /// <summary>
+        /// Everything closed and waiting to be deleted, deleted now: the game's own loop, which goes on until none are left
+        /// (out of the frame's end, where SentisOptimisations would spread it over frames). For the checks, not a server's
+        /// play: a big cleanup is one long frame.
+        /// </summary>
+        public static void DeleteClosed()
+        {
+            if (!MyEntities.HasEntitiesToDelete()) return;
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            try { MyEntities.DeleteRememberedEntities(); }
+            finally { System.Threading.Interlocked.Add(ref _deletingTicks, watch.Elapsed.Ticks); }
+        }
+
+        private static long _deletingTicks;
+
+        /// <summary>The seconds <see cref="DeleteClosed"/> has taken in all, since the start.</summary>
+        public static double DeletingSeconds => TimeSpan.FromTicks(System.Threading.Interlocked.Read(ref _deletingTicks)).TotalSeconds;
+
+        /// <summary>
+        /// The clock's time a wait counts: what went by, less what <see cref="DeleteClosed"/> took meanwhile - a cleanup of
+        /// thousands of grids is one frame of seconds, and the waits by the clock (four times their frames) ran out in it.
+        /// </summary>
+        protected static Func<double> WaitClock()
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            var deleting = System.Threading.Interlocked.Read(ref _deletingTicks);
+            return () => (clock.Elapsed - TimeSpan.FromTicks(System.Threading.Interlocked.Read(ref _deletingTicks) - deleting)).TotalSeconds;
+        }
+
+        /// <summary>
+        /// A wait of so many seconds of game time, for a loop that yields once a frame: true while fewer frames than
+        /// that have gone (each call is a frame), and no more than four times as long by the clock - as <c>Until</c> counts.
+        /// The game does its work by frames: a wait by the clock on a loaded server gave it less time than it needed.
+        /// </summary>
+        protected static Func<bool> Within(double seconds)
+        {
+            var frames = 0;
+            var limit = Frames(seconds);
+            var clock = WaitClock();
+            return () => frames++ < limit && clock() < seconds * 4;
+        }
+
         protected IEnumerator HoldShip(double seconds, MyShipController seat, Vector3 move, Vector2 rotate = default(Vector2), float roll = 0)
         {
             for (var i = Frames(seconds); i > 0; i--)
@@ -277,7 +334,7 @@ namespace SentisTests.Regression
             for (var type = target.GetType(); type != null && found == null; type = type.BaseType)
                 found = type.GetMethods(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static |
                                         System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.DeclaredOnly)
-                    .FirstOrDefault(m => m.Name == method && m.GetParameters().Length == args.Length);
+                    .Where(m => m.Name == method && m.GetParameters().Length == args.Length).OrderBy(m => Fits(m, args) ? 0 : 1).FirstOrDefault();
             if (found == null) throw new ScenarioFailedException(target.GetType().Name + "." + method + " with " + args.Length + " arguments is not in this game");
             object result = null;
             FakeClients.AsClient(client, () =>
@@ -288,13 +345,38 @@ namespace SentisTests.Regression
             return result;
         }
 
+        /// <summary>
+        /// What the server's network check says to a client's request (<see cref="Request(object,string,object[])"/> skips it):
+        /// the event's own flags (<c>[Server(ValidationType...)]</c>) put to the target's replicable, as
+        /// <c>MyMultiplayerServerBase.ValidateRpc</c> and <c>MyReplicationServer</c> do on an event from that client.
+        /// </summary>
+        protected VRage.Network.ValidationResult Rights(int client, object target, string method)
+        {
+            System.Reflection.MethodInfo found = null;
+            for (var type = target.GetType(); type != null && found == null; type = type.BaseType)
+                found = type.GetMethods(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic |
+                                        System.Reflection.BindingFlags.DeclaredOnly).FirstOrDefault(m => m.Name == method);
+            if (found == null) throw new ScenarioFailedException(target.GetType().Name + "." + method + " is not in this game");
+            var flags = ((VRage.Network.ServerAttribute)Attribute.GetCustomAttribute(found, typeof(VRage.Network.ServerAttribute)))?.ValidationFlags ?? VRage.Network.ValidationType.None;
+            var replicable = Sandbox.Game.Replication.MyExternalReplicable.FindByObject(target);
+            if (replicable == null) throw new ScenarioFailedException("no replicable for " + target);
+            var result = VRage.Network.ValidationResult.Passed;
+            var endpoint = new VRage.Network.EndpointId(FakeClients.PlayerOf(client).Id.SteamId);
+            FakeClients.AsClient(client, () => result = replicable.HasRights(endpoint, flags));
+            return result;
+        }
+
+        /// <summary>Whether the arguments go to the method's parameters as they are (of overloads, the one they fit).</summary>
+        private static bool Fits(System.Reflection.MethodInfo method, object[] args) =>
+            method.GetParameters().Select((p, i) => args[i] == null ? !p.ParameterType.IsValueType : p.ParameterType.IsInstanceOfType(args[i])).All(x => x);
+
         /// <summary><see cref="Request(object,string,object[])"/> for a static event handler of a type.</summary>
         protected object Request(Type type, string method, params object[] args) => RequestStaticAs(Me, type, method, args);
 
         private object RequestStaticAs(int client, Type type, string method, object[] args)
         {
             var found = type.GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic)
-                            .FirstOrDefault(m => m.Name == method && m.GetParameters().Length == args.Length)
+                            .Where(m => m.Name == method && m.GetParameters().Length == args.Length).OrderBy(m => Fits(m, args) ? 0 : 1).FirstOrDefault()
                         ?? throw new ScenarioFailedException(type.Name + "." + method + " with " + args.Length + " arguments is not in this game");
             object result = null;
             FakeClients.AsClient(client, () =>
@@ -378,7 +460,7 @@ namespace SentisTests.Regression
         /// place on the tool is read from a first rig built out of the way (it comes from the model), then the rig is built
         /// where it belongs. The tool is left switched off.
         /// </summary>
-        protected MyCubeGrid ToolRig(string name, string toolId, Vector3D sensorAt, Vector3D direction, bool isStatic = true)
+        protected MyCubeGrid ToolRig(string name, string toolId, Vector3D sensorAt, Vector3D direction, bool isStatic = true, long? ownedBy = null)
         {
             direction.Normalize();
             var up = Vector3D.CalculatePerpendicularVector(direction);
@@ -391,7 +473,7 @@ namespace SentisTests.Regression
             var probe = Build(name + "-probe", probeAt, true, parts, tool.CubeSize, forward: direction, up: up);
             var offset = WorldApi.SensorSphere(probe.GetCubeBlock(Vector3I.Zero).FatBlock).Center - probeAt;
             probe.Close();
-            var rig = Build(name, sensorAt - offset, isStatic, parts, tool.CubeSize, forward: direction, up: up);
+            var rig = Build(name, sensorAt - offset, isStatic, parts, tool.CubeSize, forward: direction, up: up, ownedBy: ownedBy);
             Put(Inventory(rig.GetCubeBlock(new Vector3I(0, 0, behind)).FatBlock), "Ingot/Uranium", 5);
             return rig;
         }
@@ -429,14 +511,19 @@ namespace SentisTests.Regression
         /// the way, the conveyor system is given a few frames to join what it joins, and the first pair that connects is
         /// given back (<paramref name="found"/>).
         /// </summary>
-        protected IEnumerator ConveyorNeighbour(Part first, string second, Func<Part, bool> allowed, Action<Part> found) =>
+        protected IEnumerator ConveyorNeighbour(Part first, string second, Func<Part, bool> allowed, Action<Part> found, MyCubeSize size = MyCubeSize.Large) =>
             Neighbour(first, second, allowed, "on its conveyors", (probe, place) =>
             {
-                var one = probe.GetCubeBlock(first.Min)?.FatBlock as Sandbox.Game.GameSystems.Conveyors.IMyConveyorEndpointBlock;
-                var two = probe.GetCubeBlock(place.Min)?.FatBlock as Sandbox.Game.GameSystems.Conveyors.IMyConveyorEndpointBlock;
+                var one = Endpoint(probe.GetCubeBlock(first.Min)?.FatBlock);
+                var two = Endpoint(probe.GetCubeBlock(place.Min)?.FatBlock);
                 return one != null && two != null && one != two &&
                        Sandbox.Game.GameSystems.MyGridConveyorSystem.Reachable(one.ConveyorEndpoint, two.ConveyorEndpoint);
-            }, found);
+            }, found, gridSize: size);
+
+        /// <summary>A block's conveyor endpoint: the block's own, or a component's (a farm plot's).</summary>
+        protected static Sandbox.Game.GameSystems.Conveyors.IMyConveyorEndpointBlock Endpoint(MyCubeBlock block) =>
+            block as Sandbox.Game.GameSystems.Conveyors.IMyConveyorEndpointBlock
+            ?? block?.Components.Get<SpaceEngineers.Game.EntityComponents.GameLogic.MyConveyorEndpointComponent>();
 
         /// <summary>
         /// Where a block goes next to another for the two to work together the way <paramref name="joined"/> tells (on one
@@ -445,7 +532,7 @@ namespace SentisTests.Regression
         /// joined after <paramref name="ticks"/> frames is given back.
         /// </summary>
         protected IEnumerator Neighbour(Part first, string second, Func<Part, bool> allowed, string what, Func<MyCubeGrid, Part, bool> joined, Action<Part> found,
-            int ticks = 10)
+            int ticks = 10, MyCubeSize gridSize = MyCubeSize.Large)
         {
             var taken = Cells(first);
             var size = Definition(second).Size;
@@ -481,9 +568,9 @@ namespace SentisTests.Regression
                 // a charged battery against the first block: a grid's conveyors join nothing without power
                 var used = new HashSet<Vector3I>(taken.Concat(Cells(candidates[i])));
                 var free = taken.SelectMany(c => Base6Directions.IntDirections.Select(d => c + d)).First(c => !used.Contains(c));
-                var battery = new Part("BatteryBlock/LargeBlockBatteryBlock", free.X, free.Y, free.Z)
+                var battery = new Part(gridSize == MyCubeSize.Large ? "BatteryBlock/LargeBlockBatteryBlock" : "BatteryBlock/SmallBlockSmallBatteryBlock", free.X, free.Y, free.Z)
                     .With(b => ((Sandbox.Common.ObjectBuilders.MyObjectBuilder_BatteryBlock)b).CurrentStoredPower = 1f);
-                try { probes.Add(new KeyValuePair<Part, MyCubeGrid>(candidates[i], Build("neighbour-probe", Site.Origin + row + Site.Right * (i % 20 * 20) - Site.Forward * (i / 20 * 20), true, new[] { first, candidates[i], battery }))); }
+                try { probes.Add(new KeyValuePair<Part, MyCubeGrid>(candidates[i], Build("neighbour-probe", Site.Origin + row + Site.Right * (i % 20 * 20) - Site.Forward * (i / 20 * 20), true, new[] { first, candidates[i], battery }, gridSize))); }
                 catch (ScenarioFailedException) { }
             }
             yield return WaitForTicks(ticks);
@@ -591,24 +678,29 @@ namespace SentisTests.Regression
 
         // ------------------------------------------------------------------ waits
 
-        /// <summary>Waits for a number to pass a bound, saying where it is every few seconds; fails with its last value.</summary>
+        /// <summary>
+        /// Waits for a number to pass a bound, saying where it is every few seconds; fails with its last value. The time is
+        /// the game's (frames: a loaded server runs slow), up to four times as long by the clock.
+        /// </summary>
         protected IEnumerator Until(Func<double> read, Func<double, bool> done, string what, int seconds = 60, Func<string> why = null)
         {
-            var started = DateTime.UtcNow;
+            var clock = WaitClock();
             var told = DateTime.UtcNow;
+            var frames = 0;
             while (true)
             {
                 double value;
                 try { value = read(); }
                 catch (Exception e) { throw new ScenarioFailedException(what + ": " + e.GetType().Name + ": " + e.Message); }
                 if (done(value)) yield break;
-                if ((DateTime.UtcNow - started).TotalSeconds > seconds)
+                if (frames > Frames(seconds) || clock() > seconds * 4)
                     throw new ScenarioFailedException(what + ": not in " + seconds + " s, at " + F(value) + (why == null ? "" : " (" + Describe(why) + ")"));
                 if ((DateTime.UtcNow - told).TotalSeconds > 10)
                 {
                     told = DateTime.UtcNow;
                     Note(what + ": " + F(value));
                 }
+                frames++;
                 yield return null;
             }
         }
@@ -645,14 +737,60 @@ namespace SentisTests.Regression
             for (var i = Frames(seconds); i > 0; i--) yield return null;
         }
 
+        /// <summary>
+        /// The game's simulation quality held high for this check (the adaptive quality off, as on a server at ease): at
+        /// low quality - the game's own past 90 % CPU - grids pass through each other at speed and explosions cut no
+        /// ground. Shared by the checks running together; let go at the cleanup.
+        /// </summary>
+        protected void HoldHighQuality()
+        {
+            if (_holdingQuality) return;
+            _holdingQuality = true;
+            SimulationQuality.Hold();
+        }
+
+        protected void ReleaseHighQuality()
+        {
+            if (!_holdingQuality) return;
+            _holdingQuality = false;
+            SimulationQuality.Release();
+        }
+
+        private bool _holdingQuality;
+
         public override void Cleanup()
         {
             try
             {
+                ReleaseHighQuality();
                 _gameplay?.Restore();
                 if (!InSuite) FakeClients.RemoveAll();
             }
             finally { base.Cleanup(); }
         }
+    }
+
+    /// <summary>The simulation quality held high while any check holds it; the world's adaptive setting back after the last.</summary>
+    internal static class SimulationQuality
+    {
+        private static int _holds;
+        private static bool _adaptive;
+
+        public static void Hold()
+        {
+            if (_holds++ == 0) _adaptive = Sandbox.Game.World.MySession.Static.Settings.AdaptiveSimulationQuality;
+            Sandbox.Game.World.MySession.Static.Settings.AdaptiveSimulationQuality = false;
+            Set(true);
+        }
+
+        public static void Release()
+        {
+            if (_holds == 0 || --_holds > 0 || Sandbox.Game.World.MySession.Static == null) return;
+            Sandbox.Game.World.MySession.Static.Settings.AdaptiveSimulationQuality = _adaptive;
+        }
+
+        public static void Set(bool high) =>
+            (typeof(Sandbox.Game.World.MySession).GetProperty("HighSimulationQuality")?.GetSetMethod(true) ?? throw new Core.ScenarioFailedException("MySession.HighSimulationQuality cannot be set"))
+            .Invoke(Sandbox.Game.World.MySession.Static, new object[] { high });
     }
 }

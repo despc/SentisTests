@@ -53,8 +53,8 @@ namespace SentisTests.Regression.Checks
             var gone = Vector3D.Dot(body.PositionComp.GetPosition() - from, Site.Forward);
             Check(gone > 3, "3 s on the jetpack forward took the astronaut " + F(gone) + " m forward (speed " + F(speed) + " m/s)");
             yield return Hold(1, Vector3.Zero, jetpack: true, dampeners: true, face: Site.Forward);
-            var started = DateTime.UtcNow;
-            while (Motion.Speed(body) > 0.3 && (DateTime.UtcNow - started).TotalSeconds < 10)
+            var within = Within(10);
+            while (Motion.Speed(body) > 0.3 && within())
             {
                 Keys(Vector3.Zero, jetpack: true, dampeners: true, face: Site.Forward);
                 yield return null;
@@ -124,8 +124,7 @@ namespace SentisTests.Regression.Checks
             var gone = Vector3D.Dot(ship.PositionComp.GetPosition() - from, seat.WorldMatrix.Forward);
             Check(gone > 2, "3 s of forward thrust took the ship " + F(gone) + " m forward (" + F(speed) + " m/s; " +
                             string.Join("; ", Blocks<MyThrust>(ship).Select(t => State(t) + ", thrust " + F(t.CurrentStrength))) + ")");
-            var started = DateTime.UtcNow;
-            while (Motion.Speed(ship) > 0.3 && (DateTime.UtcNow - started).TotalSeconds < 15)
+            for (var f = Frames(15); f > 0 && Motion.Speed(ship) > 0.3; f--)
             {
                 ShipKeys(seat, Vector3.Zero);
                 yield return null;

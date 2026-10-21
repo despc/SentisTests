@@ -75,6 +75,8 @@ namespace SentisTests.Regression.Checks
 
         protected override IEnumerator Check()
         {
+            // at the game's low quality (its own under load) bullets check what they hit a third as often and fly through walls
+            HoldHighQuality();
             yield return Arrive(Site.At(0, 0, -6));
             Zone(0, MySafeZoneAccess.Blacklist, null, "zone-forbids");
             yield return Seconds(1);
@@ -192,6 +194,8 @@ namespace SentisTests.Regression.Checks
 
         protected override IEnumerator Check()
         {
+            // at the game's low quality (its own under load) bullets check what they hit a third as often and fly through walls
+            HoldHighQuality();
             yield return Arrive(Site.At(0, 0, -6));
             Zone(MySafeZoneAction.All, MySafeZoneAccess.Blacklist, null, "zone-allows");
             yield return Seconds(1);

@@ -99,8 +99,8 @@ namespace SentisTests.Regression.Checks
     }
 
     /// <summary>
-    /// An assembler in repeat mode, asked for one steel plate, keeps making plates: three plates made, the plate is still
-    /// in its queue. Repeat switched off, the queue runs out.
+    /// An assembler in repeat mode, asked for one steel plate, keeps making plates: three plates made, the one plate is
+    /// still in its queue, no more. Repeat switched off, the queue runs out.
     /// </summary>
     public sealed class AssemblerRepeatCheck : RegressionCheck
     {
@@ -121,6 +121,9 @@ namespace SentisTests.Regression.Checks
             yield return Until(() => Amount(assembler.OutputInventory, "Component/SteelPlate"), v => v >= 3, "steel plates made in repeat", 120, () => State(assembler));
             var queued = ((Sandbox.ModAPI.Ingame.IMyProductionBlock)assembler).IsQueueEmpty ? 0 : 1;
             Check(queued > 0, "the assembler's queue is empty in repeat after " + Amount(assembler.OutputInventory, "Component/SteelPlate") + " plates");
+            // in repeat an item made goes back to the end of the queue: one plate asked for stays one plate
+            var amount = ((Sandbox.ModAPI.IMyAssembler)assembler).GetQueue().Sum(q => (double)q.Amount);
+            Check(System.Math.Abs(amount - 1) < 0.01, "the queue holds " + amount + " plates in repeat after " + Amount(assembler.OutputInventory, "Component/SteelPlate") + " made, 1 asked for");
             Request(assembler, "RepeatEnabledCallback", false, false);
             yield return Until(() => ((Sandbox.ModAPI.Ingame.IMyProductionBlock)assembler).IsQueueEmpty ? 1 : 0, v => v > 0, "the queue run out with repeat off", 30);
             Result("one plate queued in repeat made " + Amount(assembler.OutputInventory, "Component/SteelPlate") + " and stayed queued; repeat off, the queue ran out");
