@@ -228,6 +228,7 @@ namespace SentisTests.Regression
             Add(() => new FactionRanksCheck());
             Add(() => new ScrapCheck());
             Add(() => new RadiationDeletedCharacterCheck());
+            Add(() => new ClaimNpcOwnershipCheck());
             Add(() => new RefineryAllOresCheck());
             Add(() => new AssemblerAllComponentsCheck());
             Add(() => new AllBlocksBuildCheck(VRage.Game.MyCubeSize.Large));
