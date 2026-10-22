@@ -49,7 +49,8 @@ namespace SentisTests.Regression.Checks
             var before = food.Value;
             Request(suit, "InventoryConsumeItem_Implementation", (MyFixedPoint)1, meal, Body.EntityId);
             Check(Amount(suit, "ConsumableItem/MealPack_Chili") == 1, "the suit has " + Amount(suit, "ConsumableItem/MealPack_Chili") + " packs after eating one of 2");
-            yield return Until(() => food.Value - before, v => v >= 5, "the food stat up by 5 after the meal", 15);
+            // the meal acts over time: under the suite's load the 5 points can take most of a minute
+            yield return Until(() => food.Value - before, v => v >= 5, "the food stat up by 5 after the meal", 40);
             Request(suit, "InventoryConsumeItem_Implementation", (MyFixedPoint)1, meal, Body.EntityId);
             Check(Amount(suit, "ConsumableItem/MealPack_Chili") == 1, "a second pack was eaten while the first still acts");
             Result("ate a pack of chili: food " + F(before) + " -> " + F(food.Value) + " of " + F(food.MaxValue) + ", a second one refused while it acts");

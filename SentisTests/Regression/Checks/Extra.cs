@@ -201,7 +201,13 @@ namespace SentisTests.Regression.Checks
             }
             var off = Vector3D.Distance(Body.PositionComp.GetPosition(), at.PositionComp.GetPosition());
             Check(off < 10, "the new astronaut is " + F(off) + " m from the " + _at);
-            Result("died and respawned " + F(off) + " m from the " + _at);
+            // the world's SpawnWithTools: the scenario's survival tools in the new astronaut's inventory (MyWorldGenerator.FillInventoryWithDefaults)
+            var tools = MySession.Static.Settings.SpawnWithTools && MySession.Static.Scenario?.SurvivalModeWeapons != null
+                ? MySession.Static.Scenario.SurvivalModeWeapons.Select(w => w.ToString()).ToList() : new System.Collections.Generic.List<string>();
+            var carried = Inventory(Body).GetItems().Select(i => i.Content.SubtypeName).ToList();
+            var missing = tools.Where(t => !carried.Contains(t)).ToList();
+            Check(missing.Count == 0, "the new astronaut has not the scenario's tools " + string.Join(", ", missing) + " (carries " + string.Join(", ", carried) + ")");
+            Result("died and respawned " + F(off) + " m from the " + _at + (tools.Count > 0 ? ", with the tools " + string.Join(", ", tools) : ""));
         }
     }
 

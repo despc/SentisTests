@@ -281,6 +281,21 @@ namespace SentisTests.Regression
             Add(() => new AntennaUnicastCheck());
             Add(() => new ProceduralEncounterCheck());
             Add(() => new ChatRoutingCheck());
+            Add(() => new TemperatureDamageCheck());
+            Add(() => new PowerPriorityCheck());
+            Add(() => new GpsCheck());
+            Add(() => new ConnectorTradingCheck());
+            Add(() => new TransponderSignalCheck());
+            Add(() => new AutoHealingCheck());
+            Add(() => new RemoteBlockRemovalCheck());
+            Add(() => new GridPowerSwitchCheck());
+            Add(() => new SensorRelationsCheck());
+            Add(() => new ProductionTiersCheck());
+            Add(() => new RefillStationCheck());
+            Add(() => new StoreBuyShipCheck());
+            Add(() => new ProgrammableLimitsCheck());
+            Add(() => new PilotMassCheck());
+            Add(() => new ParkingCheck());
 
             foreach (var make in Added)
                 Add(make);
