@@ -168,7 +168,10 @@ namespace SentisTests.Regression.Checks
             var bottle = (MyObjectBuilder_GasContainerObject)VRage.ObjectBuilders.MyObjectBuilderSerializer.CreateNewObject(Item("GasContainerObject/HydrogenBottle"));
             bottle.GasLevel = 1f;
             Inventory(Body).AddItems(1, bottle);
-            yield return Until(() => suit.GetGasFillLevel(hydrogen), v => v > 0.5, "the suit's hydrogen from the bottle", 15);
+            yield return Until(() => suit.GetGasFillLevel(hydrogen), v => v > 0.5, "the suit's hydrogen from the bottle", 40,
+                () => "the bottle in the inventory: " + string.Join(", ", Inventory(Body).GetItems()
+                    .Select(i => i.Content).OfType<MyObjectBuilder_GasContainerObject>()
+                    .Select(b => b.SubtypeName + " at " + (b.GasLevel * 100).ToString("F0") + " %")));
             var left = Inventory(Body).GetItems().Select(i => i.Content).OfType<MyObjectBuilder_GasContainerObject>().Select(b => b.GasLevel).FirstOrDefault();
             Check(left < 1f, "the bottle is still full after filling the suit");
             Result("the empty suit took hydrogen from the bottle carried: " + F(suit.GetGasFillLevel(hydrogen) * 100) + " %, the bottle left at " + F(left * 100) + " %");

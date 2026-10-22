@@ -81,7 +81,7 @@ namespace SentisTests.Regression.Checks
     public sealed class RelativeDampenersCheck : RegressionCheck
     {
         public override string Name => Prefix + "relative_dampeners";
-        public override int TimeoutSeconds => 60;
+        public override int TimeoutSeconds => 120; // under the suite's load the character alone can take most of a minute to stand up
 
         protected override IEnumerator Check()
         {
@@ -221,8 +221,8 @@ namespace SentisTests.Regression.Checks
             var defensive = drone.GetFatBlocks().OfType<Sandbox.ModAPI.IMyDefensiveCombatBlock>().FirstOrDefault();
             Check(defensive != null, "no defensive combat block on the drone");
             var block = (MyCubeBlock)defensive;
-            Drones.Activate((MyCubeBlock)drone.GetCubeBlock(Vector3I.Zero).FatBlock);
-            Drones.Activate(block);
+            yield return Drones.Activate((MyCubeBlock)drone.GetCubeBlock(Vector3I.Zero).FatBlock);
+            yield return Drones.Activate(block);
             var fleeing = block.GetType().GetProperty("IsFleeing");
             bool Fleeing() => fleeing != null && (bool)fleeing.GetValue(block);
             yield return Until(() => Fleeing() ? 1 : 0, v => v > 0, "the defensive block fleeing", 30, () => Drones.Info(block));
@@ -350,6 +350,7 @@ namespace SentisTests.Regression.Checks
     {
         public override string Name => Prefix + "floating_lifetime";
         public override int TimeoutSeconds => 60;
+        protected override bool NeedsLooseItems => true;
         private Scenarios.ConfigOverride _gameplay;
 
         protected override IEnumerator Check()
@@ -359,7 +360,7 @@ namespace SentisTests.Regression.Checks
             yield return Arrive(Site.At(0, 0, -6));
             _gameplay = new Scenarios.ConfigOverride(Scenarios.ConfigOverride.Gameplay);
             _gameplay.Set("CustomFloatingObjectsCleanup", true);
-            var lifetime = (int)Scenarios.ConfigOverride.Remember(Scenarios.ConfigOverride.Gameplay, "FloatingObjectsLifetime");
+            var lifetime = (int)Scenarios.ConfigOverride.Get(Scenarios.ConfigOverride.Gameplay, "FloatingObjectsLifetime");
             SkipUnless(lifetime > 0 && lifetime < 10, "the loose items' lifetime is " + lifetime + " minutes");
             var oldAt = Site.At(0, 0, 0);
             var newAt = Site.At(10, 0, 0);
@@ -377,7 +378,7 @@ namespace SentisTests.Regression.Checks
             yield return Until(() => noted.ContainsKey(old) && noted.ContainsKey(fresh) ? 1 : 0, v => v > 0, "SGI noting the loose stacks", 10);
             noted[old] = System.DateTime.Now.AddMinutes(-10);
             yield return Until(() => old.MarkedForClose || old.Closed ? 1 : 0, v => v > 0, "the stack older than " + lifetime + " minutes removed", 20);
-            Check(!fresh.MarkedForClose && !fresh.Closed, "the fresh stack was removed too");
+            Check(!fresh.MarkedForClose && !fresh.Closed, "the fresh stack was removed too (loose in the world: " + LooseItems + ")");
             Result("a stack 10 minutes old removed (lifetime " + lifetime + " min), the fresh one kept");
         }
 

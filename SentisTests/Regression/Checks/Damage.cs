@@ -131,37 +131,64 @@ namespace SentisTests.Regression.Checks
     public sealed class DeathLootCheck : RegressionCheck
     {
         public override string Name => Prefix + "death_loot";
-        public override int TimeoutSeconds => 120;
+        public override int TimeoutSeconds => 240; // past the wait for the bag (150 s), so its own report of what is where comes out
         protected override bool NeedsDamage => true;
+        protected override bool NeedsBags => true;
+
+        /// <summary>The frames of the plugins and the game that are closing an entity now.</summary>
+        private static string Closer() => string.Join(" < ", Environment.StackTrace.Split('\n')
+            .Select(l => l.Trim()).Where(l => l.StartsWith("at ") && !l.Contains("System.Environment") && !l.Contains("DeathLootCheck"))
+            .Take(12).Select(l => l.Substring(3).Split('(')[0]));
 
         protected override IEnumerator Check()
         {
             yield return Arrive(Site.Origin);
             var body = Body;
+            var plates = Item("Component/SteelPlate");
             Put(Inventory(body), "Component/SteelPlate", 17);
-            body.DoDamage(1000f, MyDamageType.Suicide, true, attackerId: 0);
-            yield return Until(() => body.IsDead ? 1 : 0, v => v > 0, "the player dead", 10);
-            Track(body);
             var died = body.PositionComp.GetPosition();
-            Func<IEnumerable<VRage.Game.Entity.MyEntity>> bags = () => MyEntities.GetEntities().Where(e => (e is MyInventoryBagEntity || e is MyCargoContainerInventoryBagEntity) && !e.MarkedForClose &&
-                                                                                                         Vector3D.Distance(e.PositionComp.GetPosition(), died) < 50);
-            Func<double> kept = () =>
+            // the bags that come into the world from the death on, and how each one near went
+            var gone = new List<string>();
+            Action<VRage.Game.Entity.MyEntity> added = e =>
             {
-                var onBody = body.MarkedForClose ? 0 : (double)(body.GetInventory()?.GetItemAmount(Item("Component/SteelPlate")) ?? 0);
-                return onBody + bags().Sum(e => (double)(e.GetInventory()?.GetItemAmount(Item("Component/SteelPlate")) ?? 0));
+                if (!(e is MyInventoryBagEntity || e is MyCargoContainerInventoryBagEntity)) return;
+                e.OnMarkForClose += x =>
+                {
+                    var off = Vector3D.Distance(x.PositionComp.GetPosition(), died);
+                    if (off < 300)
+                        gone.Add(x.GetType().Name + " " + F(off) + " m off with " + F((double)(x.GetInventory()?.GetItemAmount(plates) ?? 0)) + " plates, closed by " + Closer());
+                };
             };
-            // the body may give its things to a bag a moment after the death
-            yield return Seconds(2);
-            // the bag is queued (MyFloatingObjects' spawn queue, a few a frame): under the suite's load it comes late, and
-            // meanwhile the plates are nowhere - the body's inventory is cleared at the death
-            yield return Until(kept, v => Math.Abs(v - 17) < 0.01, "the 17 plates on the body or in a bag", 90,
-                () => "the body " + (body.MarkedForClose ? "gone" : "there, " + F(Vector3D.Distance(body.PositionComp.GetPosition(), died)) + " m from where it died, its items: "
-                          + string.Join(", ", body.GetInventory()?.GetItems().Select(i => i.Content.SubtypeName + " " + i.Amount) ?? Enumerable.Empty<string>())) + ", bags " + bags().Count()
-                      + "; anything with 17 plates in the world: " + string.Join(", ", MyEntities.GetEntities().Where(e => e.HasInventory && e.GetInventory()?.GetItemAmount(Item("Component/SteelPlate")) == 17)
-                          .Select(e => e.GetType().Name + " " + F(Vector3D.Distance(e.PositionComp.GetPosition(), died)) + " m")));
-            foreach (var bag in bags().ToList())
-                Track(bag);
-            Result("dead, the 17 plates kept " + (body.MarkedForClose ? "in a bag" : "on the body"));
+            MyEntities.OnEntityAdd += added;
+            string closedBy = null;
+            body.OnMarkForClose += e => closedBy = Closer();
+            try
+            {
+                body.DoDamage(1000f, MyDamageType.Suicide, true, attackerId: 0);
+                yield return Until(() => body.IsDead ? 1 : 0, v => v > 0, "the player dead", 10);
+                Track(body);
+                Func<IEnumerable<VRage.Game.Entity.MyEntity>> bags = () => MyEntities.GetEntities().Where(e => (e is MyInventoryBagEntity || e is MyCargoContainerInventoryBagEntity) && !e.MarkedForClose &&
+                                                                                                             Vector3D.Distance(e.PositionComp.GetPosition(), died) < 50);
+                Func<double> kept = () =>
+                {
+                    var onBody = body.MarkedForClose ? 0 : (double)(body.GetInventory()?.GetItemAmount(plates) ?? 0);
+                    return onBody + bags().Sum(e => (double)(e.GetInventory()?.GetItemAmount(plates) ?? 0));
+                };
+                // the body may give its things to a bag a moment after the death
+                yield return Seconds(2);
+                yield return Until(kept, v => Math.Abs(v - 17) < 0.01, "the 17 plates on the body or in a bag", 150,
+                    () => "the body " + (body.MarkedForClose ? "gone (closed by " + closedBy + ")" : "there, " + F(Vector3D.Distance(body.PositionComp.GetPosition(), died)) + " m from where it died, its items: "
+                              + string.Join(", ", body.GetInventory()?.GetItems().Select(i => i.Content.SubtypeName + " " + i.Amount) ?? Enumerable.Empty<string>())) + ", bags " + bags().Count()
+                          + "; anything with plates within 300 m: " + string.Join(", ", MyEntities.GetEntities().Where(e => e.HasInventory && (e.GetInventory()?.GetItemAmount(plates) ?? 0) > 0
+                              && Vector3D.Distance(e.PositionComp.GetPosition(), died) < 300)
+                              .Select(e => e.GetType().Name + " " + F(Vector3D.Distance(e.PositionComp.GetPosition(), died)) + " m of " + e.GetInventory()?.GetItemAmount(plates) + " plates"))
+                          + "; bags gone within 300 m: " + (gone.Count == 0 ? "none" : string.Join(" | ", gone)) + "; loose in the world: " + LooseItems);
+                foreach (var bag in bags().ToList())
+                    Track(bag);
+            }
+            finally { MyEntities.OnEntityAdd -= added; }
+            var onTheBody = body.MarkedForClose ? 0 : (double)(body.GetInventory()?.GetItemAmount(plates) ?? 0);
+            Result("dead, the 17 plates kept " + (onTheBody >= 17 ? "on the body" : onTheBody > 0 ? F(onTheBody) + " on the body, the rest in a bag" : "in a bag by it"));
         }
     }
 

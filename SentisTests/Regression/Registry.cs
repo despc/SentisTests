@@ -267,6 +267,20 @@ namespace SentisTests.Regression
             Add(() => new WeatherCheck());
             Add(() => new MeteorCheck());
             Add(() => new GridStorageCheck());
+            Add(() => new NpcBuildRefusedCheck());
+            Add(() => new LandingGearRefusedCheck());
+            Add(() => new BeaconWarningCheck());
+            Add(() => new CharacterInventoryCheck());
+            Add(() => new VendingMachineCheck());
+            Add(() => new ResearchCheck());
+            Add(() => new TrashRemovalCheck());
+            Add(() => new PirateDronesCheck());
+            Add(() => new RespawnFactionMedbayCheck());
+            Add(() => new EconomyRestockCheck());
+            Add(() => new GlobalEncounterCheck());
+            Add(() => new AntennaUnicastCheck());
+            Add(() => new ProceduralEncounterCheck());
+            Add(() => new ChatRoutingCheck());
 
             foreach (var make in Added)
                 Add(make);

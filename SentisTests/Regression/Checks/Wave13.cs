@@ -33,9 +33,12 @@ namespace SentisTests.Regression.Checks
             return parts;
         }
 
-        public static void Activate(MyCubeBlock block)
+        public static IEnumerator Activate(MyCubeBlock block)
         {
             var terminal = (Sandbox.ModAPI.IMyTerminalBlock)block;
+            // an AI block raises its terminal controls as it comes up; under the suite's load that can lag a few frames
+            for (var frame = 0; frame < 120 && terminal.GetProperty("ActivateBehavior") == null; frame++)
+                yield return null;
             if (terminal.GetProperty("ActivateBehavior") == null)
                 throw new Core.ScenarioFailedException(block.BlockDefinition.Id.SubtypeName + " has no \"ActivateBehavior\" in its terminal");
             terminal.SetValueBool("ActivateBehavior", true);
@@ -66,8 +69,8 @@ namespace SentisTests.Regression.Checks
             var offensive = drone.GetFatBlocks().FirstOrDefault(b => b is Sandbox.ModAPI.Ingame.IMyOffensiveCombatBlock);
             Check(offensive != null, "no offensive combat block on the drone: " + string.Join(", ", drone.GetFatBlocks().Select(b => b.BlockDefinition.Id.ToString())));
             var ingame = (Sandbox.ModAPI.Ingame.IMyOffensiveCombatBlock)offensive;
-            Drones.Activate((MyCubeBlock)drone.GetCubeBlock(Vector3I.Zero).FatBlock);
-            Drones.Activate(offensive);
+            yield return Drones.Activate((MyCubeBlock)drone.GetCubeBlock(Vector3I.Zero).FatBlock);
+            yield return Drones.Activate(offensive);
             Func<bool> onStation = () => ingame.SearchEnemyComponent?.FoundEnemyId is long id && MyEntities.GetEntityById(id)?.GetTopMostParent() == station;
             yield return Until(() => onStation() ? 1 : 0, v => v > 0, "the offensive block finding the enemy station", 30,
                 () => "found " + ingame.SearchEnemyComponent?.FoundEnemyId + "; " + Drones.Info(offensive));
@@ -156,8 +159,8 @@ namespace SentisTests.Regression.Checks
             var follow = block.Components.Get<SpaceEngineers.Game.EntityComponents.Blocks.MyBasicMissionFollowPlayer>();
             Check(follow != null, "the basic task block has no \"Follow player\" task");
             ((Sandbox.ModAPI.Ingame.IMyBasicMissionBlock)block).SelectedMissionId = follow.UniqueSelectionId;
-            Drones.Activate((MyCubeBlock)drone.GetCubeBlock(Vector3I.Zero).FatBlock);
-            Drones.Activate(block);
+            yield return Drones.Activate((MyCubeBlock)drone.GetCubeBlock(Vector3I.Zero).FatBlock);
+            yield return Drones.Activate(block);
             yield return Seconds(1);
             Request(follow, "FollowPlayer");
             Func<double> off = () => Vector3D.Distance(drone.PositionComp.WorldAABB.Center, Body.PositionComp.GetPosition());
@@ -191,8 +194,8 @@ namespace SentisTests.Regression.Checks
             var points = new List<Sandbox.ModAPI.Ingame.IMyAutopilotWaypoint>();
             recorder.GetWaypoints(points);
             Check(points.Count == 1, "the recorder has " + points.Count + " waypoints after one was added");
-            Drones.Activate((MyCubeBlock)drone.GetCubeBlock(Vector3I.Zero).FatBlock);
-            Drones.Activate(block);
+            yield return Drones.Activate((MyCubeBlock)drone.GetCubeBlock(Vector3I.Zero).FatBlock);
+            yield return Drones.Activate(block);
             recorder.Play();
             Func<double> off = () => Vector3D.Distance(drone.PositionComp.WorldAABB.Center, target);
             yield return Until(off, v => v < 20, "the drone flying the recorded path, m off its waypoint", 90, () => F(Motion.Speed(drone)) + " m/s; " + Drones.Info(block));

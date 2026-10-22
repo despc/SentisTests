@@ -195,4 +195,67 @@ namespace SentisTests.Regression.Checks
             finally { base.Cleanup(); }
         }
     }
+
+    /// <summary>
+    /// The economy's restock of an NPC station's store (<c>MyStoreItemsGenerator.Update</c> of the faction, what the
+    /// economy tick <c>UpdateStations</c> calls; the tick's timing is not checked): a station of an NPC trader faction's
+    /// made for the check, its store empty, gets offers and orders of the game's own, priced. The faction's own stations
+    /// are not restocked by it. After, the station is taken off the faction.
+    /// </summary>
+    public sealed class EconomyRestockCheck : RegressionCheck
+    {
+        public override string Name => Prefix + "economy_restock";
+
+        private MyFaction _faction;
+        private MyFactionStation _station;
+
+        private static readonly System.Reflection.FieldInfo Stations =
+            typeof(MyFaction).GetField("m_stations", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        protected override IEnumerator Check()
+        {
+            SkipUnless(MySession.Static.Settings.EnableEconomy, "the economy is off in this world");
+            var economy = MySession.Static.GetComponent<MySessionComponentEconomy>();
+            var generator = typeof(MySessionComponentEconomy).GetField("m_storeItemsGenerator", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)?.GetValue(economy);
+            Check(generator != null, "MySessionComponentEconomy has no m_storeItemsGenerator");
+            _faction = MySession.Static.Factions.Select(f => f.Value).OfType<MyFaction>()
+                .FirstOrDefault(f => f.FactionTypeString == "Trader" && f.Stations.Count > 0 && MySession.Static.Players.IdentityIsNpc(f.FounderId));
+            SkipUnless(_faction != null, "no NPC trader faction in this world");
+            yield return Arrive(Site.At(0, 0, -3));
+            var grid = BuildFor(_faction.FounderId, "npc-restock", Site.Origin,
+                new Part("StoreBlock/StoreBlock", 0, 0, 0).With(b => b.ShareMode = MyOwnershipShareModeEnum.All),
+                new Part("BatteryBlock/LargeBlockBatteryBlock", 0, -1, 0).With(b => Motion.Charged(b)));
+            _station = new MyFactionStation(MyEntityIdentifier.AllocateId(MyEntityIdentifier.ID_OBJECT_TYPE.STATION), "Regression restock post", grid.PositionComp.GetPosition(),
+                MyStationTypeEnum.SpaceStation, _faction, "", null) { StationEntityId = grid.EntityId };
+            _faction.AddStation(_station);
+            Check(_station.StoreItems.Count == 0, "the new station's store is not empty: " + _station.StoreItems.Count + " items");
+            // the restock goes over every station of the faction: the world's own ones are taken off it for that call, so
+            // only the check's gets restocked (all in one call of the game thread, nobody sees them away)
+            var stations = (Dictionary<long, IMyFactionStation>)Stations.GetValue(_faction);
+            var others = stations.Where(p => p.Key != _station.Id).ToList();
+            foreach (var other in others) stations.Remove(other.Key);
+            try { generator.GetType().GetMethod("Update").Invoke(generator, new object[] { _faction, false }); }
+            finally { foreach (var other in others) stations[other.Key] = other.Value; }
+            yield return null;
+            var offers = _station.StoreItems.Where(i => i.StoreItemType == StoreItemTypes.Offer).ToList();
+            var orders = _station.StoreItems.Where(i => i.StoreItemType == StoreItemTypes.Order).ToList();
+            Check(offers.Count > 0, "the economy's restock gave the station no offers");
+            Check(orders.Count > 0, "the economy's restock gave the station no orders");
+            // the roll can offer an item in zero amount (e.g. a plushie) - that is the game's own randomness, not a break;
+            Check(_station.StoreItems.All(i => i.PricePerUnit > 0), "an item of the restock has no price: " +
+                string.Join(", ", _station.StoreItems.Where(i => i.PricePerUnit <= 0).Select(i => (i.Item?.SubtypeName ?? i.ItemType.ToString()) + " " + i.Amount + " at " + i.PricePerUnit)));
+            Check(offers.Any(i => i.Amount > 0), "no offer of the restock has an amount");
+            Result("the restock of " + _faction.Tag + " gave the new station " + offers.Count + " offers and " + orders.Count + " orders (e.g. " +
+                   string.Join(", ", offers.Take(3).Select(i => (i.Item?.SubtypeName ?? i.ItemType.ToString()) + " x" + i.Amount + " at " + i.PricePerUnit)) + ")");
+        }
+
+        public override void Cleanup()
+        {
+            try
+            {
+                if (_station != null && Stations?.GetValue(_faction) is Dictionary<long, IMyFactionStation> stations) stations.Remove(_station.Id);
+            }
+            finally { base.Cleanup(); }
+        }
+    }
 }

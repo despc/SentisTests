@@ -24,6 +24,7 @@ namespace SentisTests.Regression
 
         private readonly List<Running> _runs = new List<Running>();
         private ConfigOverride _gameplay;
+        private ConfigOverride _essentials;
 
         public override string Name => ScenarioName;
 
@@ -82,6 +83,19 @@ namespace SentisTests.Regression
                 // a fast fall through the ground where the planet has no physics yet happens in the game itself; the
                 // server's answer is to bring such a grid back (off in the stand's config)
                 _gameplay.Set("AutoRestoreFromVoxel", true);
+                // the checks' drops (death bags, stacks for collectors and the cleanup) all at once pass SGI's cap of loose
+                // items, and past it SGI closes them at random: the cap is out of reach while the suite runs
+                _gameplay.Set("MaxFloatingObjects", RegressionCheck.LooseItemsCap);
+            }
+
+            // Essentials' limit of death bags (BackpackLimit, 1 on the stand) counts them by the owner it reads as a bag
+            // comes into the world, and the game sets the owner after that: every bag counts as nobody's, and past the
+            // limit all but the newest of the whole server are closed 30 s on. The suite's deaths come together, so the
+            // limit is off while it runs (as on V5)
+            if (Integrations.IsLoaded(ConfigOverride.Essentials))
+            {
+                _essentials = new ConfigOverride(ConfigOverride.Essentials);
+                _essentials.Set("BackpackLimit", -1);
             }
 
             var next = new Dictionary<SiteKind, int>();
@@ -195,6 +209,8 @@ namespace SentisTests.Regression
             }
             try { _gameplay?.Restore(); }
             catch (Exception e) { Log.Warn("restoring SentisGameplayImprovements' settings failed: {0}", e.Message); }
+            try { _essentials?.Restore(); }
+            catch (Exception e) { Log.Warn("restoring Essentials' settings failed: {0}", e.Message); }
             try { FakeClients.RemoveAll(); }
             finally { base.Cleanup(); }
         }

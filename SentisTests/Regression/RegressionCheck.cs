@@ -95,6 +95,28 @@ namespace SentisTests.Regression
         /// </summary>
         protected virtual bool NeedsFallRestore => false;
 
+        /// <summary>
+        /// The check drops loose items and needs them to stay: SentisGameplayImprovements' cleanup closes loose items at
+        /// random once the world holds more than its cap (<c>MaxFloatingObjects</c>), and a busy stand or the suite's own
+        /// drops pass it. The cap is put out of reach while the check runs (the suite does it once for all).
+        /// </summary>
+        protected virtual bool NeedsLooseItems => false;
+
+        /// <summary>
+        /// The check needs a death bag to stay: Essentials' limit of bags (<c>BackpackLimit</c>) takes every bag as
+        /// nobody's (it reads the owner before the game sets it) and closes all but the newest of the server; it is off
+        /// while the check runs (the suite does it once for all).
+        /// </summary>
+        protected virtual bool NeedsBags => false;
+
+        private Scenarios.ConfigOverride _essentials;
+
+        /// <summary>The cap of loose items while a check that needs them runs: out of reach.</summary>
+        internal const int LooseItemsCap = 100000;
+
+        /// <summary>Loose items in the world now.</summary>
+        protected static int LooseItems => MyEntities.GetEntities().Count(e => e is MyFloatingObject && !e.MarkedForClose && !e.Closed);
+
         private Scenarios.ConfigOverride _gameplay;
 
         /// <summary>Where this run builds; the suite sets it, alone it is site 0.</summary>
@@ -118,7 +140,7 @@ namespace SentisTests.Regression
             WorldApi.EnsureUnpaused(Name);
             if (Site == null) Site = TestRunner.RunOrigin.HasValue ? Sites.InFrontOfPlayer(Kind, TestRunner.RunOrigin.Value) : Sites.Get(Kind, 0);
             if (!InSuite) FakeClients.RemoveAll();
-            if (!InSuite && (NeedsDamage || NeedsFallRestore) && Integrations.Missing(new[] { Integrations.Gameplay }).Count == 0)
+            if (!InSuite && (NeedsDamage || NeedsFallRestore || NeedsLooseItems) && Integrations.Missing(new[] { Integrations.Gameplay }).Count == 0)
             {
                 _gameplay = new Scenarios.ConfigOverride(Scenarios.ConfigOverride.Gameplay);
                 if (NeedsDamage)
@@ -128,6 +150,12 @@ namespace SentisTests.Regression
                     _gameplay.Set("MinimumMassForKineticDamage", 1);
                 }
                 if (NeedsFallRestore) _gameplay.Set("AutoRestoreFromVoxel", true);
+                if (NeedsLooseItems) _gameplay.Set("MaxFloatingObjects", LooseItemsCap);
+            }
+            if (!InSuite && NeedsBags && Integrations.IsLoaded(Scenarios.ConfigOverride.Essentials))
+            {
+                _essentials = new Scenarios.ConfigOverride(Scenarios.ConfigOverride.Essentials);
+                _essentials.Set("BackpackLimit", -1);
             }
             Note(Site.ToString());
             yield return Check();
@@ -766,6 +794,7 @@ namespace SentisTests.Regression
             {
                 ReleaseHighQuality();
                 _gameplay?.Restore();
+                _essentials?.Restore();
                 if (!InSuite) FakeClients.RemoveAll();
             }
             finally { base.Cleanup(); }

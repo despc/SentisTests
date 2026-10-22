@@ -152,6 +152,7 @@ public void Main(string argument)
     public sealed class CollectorCheck : RegressionCheck
     {
         public override string Name => Prefix + "collector";
+        protected override bool NeedsLooseItems => true;
 
         protected override IEnumerator Check()
         {
@@ -167,7 +168,8 @@ public void Main(string argument)
             Check(dummy != null, "MyCollector.m_collectorDummyMatrix is not in this game");
             var field = Vector3D.Transform(((Matrix)dummy.GetValue(collector)).Translation, collector.WorldMatrix);
             MyFloatingObjects.Spawn(item, field, collector.WorldMatrix.Forward, collector.WorldMatrix.Up);
-            yield return Until(() => Amount(Inventory(collector), "Component/SteelPlate"), v => v >= 15, "the plates collected", 20, () => State(collector));
+            yield return Until(() => Amount(Inventory(collector), "Component/SteelPlate"), v => v >= 15, "the plates collected", 20,
+                () => State(collector) + ", loose in the world: " + LooseItems);
             Result("the collector took in the 15 plates floating in front of it");
         }
     }

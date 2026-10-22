@@ -491,12 +491,6 @@ namespace SentisTests.Core
             try { ReportUnderground(scenario); }
             catch (Exception e) { Log.Warn("underground check failed for {0}: {1}", scenario.Name, e.Message); }
 
-            // Whatever the scenario put back or forgot to, the plugin settings it touched go back to
-            // what they were before it: Torch writes every change to the config file, and a stand
-            // left with the freezer off or the welders at x100 skews every run after it.
-            try { Scenarios.ConfigOverride.RestoreLeftovers(); }
-            catch (Exception e) { Log.Warn("config restore failed after {0}: {1}", scenario.Name, e.Message); }
-
             if (delay < 0)
             {
                 foreach (var entity in scenario.TakeTracked())
@@ -539,6 +533,13 @@ namespace SentisTests.Core
             // base Cleanup has none left to remove.
             try { scenario.Cleanup(); }
             catch (Exception e) { Log.Warn("cleanup of {0} failed: {1}", scenario.Name, e.Message); }
+
+            // Whatever the scenario forgot to put back in its Cleanup, the plugin settings it touched go back to
+            // what they were before it: Torch writes every change to the config file, and a stand left with the
+            // freezer off or the welders at x100 skews every run after it. After the Cleanup, so only what it
+            // really left behind is told
+            try { Scenarios.ConfigOverride.RestoreLeftovers(); }
+            catch (Exception e) { Log.Warn("config restore failed after {0}: {1}", scenario.Name, e.Message); }
 
             foreach (var progress in scenario.ProgressLog)
                 result.Notes.Add(progress);

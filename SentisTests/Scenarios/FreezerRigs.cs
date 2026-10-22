@@ -119,6 +119,8 @@ namespace SentisTests.Scenarios
         public const string Optimisations = "SentisOptimisations";
         public const string Gameplay = "SentisGameplayImprovements";
         public const string Clusters = "SentisClusters";
+        /// <summary>The third-party Essentials: its settings are on the plugin's instance.</summary>
+        public const string Essentials = "Essentials";
 
         private readonly string _plugin;
         private readonly Dictionary<string, object> _saved = new Dictionary<string, object>();
@@ -164,6 +166,13 @@ namespace SentisTests.Scenarios
             return value;
         }
 
+        /// <summary>The setting as it is now, read only (nothing noted for a restore).</summary>
+        public static object Get(string plugin, string property)
+        {
+            var config = Config(plugin);
+            return (config.GetType().GetProperty(property) ?? throw new InvalidOperationException(plugin + " has no setting " + property)).GetValue(config);
+        }
+
         /// <summary>Puts back every original still in <see cref="RestoreFile"/>.</summary>
         public static void RestoreLeftovers()
         {
@@ -193,6 +202,14 @@ namespace SentisTests.Scenarios
 
         private static object Config(string plugin)
         {
+            if (plugin == Essentials)
+            {
+                var essentials = AppDomain.CurrentDomain.GetAssemblies()
+                    .Select(a => a.GetType("Essentials.EssentialsPlugin")).FirstOrDefault(t => t != null)
+                    ?? throw new ScenarioSkippedException(Core.Integrations.MissingReason(plugin));
+                var instance = essentials.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
+                return instance?.GetType().GetProperty("Config")?.GetValue(instance) ?? throw new InvalidOperationException(plugin + " has no config");
+            }
             var typeName = plugin == Gameplay
                 ? "SentisGameplayImprovements.SentisGameplayImprovementsPlugin"
                 : plugin == Clusters

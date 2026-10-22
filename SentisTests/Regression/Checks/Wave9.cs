@@ -30,8 +30,19 @@ namespace SentisTests.Regression.Checks
             yield return Arrive(Site.At(0, 0, -3));
             var grids = new List<MyCubeGrid>();
             var mine = false;
+            // the game's own cargo timer can spawn a ship for another player while this one waits: take only those
+            // that came within the box round this check's player the game spawns it in. The player's character can be
+            // gone by the last tries under the suite's load, so the spot they were put at, not their live position
+            var here = Site.At(0, 0, -3);
+            var far = new List<string>();
             Action<List<MyCubeGrid>, MySpawnGroupDefinition, MySpawnGroupDefinition.SpawnGroupPrefab, long> created =
-                (list, group, prefab, owner) => { if (mine && group.IsCargoShip) grids.AddRange(list); };
+                (list, group, prefab, owner) =>
+                {
+                    if (!mine || !group.IsCargoShip) return;
+                    grids.AddRange(list.Where(g => Vector3D.Distance(g.PositionComp.GetPosition(), here) < 40000));
+                    far.AddRange(list.Where(g => Vector3D.Distance(g.PositionComp.GetPosition(), here) >= 40000)
+                        .Select(g => g.DisplayName + " " + F(Vector3D.Distance(g.PositionComp.GetPosition(), here)) + " m off"));
+                };
             Patch();
             MySpawnGroupDefinition.OnSpawnGroupGridsCreated += created;
             try
@@ -52,10 +63,10 @@ namespace SentisTests.Regression.Checks
                 MySpawnGroupDefinition.OnSpawnGroupGridsCreated -= created;
                 foreach (var g in grids) Track(g);
             }
-            Check(grids.Count > 0, "no cargo ship spawned in 10 tries");
+            Check(grids.Count > 0, "no cargo ship spawned by the player in 10 tries" + (far.Count > 0 ? " (further than 40 km: " + string.Join(", ", far) + ")" : ""));
             var ship = grids.OrderByDescending(g => g.BlocksCount).First();
-            var distance = Vector3D.Distance(ship.PositionComp.GetPosition(), Body.PositionComp.GetPosition());
-            Check(distance < 40000, "the cargo ship spawned " + F(distance) + " m from the player it was spawned for");
+            // within 40 km of the player by the take above
+            var distance = Vector3D.Distance(ship.PositionComp.GetPosition(), here);
             var owner = ship.BigOwners.FirstOrDefault();
             Check(owner != 0 && MySession.Static.Players.IdentityIsNpc(owner), "the cargo ship is owned by " + owner + ", not an NPC");
             // flown by a remote control's autopilot, AI blocks, or (with neither) the game's simple autopilot on the grid
@@ -63,7 +74,7 @@ namespace SentisTests.Regression.Checks
             var ai = grids.SelectMany(g => g.GetFatBlocks()).Any(b => b.GetType().Name.Contains("MyFlightMovementBlock"));
             // the game puts it on the edge of a box of 8 km round the player, out to 14 km: past the SO freezer's 10 km it
             // stands frozen until a player comes near. The player flies up to it, as one meeting it does
-            var near = ship.PositionComp.GetPosition() + Vector3D.Normalize(Body.PositionComp.GetPosition() - ship.PositionComp.GetPosition()) * 400;
+            var near = ship.PositionComp.GetPosition() + Vector3D.Normalize(here - ship.PositionComp.GetPosition()) * 400;
             StandAt(near, ship.PositionComp.GetPosition());
             yield return Until(() => ship.Physics?.LinearVelocity.Length() ?? 0, v => v > 1, "the cargo ship under way with the player by it", 60,
                 () => "physics " + (ship.Physics == null ? "none" : "active " + ship.Physics.IsActive) + ", the player " + F(Vector3D.Distance(ship.PositionComp.GetPosition(), Body.PositionComp.GetPosition())) + " m off"

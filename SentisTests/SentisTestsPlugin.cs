@@ -303,6 +303,9 @@ namespace SentisTests
                 ScenarioRegistry.Register(TranslatorNoticesScenario.ScenarioName, () => new TranslatorNoticesScenario());
                 ScenarioRegistry.Register(TranslatorLoadScenario.ScenarioName, () => new TranslatorLoadScenario());
                 ScenarioRegistry.Register(Regression.Checks.GridStorageSaveCheck.ScenarioName, () => new Regression.Checks.GridStorageSaveCheck());
+                // not in the suite: they change a setting of the whole server (the checks beside them would see it)
+                ScenarioRegistry.Register(Regression.RegressionCheck.Prefix + "connector_destroy", () => new Regression.Checks.ConnectorDestroyCheck());
+                ScenarioRegistry.Register(Regression.RegressionCheck.Prefix + "raycast_limit", () => new Regression.Checks.RaycastLimitCheck());
                 ScenarioRegistry.Register(ProductionScenario.ScenarioName, () => new ProductionScenario());
                 Regression.Registry.RegisterAll();
                 ScenarioRegistry.Register(ProductionFreezerStressScenario.ScenarioName,
