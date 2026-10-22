@@ -301,6 +301,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(TranslatorSayScenario.InlineName, () => new TranslatorSayScenario(inline: true));
                 ScenarioRegistry.Register(TranslatorSayScenario.DiscordName, () => new TranslatorSayScenario(discord: true));
                 ScenarioRegistry.Register(TranslatorNoticesScenario.ScenarioName, () => new TranslatorNoticesScenario());
+                ScenarioRegistry.Register(TranslatorLoadScenario.ScenarioName, () => new TranslatorLoadScenario());
                 ScenarioRegistry.Register(Regression.Checks.GridStorageSaveCheck.ScenarioName, () => new Regression.Checks.GridStorageSaveCheck());
                 ScenarioRegistry.Register(ProductionScenario.ScenarioName, () => new ProductionScenario());
                 Regression.Registry.RegisterAll();
@@ -417,7 +418,7 @@ namespace SentisTests
 
             ScenarioRegistry.Needs(Integrations.Adventures, NpcSpawnScenario.ScenarioName);
             ScenarioRegistry.Needs(Integrations.Garage, GarageRoundtripScenario.ScenarioName);
-            ScenarioRegistry.Needs(Integrations.Translator, TranslatorChatScenario.ScenarioName, TranslatorChatScenario.RestartName, TranslatorSayScenario.ScenarioName, TranslatorSayScenario.InlineName, TranslatorSayScenario.DiscordName, TranslatorNoticesScenario.ScenarioName);
+            ScenarioRegistry.Needs(Integrations.Translator, TranslatorChatScenario.ScenarioName, TranslatorChatScenario.RestartName, TranslatorSayScenario.ScenarioName, TranslatorSayScenario.InlineName, TranslatorSayScenario.DiscordName, TranslatorNoticesScenario.ScenarioName, TranslatorLoadScenario.ScenarioName);
 
             // One pass over the world per plugin that sweeps it: the scenario needs all three.
             ScenarioRegistry.Needs(new[] { Integrations.Adventures, Integrations.Gameplay, Integrations.Optimisations },

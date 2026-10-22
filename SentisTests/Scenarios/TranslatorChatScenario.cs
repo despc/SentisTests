@@ -40,7 +40,8 @@ namespace SentisTests.Scenarios
     /// - Discord (SEDiscordBridge, a stand-in of it here): a message in the chat channel translated for everyone who
     ///   needs it, under the Discord author's name; one in a faction's channel (the bridge sends it to each member) to
     ///   the member it went to, translated once; a player's message to Discord (it reads Russian): an English one with its
-    ///   translation, "text (translation)", a Russian one as it is;
+    ///   translation, "text (translation)", a Russian one as it is; in inline mode a Discord message held and sent on as
+    ///   one: the original to those who read it, "text (translation)" to the others;
     /// - "!st disable" from a player who is not an admin: refused.
     /// The plugin's settings are changed in memory and put back (the players' languages too), real players online are
     /// left out of it (taken as having translations off while it runs).
@@ -254,6 +255,8 @@ namespace SentisTests.Scenarios
             Set("InlineMode", true);
             step = Inline();
             while (step.MoveNext()) yield return step.Current;
+            step = DiscordInline();
+            while (step.MoveNext()) yield return step.Current;
             Set("InlineMode", false);
 
             // --- an admin's command from a player who is not one
@@ -396,6 +399,49 @@ namespace SentisTests.Scenarios
             Note(what + ": original to D at once, \"" + combined + "\" to B,C");
         }
 
+        /// <summary>
+        /// Inline mode, a Russian message from Discord to everyone: held, and sent on as one message under the Discord
+        /// author's name - the original to A and D (Russian) at once, "text (translation)" to B and C; nothing more.
+        /// </summary>
+        private IEnumerator DiscordInline()
+        {
+            const string what = "inline mode, Discord";
+            const string author = "[D] Vasya";
+            const string text = "Кто со мной на астероид за платиной?";
+            Drain();
+            _asOther = true;
+            try
+            {
+                SEDiscordBridge.DiscordBridge.Discord_MessageCreated((IChatManagerServer)_chat, author, text, 0);
+                var got = Wait(() => Captured.Count(c => c.Author == author && c.Text != text && _fakes.Contains(c.To)) >= 2, what + ": combined to B and C", TranslateSeconds);
+                while (got.MoveNext()) yield return got.Current;
+                var quiet = WaitForSeconds(QuietSeconds, what + ": nothing more");
+                while (quiet.MoveNext()) yield return quiet.Current;
+            }
+            finally { _asOther = false; }
+            var sent = Drain().Where(c => c.Author == author && _fakes.Contains(c.To)).ToList(); // real players online are not this check's
+            var originals = sent.Where(c => c.Text == text).Select(c => c.To).OrderBy(x => x).ToList();
+            var combined = sent.Where(c => c.Text != text).ToList();
+            Check(originals.SequenceEqual(new[] { _identity[A], _identity[D] }.OrderBy(x => x)),
+                what + ": the original went to " + string.Join(",", originals.Select(Who)) + ", not A,D (one message each)");
+            Check(combined.Select(c => c.To).OrderBy(x => x).SequenceEqual(new[] { _identity[B], _identity[C] }.OrderBy(x => x)),
+                what + ": the combined message went to " + string.Join(",", combined.Select(c => Who(c.To))) + ", not B,C (one message each)");
+            Check(combined.All(c => c.Text.StartsWith(text) && c.Text.Length > text.Length + 5 && Cyrillic(c.Text.Substring(text.Length)) < 0.05),
+                what + ": " + string.Join(" / ", combined.Select(c => "\"" + c.Text + "\"")) + " is not the original and its English");
+            Note(what + ": the original to A,D, \"" + combined[0].Text + "\" to B,C");
+        }
+
+        // what the plugin sends on as a Discord message (inline mode): Torch's SendMessageAsOther with a colour, under the
+        // Discord author's name
+        private static bool _asOther;
+
+        private static void AsOtherPrefix(string author, string message, ulong targetSteamId)
+        {
+            if (!_capturing || !_asOther || author == null || !author.StartsWith("[D]")) return;
+            var to = targetSteamId == 0 ? 0 : MySession.Static.Players.TryGetIdentityId(targetSteamId);
+            Captured.Enqueue(new Sent { Text = message ?? "", Author = author, To = to, Font = "AsOther" });
+        }
+
         private IEnumerator Restart()
         {
             SkipUnless((bool)Get("AutoRestartServer"), "AutoRestartServer is off in SentisTranslator.cfg");
@@ -509,6 +555,11 @@ namespace SentisTests.Scenarios
             {
                 var context = patches.AcquireContext();
                 context.GetPattern(dialog).Prefixes.Add(typeof(TranslatorChatScenario).GetMethod(nameof(DialogPrefix), BindingFlags.Static | BindingFlags.NonPublic));
+                // the colour overload: the one the plugin's prefix (on the font overload) does not stand on
+                var asOther = typeof(Torch.Managers.ChatManager.ChatManagerServer).GetMethod("SendMessageAsOther",
+                    new[] { typeof(string), typeof(string), typeof(Color), typeof(ulong), typeof(string) });
+                if (asOther != null)
+                    context.GetPattern(asOther).Prefixes.Add(typeof(TranslatorChatScenario).GetMethod(nameof(AsOtherPrefix), BindingFlags.Static | BindingFlags.NonPublic));
                 patches.Commit();
             }
             var asPlayer = Integrations.TypeOf(PluginName, "SentisTranslator.ChatHook")?.GetMethod("SendAsPlayer", Any);
