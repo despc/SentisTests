@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -22,13 +22,13 @@ namespace SentisTests.Core
     public static class CrashDump
     {
         private static readonly Logger Log = LogManager.GetCurrentClassLogger();
-        private static readonly Harmony Harmony = new Harmony("SentisTests.CrashDump");
         private const int KeepDumps = 3;
         private static int _taken;
 
         public static string Folder => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CrashDumps");
 
-        public static void Install()
+        /// <summary>The prefix on Torch's handler of a fatal exception; by Torch (SEDiscordBridge has one there too).</summary>
+        public static void Install(Torch.Managers.PatchManager.PatchManager patches)
         {
             try
             {
@@ -42,7 +42,11 @@ namespace SentisTests.Core
                 }
                 var handler = initializer.GetMethod("HandleException", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
                               ?? throw new MissingMethodException(initializer.FullName, "HandleException");
-                Harmony.Patch(handler, prefix: new HarmonyMethod(typeof(CrashDump).GetMethod(nameof(HandleExceptionPrefix), BindingFlags.Static | BindingFlags.NonPublic)));
+                // by Torch, not Harmony: SEDiscordBridge puts a Torch prefix on it, and the jump written last is the one
+                // that runs (patch_conflicts)
+                var context = patches?.AcquireContext() ?? throw new InvalidOperationException("no patch manager");
+                context.GetPattern(handler).Prefixes.Add(typeof(CrashDump).GetMethod(nameof(HandleExceptionPrefix), BindingFlags.Static | BindingFlags.NonPublic));
+                patches.Commit();
                 Log.Info("CrashDump: a fatal exception is dumped to " + Folder + " by " + (ProcDump() ?? "procdump (not found)"));
             }
             catch (Exception e)

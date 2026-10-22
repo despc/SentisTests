@@ -66,7 +66,7 @@ namespace SentisTests
         {
             TorchInstance = torch;
             // first: a fatal exception from here on leaves a full dump
-            CrashDump.Install();
+            CrashDump.Install(torch.Managers.GetManager<PatchManager>());
             try
             {
                 _config = Persistent<MainConfig>.Load(Path.Combine(StoragePath, "SentisTests.cfg"));
@@ -289,6 +289,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(PatchRetBufScenario.ScenarioName, () => new PatchRetBufScenario());
                 ScenarioRegistry.Register(PatchJumpsScenario.ScenarioName, () => new PatchJumpsScenario());
                 ScenarioRegistry.Register(PatchParamsScenario.ScenarioName, () => new PatchParamsScenario());
+                ScenarioRegistry.Register(PatchConflictsScenario.ScenarioName, () => new PatchConflictsScenario());
                 ScenarioRegistry.Register(StructThisGcScenario.ScenarioName, () => new StructThisGcScenario());
                 ScenarioRegistry.Register(MixedWeldScenario.ScenarioName, () => new MixedWeldScenario());
                 ScenarioRegistry.Register(HandWeldScenario.ScenarioName, () => new HandWeldScenario());
@@ -300,6 +301,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(TranslatorSayScenario.InlineName, () => new TranslatorSayScenario(inline: true));
                 ScenarioRegistry.Register(TranslatorSayScenario.DiscordName, () => new TranslatorSayScenario(discord: true));
                 ScenarioRegistry.Register(TranslatorNoticesScenario.ScenarioName, () => new TranslatorNoticesScenario());
+                ScenarioRegistry.Register(Regression.Checks.GridStorageSaveCheck.ScenarioName, () => new Regression.Checks.GridStorageSaveCheck());
                 ScenarioRegistry.Register(ProductionScenario.ScenarioName, () => new ProductionScenario());
                 Regression.Registry.RegisterAll();
                 ScenarioRegistry.Register(ProductionFreezerStressScenario.ScenarioName,

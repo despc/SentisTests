@@ -266,6 +266,7 @@ namespace SentisTests.Regression
             Add(() => new AllBlocksBuildCheck(VRage.Game.MyCubeSize.Small));
             Add(() => new WeatherCheck());
             Add(() => new MeteorCheck());
+            Add(() => new GridStorageCheck());
 
             foreach (var make in Added)
                 Add(make);

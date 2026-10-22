@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -269,10 +269,21 @@ namespace SentisTests.Core
                 SentisTestsPlugin.Log.Warn("FrameProbe: hook target not found for " + prefix);
                 return;
             }
+            var before = typeof(FrameProbe).GetMethod(prefix, BindingFlags.Static | BindingFlags.NonPublic);
+            var after = typeof(FrameProbe).GetMethod(suffix, BindingFlags.Static | BindingFlags.NonPublic);
+            // a method a plugin patches by Harmony is probed by Harmony too: a Torch patch on it would throw the
+            // plugin's out (the jump written last runs; patch_conflicts)
+            if (HarmonyLib.Harmony.GetPatchInfo(target) != null)
+            {
+                Harmony.Patch(target, prefix: new HarmonyLib.HarmonyMethod(before), postfix: new HarmonyLib.HarmonyMethod(after));
+                return;
+            }
             var pattern = ctx.GetPattern(target);
-            pattern.Prefixes.Add(typeof(FrameProbe).GetMethod(prefix, BindingFlags.Static | BindingFlags.NonPublic));
-            pattern.Suffixes.Add(typeof(FrameProbe).GetMethod(suffix, BindingFlags.Static | BindingFlags.NonPublic));
+            pattern.Prefixes.Add(before);
+            pattern.Suffixes.Add(after);
         }
+
+        private static readonly HarmonyLib.Harmony Harmony = new HarmonyLib.Harmony("SentisTests.FrameProbe");
 
         /// <summary>
         /// Measuring only while a scenario runs, decided at the start of each frame. Otherwise every hook returns
