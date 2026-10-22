@@ -39,7 +39,8 @@ namespace SentisTests.Scenarios
     ///   the server's chat listeners (Torch's MessageRecieved: SEDiscordBridge) hear the original as of a message not held;
     /// - Discord (SEDiscordBridge, a stand-in of it here): a message in the chat channel translated for everyone who
     ///   needs it, under the Discord author's name; one in a faction's channel (the bridge sends it to each member) to
-    ///   the member it went to, translated once;
+    ///   the member it went to, translated once; a player's message to Discord (it reads Russian): an English one with its
+    ///   translation, "text (translation)", a Russian one as it is;
     /// - "!st disable" from a player who is not an admin: refused.
     /// The plugin's settings are changed in memory and put back (the players' languages too), real players online are
     /// left out of it (taken as having translations off while it runs).
@@ -243,6 +244,12 @@ namespace SentisTests.Scenarios
             var toD = Drain();
             Check(toD.Count == 0, "Discord, Russian, a faction channel to D (reads Russian): the plugin sent " + string.Join(" / ", toD));
 
+            // --- to Discord (it reads Russian): an English message goes with its translation, a Russian one as it is
+            step = ToDiscord("To Discord, English", "Is anyone up for a trip to the moon tonight?", translated: true);
+            while (step.MoveNext()) yield return step.Current;
+            step = ToDiscord("To Discord, Russian", "Кто сегодня летит на луну?", translated: false);
+            while (step.MoveNext()) yield return step.Current;
+
             // --- inline mode: held, combined to those who need it, the original to the others at once
             Set("InlineMode", true);
             step = Inline();
@@ -263,7 +270,7 @@ namespace SentisTests.Scenarios
             }
             else Note("A is an admin on this server: the refusal of \"!st disable\" is not checked");
 
-            Note("TRANSLATOR CHAT RESULT | global both ways, !st off/on, !st help, other commands and untranslatable text left, the writer's language learnt, !st lang chosen and auto, faction, private, Discord, inline, admin commands refused");
+            Note("TRANSLATOR CHAT RESULT | global both ways, !st off/on, !st help, other commands and untranslatable text left, the writer's language learnt, !st lang chosen and auto, faction, private, Discord both ways, inline, admin commands refused");
         }
 
         // ------------------------------------------------------------------ steps
@@ -282,6 +289,29 @@ namespace SentisTests.Scenarios
                 return false;
             }, to, english, author);
             while (step.MoveNext()) yield return step.Current;
+        }
+
+        /// <summary>
+        /// A player's message as SEDiscordBridge is about to send it to Discord (<c>ChatHook.OnToDiscord</c>, what the
+        /// plugin's prefix on the bridge's <c>SendAsync</c> calls): <paramref name="translated"/> - taken, and sent on as
+        /// "text (translation)" with Russian in it; otherwise left to the bridge as it is.
+        /// </summary>
+        private IEnumerator ToDiscord(string what, string text, bool translated)
+        {
+            var hookType = RequireType(Integrations.TypeOf(PluginName, "SentisTranslator.ChatHook"), "SentisTranslator.ChatHook");
+            var hook = hookType.GetProperty("Current", Any)?.GetValue(null);
+            Check(hook != null, what + ": the plugin's chat hook is not registered");
+            var on = hookType.GetMethod("OnToDiscord", Any);
+            Check(on != null, what + ": ChatHook.OnToDiscord is not there");
+            string sent = null;
+            var taken = (bool)on.Invoke(hook, new object[] { text, (ulong?)_steam[A], new Action<string>(t => sent = t) });
+            Check(taken == translated, what + (taken ? ": held for a translation" : ": left to the bridge as it is"));
+            if (!translated) yield break;
+            var got = Wait(() => sent != null, what + ": sent on to Discord", TranslateSeconds);
+            while (got.MoveNext()) yield return got.Current;
+            Check(sent.StartsWith(text) && sent.Length > text.Length && sent.Substring(text.Length).Any(ch => ch >= 'А' && ch <= 'я'),
+                what + ": went to Discord as \"" + sent + "\", not the text with a Russian translation");
+            Note(what + ": " + sent);
         }
 
         private IEnumerator Translated(string what, Func<bool> say, int[] to, bool english, string author = null)
@@ -472,9 +502,15 @@ namespace SentisTests.Scenarios
             var colored = typeof(MyVisualScriptLogicProvider).GetMethod("SendChatMessageColored", new[] { typeof(string), typeof(Color), typeof(string), typeof(long), typeof(string) });
             if (colored != null)
                 _harmony.Patch(colored, prefix: new HarmonyMethod(typeof(TranslatorChatScenario).GetMethod(nameof(SendColoredPrefix), BindingFlags.Static | BindingFlags.NonPublic)));
+            // by Torch, not Harmony: the plugin has a Torch prefix on it (its notices), which a Harmony patch would undo
             var dialog = typeof(Torch.Mod.ModCommunication).GetMethod("SendMessageTo", new[] { typeof(Torch.Mod.Messages.MessageBase), typeof(ulong) });
-            if (dialog != null)
-                _harmony.Patch(dialog, prefix: new HarmonyMethod(typeof(TranslatorChatScenario).GetMethod(nameof(DialogPrefix), BindingFlags.Static | BindingFlags.NonPublic)));
+            var patches = SentisTestsPlugin.TorchInstance.Managers.GetManager<Torch.Managers.PatchManager.PatchManager>();
+            if (dialog != null && patches != null)
+            {
+                var context = patches.AcquireContext();
+                context.GetPattern(dialog).Prefixes.Add(typeof(TranslatorChatScenario).GetMethod(nameof(DialogPrefix), BindingFlags.Static | BindingFlags.NonPublic));
+                patches.Commit();
+            }
             var asPlayer = Integrations.TypeOf(PluginName, "SentisTranslator.ChatHook")?.GetMethod("SendAsPlayer", Any);
             if (asPlayer != null)
                 _harmony.Patch(asPlayer, prefix: new HarmonyMethod(typeof(TranslatorChatScenario).GetMethod(nameof(SendAsPlayerPrefix), BindingFlags.Static | BindingFlags.NonPublic)));
