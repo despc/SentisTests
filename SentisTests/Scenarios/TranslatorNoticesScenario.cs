@@ -80,7 +80,7 @@ namespace SentisTests.Scenarios
 
             // --- chat, Russian, to everyone
             MyVisualScriptLogicProvider.SendChatMessage("На постройке Тестовая база не установлен маяк", "Сервер", 0, "Red");
-            var toA = Drain().Where(p => p.Key == _a).ToList();
+            var toA = Only(_a);
             Check(toA.Count == 1 && toA[0].Value == "На постройке Тестовая база не установлен маяк | Сервер",
                 "chat, Russian: A (reads Russian) did not get it as it is at once: " + Show(toA));
             var step = For(_b, "chat, Russian: to B in English", text => Latin(text) && text.Contains("|"));
@@ -94,14 +94,14 @@ namespace SentisTests.Scenarios
             while (step.MoveNext()) yield return step.Current;
             Note("screen, Russian, to B: " + _last);
             MyVisualScriptLogicProvider.ShowNotification("Захват зоны: 46%", 1000, "Green", _ib);
-            var again = Drain().Where(p => p.Key == _b).ToList();
+            var again = Only(_b);
             Check(again.Count == 1 && again[0].Value.Contains("46") && Latin(again[0].Value),
                 "screen, the same line with another number: not at once from the same translation: " + Show(again));
             Check(again[0].Value == _last.Replace("45", "46"), "screen, another number: \"" + again[0].Value + "\" is not \"" + _last + "\" with 46");
 
             // --- English to everyone's screen
             MyVisualScriptLogicProvider.ShowNotificationToAll("The server restarts in 5 minutes", 3000, "Red");
-            var toB = Drain().Where(p => p.Key == _b).ToList();
+            var toB = Only(_b);
             Check(toB.Count == 1 && toB[0].Value == "The server restarts in 5 minutes", "screen to all, English: B (reads English) did not get it as it is at once: " + Show(toB));
             step = For(_a, "screen to all, English: to A in Russian", text => text.Any(Cyrillic) && text.Contains("5"));
             while (step.MoveNext()) yield return step.Current;
@@ -114,12 +114,13 @@ namespace SentisTests.Scenarios
             while (step.MoveNext()) yield return step.Current;
             Note("window, Russian, to B: " + _last);
             Torch.Mod.ModCommunication.SendMessageTo(new Torch.Mod.Messages.DialogMessage("Sentis", "Сообщение дня", motd), _a);
-            var windowA = Drain().Where(p => p.Key == _a).ToList();
+            var windowA = Only(_a);
             Check(windowA.Count == 0, "window, Russian, to A (reads Russian): taken, though nobody needs it: " + Show(windowA));
 
             // --- in both languages, sent as it is
             var asIs = Integrations.TypeOf(TranslatorChatScenario.PluginName, "SentisTranslator.NoticeHook")?.GetMethod("AsIs", Any);
             Check(asIs != null, "SentisTranslator's NoticeHook.AsIs is not there");
+            Drain();
             asIs.Invoke(null, new object[] { new Action(() => MyVisualScriptLogicProvider.SendChatMessage("команды — в окне / commands are in the window", "", _ib, "Yellow")) });
             var wait = WaitForSeconds(2, "the help line: nothing taken");
             while (wait.MoveNext()) yield return wait.Current;
@@ -142,11 +143,11 @@ namespace SentisTests.Scenarios
             while (known.MoveNext()) yield return known.Current;
             Drain();
             MyVisualScriptLogicProvider.ShowNotification(constant, 3000, "White", _ib);
-            var prepared = Drain().Where(p => p.Key == _b).ToList();
+            var prepared = Only(_b);
             Check(prepared.Count == 1 && Latin(prepared[0].Value), "a prepared text: not to B in English at once: " + Show(prepared));
             Note("prepared, to B at once: " + prepared[0].Value);
             Torch.Mod.ModCommunication.SendMessageTo(new Torch.Mod.Messages.DialogMessage("Sentis", "Message Of The Day", greetingB), _b);
-            var motdB = Drain().Where(p => p.Key == _b).ToList();
+            var motdB = Only(_b);
             Check(motdB.Count == 1 && motdB[0].Value.Contains(nameB) && !motdB[0].Value.Split('|')[1].Any(Cyrillic),
                 "a prepared MOTD with the player's name: not to B in English at once with their name: " + Show(motdB));
             Note("prepared MOTD, to B at once: " + motdB[0].Value);
@@ -183,10 +184,16 @@ namespace SentisTests.Scenarios
         private IEnumerator For(ulong steam, string what, Func<string, bool> wanted)
         {
             _last = null;
+            var seen = new List<string>();
             var got = Wait(() =>
             {
                 foreach (var pair in Drain())
-                    if (pair.Key == steam && _last == null && wanted(pair.Value)) _last = pair.Value;
+                {
+                    if (pair.Key != steam) continue;
+                    seen.Add(pair.Value);
+                    if (_last == null && wanted(pair.Value)) _last = pair.Value;
+                }
+                if (_last == null && seen.Count > 0 && FakeClients.Seconds >= 0) Note(what + ": so far got " + string.Join(" / ", seen));
                 return _last != null;
             }, what, TranslateSeconds);
             while (got.MoveNext()) yield return got.Current;
@@ -198,6 +205,15 @@ namespace SentisTests.Scenarios
 
         private static string Show(List<KeyValuePair<ulong, string>> got) =>
             got.Count == 0 ? "nothing" : string.Join(" / ", got.Select(p => p.Key + ": " + p.Value));
+
+        // what went to one player so far; what went to the others stays for their checks (a cached translation goes
+        // in the same call as the original)
+        private static List<KeyValuePair<ulong, string>> Only(ulong steam)
+        {
+            var all = Drain();
+            foreach (var other in all.Where(p => p.Key != steam)) Got.Enqueue(other);
+            return all.Where(p => p.Key == steam).ToList();
+        }
 
         private static List<KeyValuePair<ulong, string>> Drain()
         {
