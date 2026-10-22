@@ -294,6 +294,8 @@ namespace SentisTests
                 ScenarioRegistry.Register(HandWeldScenario.ScenarioName, () => new HandWeldScenario());
                 ScenarioRegistry.Register(TranslatorChatScenario.ScenarioName, () => new TranslatorChatScenario());
                 ScenarioRegistry.Register(TranslatorChatScenario.RestartName, () => new TranslatorChatScenario(restart: true));
+                ScenarioRegistry.Register(JoinLeaveBurstScenario.ScenarioName, () => new JoinLeaveBurstScenario());
+                ScenarioRegistry.Register(FloatingObjectsLimitScenario.ScenarioName, () => new FloatingObjectsLimitScenario());
                 ScenarioRegistry.Register(TranslatorSayScenario.ScenarioName, () => new TranslatorSayScenario());
                 ScenarioRegistry.Register(TranslatorSayScenario.InlineName, () => new TranslatorSayScenario(inline: true));
                 ScenarioRegistry.Register(TranslatorSayScenario.DiscordName, () => new TranslatorSayScenario(discord: true));

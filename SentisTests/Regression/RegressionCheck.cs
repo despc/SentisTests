@@ -482,8 +482,10 @@ namespace SentisTests.Regression
         protected IEnumerator AddHead(MyMechanicalConnectionBlockBase block)
         {
             yield return Seconds(0.5);
+            // made on the server, built whole
             if (block.TopGrid == null)
-                Request(block, "DoRecreateTop", Identity, MyMechanicalConnectionBlockBase.MyTopBlockSize.Normal, true);
+                typeof(MyMechanicalConnectionBlockBase).GetMethod("DoRecreateTop", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    .Invoke(block, new object[] { Identity, MyMechanicalConnectionBlockBase.MyTopBlockSize.Normal, true });
             yield return Until(() => block.TopGrid != null && ((Sandbox.ModAPI.Ingame.IMyMechanicalConnectionBlock)block).IsAttached ? 1 : 0, v => v > 0,
                 "the head on " + block.BlockDefinition.Id.SubtypeName, 10);
             Track(block.TopGrid);

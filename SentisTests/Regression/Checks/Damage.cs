@@ -131,6 +131,7 @@ namespace SentisTests.Regression.Checks
     public sealed class DeathLootCheck : RegressionCheck
     {
         public override string Name => Prefix + "death_loot";
+        public override int TimeoutSeconds => 120;
         protected override bool NeedsDamage => true;
 
         protected override IEnumerator Check()
@@ -153,7 +154,7 @@ namespace SentisTests.Regression.Checks
             yield return Seconds(2);
             // the bag is queued (MyFloatingObjects' spawn queue, a few a frame): under the suite's load it comes late, and
             // meanwhile the plates are nowhere - the body's inventory is cleared at the death
-            yield return Until(kept, v => Math.Abs(v - 17) < 0.01, "the 17 plates on the body or in a bag", 40,
+            yield return Until(kept, v => Math.Abs(v - 17) < 0.01, "the 17 plates on the body or in a bag", 90,
                 () => "the body " + (body.MarkedForClose ? "gone" : "there, " + F(Vector3D.Distance(body.PositionComp.GetPosition(), died)) + " m from where it died, its items: "
                           + string.Join(", ", body.GetInventory()?.GetItems().Select(i => i.Content.SubtypeName + " " + i.Amount) ?? Enumerable.Empty<string>())) + ", bags " + bags().Count()
                       + "; anything with 17 plates in the world: " + string.Join(", ", MyEntities.GetEntities().Where(e => e.HasInventory && e.GetInventory()?.GetItemAmount(Item("Component/SteelPlate")) == 17)

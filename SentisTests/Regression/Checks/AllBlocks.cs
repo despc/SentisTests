@@ -97,7 +97,9 @@ namespace SentisTests.Regression.Checks
                 // rotors, hinges, pistons, suspensions get their heads and wheels as a player adds them
                 foreach (var p in placed)
                     if (p.Block is Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase mechanical && mechanical.TopGrid == null)
-                        Request(mechanical, "DoRecreateTop", Identity, Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase.MyTopBlockSize.Normal, true);
+                        // made on the server, built whole
+                        typeof(Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase).GetMethod("DoRecreateTop", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                            .Invoke(mechanical, new object[] { Identity, Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase.MyTopBlockSize.Normal, true });
                 // the heads are made as grids of their own a while later (longer under load): waited for, each
                 for (var f = Frames(15); f > 0 && placed.Any(p => p.Block is Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase m && m.TopGrid == null); f--)
                     yield return null;

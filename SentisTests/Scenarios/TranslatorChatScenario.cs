@@ -36,6 +36,7 @@ namespace SentisTests.Scenarios
     /// - faction chat: the translation to the members of the faction who need it, not to the author; private chat: to
     ///   the addressee if they need it;
     /// - inline mode: the message held, the readers who need it get "text (translation)", the others the original at once;
+    ///   the server's chat listeners (Torch's MessageRecieved: SEDiscordBridge) hear the original as of a message not held;
     /// - Discord (SEDiscordBridge, a stand-in of it here): a message in the chat channel translated for everyone who
     ///   needs it, under the Discord author's name; one in a faction's channel (the bridge sends it to each member) to
     ///   the member it went to, translated once;
@@ -338,8 +339,16 @@ namespace SentisTests.Scenarios
         private IEnumerator Inline()
         {
             const string what = "inline mode";
-            var consumed = Say(A, RuText, ChatChannel.Global, 0);
+            // what the server's chat listeners hear (SEDiscordBridge sends what it hears to Discord)
+            var heard = new List<TorchChatMessage>();
+            MessageRecievedDel listen = (TorchChatMessage m, ref bool _) => heard.Add(m);
+            ((IChatManagerClient)_chat).MessageRecieved += listen;
+            bool consumed;
+            try { consumed = Say(A, RuText, ChatChannel.Global, 0); }
+            finally { ((IChatManagerClient)_chat).MessageRecieved -= listen; }
             Check(consumed, what + ": the message was not held");
+            Check(heard.Count(m => m.AuthorSteamId == _steam[A] && m.Message == RuText) == 1,
+                what + ": the server's chat listeners (Discord) heard " + (heard.Count == 0 ? "nothing" : string.Join(" / ", heard.Select(m => m.AuthorSteamId + ": " + m.Message))) + ", not A's message once");
             // D reads Russian: the original, at once (in the same call)
             var first = Drain();
             Check(first.Count == 1 && first[0].To == _identity[D] && first[0].Text == RuText && !first[0].Author.EndsWith((string)Get("TranslationSuffix")),
@@ -399,7 +408,9 @@ namespace SentisTests.Scenarios
                 TargetId = target,
             };
             var args = new object[] { msg, false };
-            _raise.Invoke(_chat, args);
+            // as the game's handler of a client's message calls it: in the event of that client
+            if (from < 0) _raise.Invoke(_chat, args);
+            else FakeClients.AsClient(from, () => _raise.Invoke(_chat, args));
             return (bool)args[1];
         }
 

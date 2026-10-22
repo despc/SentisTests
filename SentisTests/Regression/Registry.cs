@@ -19,6 +19,27 @@ namespace SentisTests.Regression
 
         private static void Add(Func<RegressionCheck> make) => All.Add(new Entry { Name = make().Name, Make = make });
 
+        private static readonly List<Func<RegressionCheck>> Added = new List<Func<RegressionCheck>>();
+        private static bool _registered;
+
+        /// <summary>
+        /// A check another plugin brings: it goes into the suite after the ones here and is a scenario of its own.
+        /// Taken before <see cref="RegisterAll"/> as well as after it.
+        /// </summary>
+        public static void AddCheck(Func<RegressionCheck> make)
+        {
+            Added.Add(make);
+            if (!_registered) return;
+            Add(make);
+            RegisterScenario(All[All.Count - 1]);
+        }
+
+        private static void RegisterScenario(Entry entry)
+        {
+            ScenarioRegistry.Register(entry.Name, () => entry.Make());
+            ScenarioRegistry.OutOfAll(entry.Name);
+        }
+
         /// <summary>Lists the checks and registers them, and the suite, with the scenarios.</summary>
         public static void RegisterAll()
         {
@@ -229,6 +250,16 @@ namespace SentisTests.Regression
             Add(() => new ScrapCheck());
             Add(() => new RadiationDeletedCharacterCheck());
             Add(() => new ClaimNpcOwnershipCheck());
+            Add(() => new RejoinCheck());
+            Add(() => new BlockTransferCheck());
+            Add(() => new TimerGroupCheck());
+            Add(() => new RelativeDampenersCheck());
+            Add(() => new DrillOresCheck());
+            Add(() => new DefensiveCombatCheck());
+            Add(() => new CleanupExceptionCheck());
+            Add(() => new AutoRenameCheck());
+            Add(() => new OnlineRewardCheck());
+            Add(() => new FloatingLifetimeCheck());
             Add(() => new RefineryAllOresCheck());
             Add(() => new AssemblerAllComponentsCheck());
             Add(() => new AllBlocksBuildCheck(VRage.Game.MyCubeSize.Large));
@@ -236,10 +267,13 @@ namespace SentisTests.Regression
             Add(() => new WeatherCheck());
             Add(() => new MeteorCheck());
 
-            foreach (var entry in All)
-                ScenarioRegistry.Register(entry.Name, () => entry.Make());
+            foreach (var make in Added)
+                Add(make);
+
             // "run all" runs them in the suite, at once, not one by one as well
-            ScenarioRegistry.OutOfAll(All.Select(e => e.Name).ToArray());
+            foreach (var entry in All)
+                RegisterScenario(entry);
+            _registered = true;
             ScenarioRegistry.Register(RegressionSuite.ScenarioName, () => new RegressionSuite());
             // 100 ships into the planet at once: the load is its own, run alone
             ScenarioRegistry.Register(PlanetTunnelCheck.MassName, () => new PlanetTunnelCheck(100));

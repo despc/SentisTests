@@ -69,6 +69,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- regression checks kept in another plugin build on the helpers here -->
+    <InternalsVisibleTo Include="SentisAnticheat.Regression" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
   </ItemGroup>

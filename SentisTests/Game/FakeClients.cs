@@ -118,6 +118,8 @@ namespace SentisTests.Game
             public Func<double, Vector3D> Path;
             /// <summary>The character is left to its own controls (walks, flies, sits): not held at its point, the client's position follows it.</summary>
             public bool Free;
+            /// <summary>Quit (<see cref="Quit"/>): not on the server until <see cref="Rejoin"/>; its slot is kept.</summary>
+            public bool Gone;
 
             public readonly ConcurrentQueue<ServerMessage> Incoming = new ConcurrentQueue<ServerMessage>();
             public readonly List<ServerMessage> Downlink = new List<ServerMessage>();
@@ -237,6 +239,8 @@ namespace SentisTests.Game
                 WorldApi.PrepareTestIdentity(identity.IdentityId);
                 client.Player = Sync.Players.CreateNewPlayer(identity, new Sandbox.Game.World.MyPlayer.PlayerId(client.Id.Value, 0), name,
                     realPlayer: true, initialPlayer: false, newIdentity: true);
+                // a new player has no respawn ship cooldowns; one an earlier fake of this Steam id left would hold this one up
+                ClearRespawnCooldowns(client.Id.Value);
                 if (withCharacters && client.Player != null)
                 {
                     // A floating astronaut that follows the client's circle (steered in Tick).
@@ -256,6 +260,22 @@ namespace SentisTests.Game
         }
 
         public static void SetProfile(NetworkProfile profile) => _profile = profile;
+
+        /// <summary>The respawn ships' cooldowns of a Steam id's players (MySpaceRespawnComponent.m_globalRespawnTimesMs). Game thread.</summary>
+        public static void ClearRespawnCooldowns(ulong steamId)
+        {
+            var respawn = Sync.Players.RespawnComponent;
+            var field = respawn?.GetType().GetField("m_globalRespawnTimesMs", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var times = field?.GetValue(respawn);
+            if (times == null) return;
+            var keys = ((System.Collections.IEnumerable)times.GetType().GetProperty("Keys").GetValue(times)).Cast<object>().ToList();
+            var remove = times.GetType().GetMethod("Remove");
+            foreach (var key in keys)
+            {
+                var controller = (Sandbox.Game.World.MyPlayer.PlayerId)key.GetType().GetField("ControllerId").GetValue(key);
+                if (controller.SteamId == steamId) remove.Invoke(times, new[] { key, (object)true });
+            }
+        }
 
         /// <summary>The player of a fake client.</summary>
         public static Sandbox.Game.World.MyPlayer PlayerOf(int index) => _clients[index].Player;
@@ -380,6 +400,11 @@ namespace SentisTests.Game
                 {
                     try
                     {
+                        if (clients[i].Gone)
+                        {
+                            // quit already: its character, left in the world, goes with the rest (PurgeLeftovers)
+                            continue;
+                        }
                         _server.OnClientLeft(clients[i].Id);
                         var player = clients[i].Player;
                         // The body goes first. Removing the player takes its identity with it, and
@@ -429,6 +454,70 @@ namespace SentisTests.Game
             }
             _frames = 0;
             return left;
+        }
+
+        /// <summary>
+        /// One fake client quits the way a real player does (<c>MyPlayerCollection.Multiplayer_ClientRemoved</c>): off the
+        /// network, its player removed and its character left where it is, seated or not; its identity stays. The others go
+        /// on. Its slot stays for <see cref="Rejoin"/>. Game thread.
+        /// </summary>
+        public static void Quit(int index)
+        {
+            var client = _clients[index];
+            if (client.Gone) return;
+            _server.OnClientLeft(client.Id);
+            var player = client.Player;
+            if (player != null) Sync.Players.RemovePlayer(player, false);
+            if (Sync.Clients.HasClient(client.Id.Value)) Sync.Clients.RemoveClient(client.Id.Value);
+            foreach (var message in client.Uplink) message.Packet.Return();
+            client.Uplink.Clear();
+            client.Downlink.Clear();
+            client.DownlinkDeliverAt.Clear();
+            while (client.Incoming.TryDequeue(out _)) { }
+            client.Player = null;
+            client.Gone = true;
+        }
+
+        /// <summary>
+        /// A client that quit comes back as a real player's game does: on the network again, then its player asked for
+        /// (<c>MyPlayerCollection.OnNewPlayerRequest</c>: the identity it had) and the join's respawn request
+        /// (<c>OnRespawnRequest</c> with <c>JoinGame</c>), all as from that client. What the game does with the character it
+        /// left is the game's. Game thread.
+        /// </summary>
+        public static Sandbox.Game.World.MyPlayer Rejoin(int index)
+        {
+            var client = _clients[index];
+            if (!client.Gone) return client.Player;
+            const System.Reflection.BindingFlags any = System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public;
+            var players = typeof(Sandbox.Game.Multiplayer.MyPlayerCollection);
+            var name = NamePrefix + index.ToString("D3");
+            client.State = Activator.CreateInstance(MyPerGameSettings.ClientStateType) as MyClientStateBase;
+            Sync.Clients.AddClient(client.Id.Value, name);
+            client.Gone = false;
+            _server.OnClientJoined(client.Id, client.State);
+            var ready = new ClientReadyDataMsg { UsePlayoutDelayBufferForCharacter = true, UsePlayoutDelayBufferForJetpack = true, UsePlayoutDelayBufferForGrids = true };
+            _server.OnClientReady(client.Endpoint, ref ready);
+
+            var parametersType = players.GetNestedType("NewPlayerRequestParameters", any) ?? throw new MissingMemberException("MyPlayerCollection.NewPlayerRequestParameters");
+            var parameters = Activator.CreateInstance(parametersType);
+            void Set(object of, string field, object value) => of.GetType().GetField(field).SetValue(of, value);
+            Set(parameters, "ClientSteamId", client.Id.Value);
+            Set(parameters, "PlayerSerialId", 0);
+            Set(parameters, "DisplayName", name);
+            Set(parameters, "RealPlayer", true);
+            Set(parameters, "InitialPlayer", true);
+            var newPlayer = players.GetMethod("OnNewPlayerRequest", any, null, new[] { parametersType }, null) ?? throw new MissingMethodException("MyPlayerCollection", "OnNewPlayerRequest");
+            AsClient(index, () => newPlayer.Invoke(null, new[] { parameters }));
+            client.Player = Sync.Players.GetPlayerById(new Sandbox.Game.World.MyPlayer.PlayerId(client.Id.Value, 0));
+
+            var respawnType = players.GetNestedType("RespawnMsg", any) ?? throw new MissingMemberException("MyPlayerCollection.RespawnMsg");
+            var respawn = Activator.CreateInstance(respawnType);
+            Set(respawn, "JoinGame", true);
+            Set(respawn, "NewIdentity", false);
+            Set(respawn, "PlayerSerialId", 0);
+            var respawnRequest = players.GetMethod("OnRespawnRequest", any, null, new[] { respawnType }, null) ?? throw new MissingMethodException("MyPlayerCollection", "OnRespawnRequest");
+            AsClient(index, () => respawnRequest.Invoke(null, new[] { respawn }));
+            return client.Player;
         }
 
         public const string NamePrefix = "FakeClient ";
@@ -602,6 +691,7 @@ namespace SentisTests.Game
             for (var i = 0; i < count; i++)
             {
                 var client = clients[i];
+                if (client.Gone) continue;
                 try
                 {
                     ReceiveFromServer(client, start, ticksPerMs, halfRtt);
