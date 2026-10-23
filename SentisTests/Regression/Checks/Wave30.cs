@@ -590,7 +590,9 @@ namespace SentisTests.Regression.Checks
             StandAt(station.PositionComp.GetPosition() + Site.Up * 0.2, station.PositionComp.GetPosition() + Site.Forward);
             // the suite's players come from other sites: the air the game counted at the last one (a planet's) goes first,
             // or the world's auto healing heals them here
-            yield return Until(() => Body.EnvironmentOxygenLevel, v => v < 0.5, "the open space's air counted at the player", 10);
+            yield return Until(() => Body.EnvironmentOxygenLevel, v => v < 0.5, "the open space's air counted at the player", 10,
+                () => "the air in this point now " + F(Sandbox.Game.GameSystems.MyOxygenProviderSystem.GetOxygenInPoint(Body.PositionComp.GetPosition())) + ", the character's oxygen component " +
+                      (Body.OxygenComponent == null ? "none" : "there") + ", updates " + Body.NeedsUpdate + ", in scene " + Body.InScene);
             Body.SuitBattery.ResourceSource.SetRemainingCapacityByType(MyResourceDistributorComponent.ElectricityId, 1E-05f * 0.05f);
             var health = Body.StatComp.Health;
             health.Value = health.MaxValue * 0.4f;
@@ -629,8 +631,11 @@ namespace SentisTests.Regression.Checks
         {
             SkipUnless(MySession.Static.Settings.EnableEconomy, "the economy is off in this world");
             var economy = MySession.Static.GetComponent<Sandbox.Game.SessionComponents.MySessionComponentEconomy>();
-            _faction = MySession.Static.Factions.Select(f => f.Value).OfType<MyFaction>()
-                .FirstOrDefault(f => f.FactionTypeString == "Trader" && f.Stations.Count > 0 && MySession.Static.Players.IdentityIsNpc(f.FounderId));
+            // a trader other than the first one when there is one: npc_station counts the first one's money to the credit,
+            // and a ship's price coming in on the same frame broke its count
+            var traders = MySession.Static.Factions.Select(f => f.Value).OfType<MyFaction>()
+                .Where(f => f.FactionTypeString == "Trader" && f.Stations.Count > 0 && MySession.Static.Players.IdentityIsNpc(f.FounderId)).ToList();
+            _faction = traders.Skip(1).FirstOrDefault() ?? traders.FirstOrDefault();
             SkipUnless(_faction != null, "no NPC trader faction in this world");
             var types = Sandbox.Definitions.MyDefinitionManager.Static.GetAllDefinitions<Sandbox.Definitions.MyFactionTypeDefinition>().Where(d => d.GridsForSale?.Length > 0).ToList();
             var type = types.FirstOrDefault(d => d.Id.SubtypeName == _faction.FactionTypeString) ?? types.FirstOrDefault();
@@ -657,8 +662,11 @@ namespace SentisTests.Regression.Checks
             var factionMoney = Sandbox.Game.GameSystems.BankingAndCurrency.MyBankingSystem.GetBalance(_faction.FactionId);
             var before = new HashSet<long>(MyEntities.GetEntities().OfType<MyCubeGrid>().Select(g => g.EntityId));
             Request(store, "BuyItem", offer.Id, 1, Body.EntityId, tick);
+            // the new grids of the player's and their subgrids: sites are 1000 m apart, and a grid another check makes near
+            // by (a rotor's head let go) is not the ship
             List<MyCubeGrid> Bought() => MyEntities.GetEntities().OfType<MyCubeGrid>().Where(g => !before.Contains(g.EntityId) && !g.MarkedForClose
-                && Vector3D.Distance(g.PositionComp.GetPosition(), grid.PositionComp.GetPosition()) < 2000).ToList();
+                && Vector3D.Distance(g.PositionComp.GetPosition(), grid.PositionComp.GetPosition()) < 2000 && g.BigOwners.Contains(Identity))
+                .SelectMany(g => MyCubeGridGroups.Static.Mechanical.GetGroupNodes(g)).Distinct().ToList();
             yield return Until(() => Bought().Count, v => v > 0, "the bought ship " + prefab.Id.SubtypeName + " by the station", 30,
                 () => "offer left " + offer.Amount + ", paid " + (money - Sandbox.Game.GameSystems.BankingAndCurrency.MyBankingSystem.GetBalance(Identity)));
             yield return Seconds(1);

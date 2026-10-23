@@ -252,7 +252,7 @@ namespace SentisTests.Regression.Checks
             Check(sent, "the drop system found no place for the player's drop");
             MyCubeGrid drop = null;
             yield return Until(() => (drop = MyEntities.GetEntities().OfType<MyCubeGrid>().FirstOrDefault(g => !before.Contains(g.EntityId) && !g.MarkedForClose
-                && g.GetFatBlocks().Any(b => b.Components.Contains(typeof(Sandbox.Game.Components.MyContainerDropComponent))))) != null ? 1 : 0, v => v > 0, "the drop's grid", 20);
+                && g.GetFatBlocks().Any(b => b.Components.Get<Sandbox.Game.Components.MyContainerDropComponent>()?.Competetive == false))) != null ? 1 : 0, v => v > 0, "the drop's grid", 20);
             Track(drop);
             var distance = Vector3D.Distance(drop.PositionComp.GetPosition(), Body.PositionComp.GetPosition());
             var gps = MySession.Static.Gpss.ExistsForPlayer(Identity) ? MySession.Static.Gpss[Identity].Count : 0;

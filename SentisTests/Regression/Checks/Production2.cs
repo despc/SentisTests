@@ -106,6 +106,14 @@ namespace SentisTests.Regression.Checks
     {
         public override string Name => Prefix + "assembler_repeat";
 
+        /// <summary>Whether the SentisOptimisations freezer holds the grid (its frozen set), or "no SO".</summary>
+        private static string Frozen(MyCubeGrid grid)
+        {
+            var type = AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("SentisOptimisationsPlugin.Freezer.FreezeLogic")).FirstOrDefault(t => t != null);
+            var set = type?.GetField("FrozenGrids")?.GetValue(null);
+            return set == null ? "no SO" : set.GetType().GetMethod("Contains")?.Invoke(set, new object[] { grid.EntityId })?.ToString() ?? "?";
+        }
+
         protected override IEnumerator Check()
         {
             yield return Arrive(Site.At(0, 8, -8));
@@ -125,7 +133,10 @@ namespace SentisTests.Regression.Checks
             var amount = ((Sandbox.ModAPI.IMyAssembler)assembler).GetQueue().Sum(q => (double)q.Amount);
             Check(System.Math.Abs(amount - 1) < 0.01, "the queue holds " + amount + " plates in repeat after " + Amount(assembler.OutputInventory, "Component/SteelPlate") + " made, 1 asked for");
             Request(assembler, "RepeatEnabledCallback", false, false);
-            yield return Until(() => ((Sandbox.ModAPI.Ingame.IMyProductionBlock)assembler).IsQueueEmpty ? 1 : 0, v => v > 0, "the queue run out with repeat off", 30);
+            yield return Until(() => ((Sandbox.ModAPI.Ingame.IMyProductionBlock)assembler).IsQueueEmpty ? 1 : 0, v => v > 0, "the queue run out with repeat off", 60,
+                () => State(assembler) + "; repeat " + assembler.RepeatEnabled + ", queue " + string.Join(", ", ((Sandbox.ModAPI.IMyAssembler)assembler).GetQueue().Select(q => q.Blueprint.Id.SubtypeName + " x" + q.Amount)) +
+                      ", state " + assembler.CurrentState + ", progress " + F(assembler.CurrentProgress) + "; the grid frozen by SO " + Frozen(grid) +
+                      ", the player " + F(Vector3D.Distance(Body.PositionComp.GetPosition(), grid.PositionComp.GetPosition())) + " m off");
             Result("one plate queued in repeat made " + Amount(assembler.OutputInventory, "Component/SteelPlate") + " and stayed queued; repeat off, the queue ran out");
         }
     }

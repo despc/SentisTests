@@ -113,8 +113,9 @@ namespace SentisTests.Regression.Checks
             Check(unlocks != null, "MySessionComponentResearch has no m_unlocks");
             Sandbox.Definitions.MyCubeBlockDefinition Cube(MyDefinitionId id) =>
                 Sandbox.Definitions.MyDefinitionManager.Static.GetCubeBlockDefinition(id);
+            // of the base game: the fake player owns no DLC, and the server may refuse a DLC block for that
             bool Simple(Sandbox.Definitions.MyCubeBlockDefinition d) =>
-                d != null && d.Public && d.AvailableInSurvival && d.CubeSize == MyCubeSize.Large && d.Size == Vector3I.One;
+                d != null && d.Public && d.AvailableInSurvival && d.CubeSize == MyCubeSize.Large && d.Size == Vector3I.One && (d.DLCs == null || d.DLCs.Length == 0);
             // a block needing no research that unlocks a one-cell block needing it: the basic assembler (it unlocks the
             // batteries) when it is in the tree, as a new player welds it first
             bool Weldable(Sandbox.Definitions.MyCubeBlockDefinition d) => d != null && d.Public && d.AvailableInSurvival && d.CubeSize == MyCubeSize.Large;

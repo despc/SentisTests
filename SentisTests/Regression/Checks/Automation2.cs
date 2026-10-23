@@ -15,7 +15,8 @@ namespace SentisTests.Regression.Checks
     /// <summary>
     /// Two stations 2 km apart in open space, each with a powered laser antenna given the other's coordinates (as a player
     /// pastes a GPS and presses Connect): the heads turn, find each other and connect; one switched to idle, the link is
-    /// gone.
+    /// gone; the other antenna picked from the terminal's list (<c>MyLaserAntenna.OnConnectToRecRequest</c>) and the link
+    /// made permanent (<c>ChangePermRequest</c>), they connect again.
     /// </summary>
     public sealed class LaserAntennaCheck : RegressionCheck
     {
@@ -50,7 +51,16 @@ namespace SentisTests.Regression.Checks
             var took = (DateTime.UtcNow - started).TotalSeconds;
             ((Sandbox.ModAPI.Ingame.IMyTerminalBlock)one).GetActionWithName("Idle").Apply(one);
             yield return Until(() => b.Status != LaserStatus.Connected ? 1 : 0, v => v > 0, "the link gone with one antenna idle", 15, () => "one " + a.Status + ", two " + b.Status);
-            Result("2 km apart, the laser antennas turned to each other's coordinates and connected in " + F(took) + " s; one idle, the other " + b.Status);
+            var lost = b.Status;
+            // linked again the way the terminal does it: the other antenna picked from the list, the link made permanent
+            Request(one, "OnConnectToRecRequest", two.EntityId);
+            yield return Until(() => a.Status == LaserStatus.Connected && b.Status == LaserStatus.Connected ? 1 : 0, v => v > 0, "the laser antennas connected again", 60,
+                () => "one " + a.Status + ", two " + b.Status);
+            // permanent only once connected
+            Request(one, "ChangePermRequest", true);
+            Check(a.IsPermanent && b.IsPermanent, "the link was not made permanent: one " + a.IsPermanent + ", two " + b.IsPermanent);
+            Result("2 km apart, the laser antennas turned to each other's coordinates and connected in " + F(took) + " s; one idle, the other " + lost +
+                   "; picked from the list, connected again, permanent");
         }
     }
 

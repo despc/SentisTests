@@ -479,6 +479,24 @@ namespace SentisTests.Game
         }
 
         /// <summary>
+        /// A client the server dropped itself (a kick): its slot is let go as <see cref="Quit"/> leaves it, without telling
+        /// the server again. Game thread.
+        /// </summary>
+        public static void Forget(int index)
+        {
+            var client = _clients[index];
+            if (client.Gone) return;
+            if (Sync.Clients.HasClient(client.Id.Value)) Sync.Clients.RemoveClient(client.Id.Value);
+            foreach (var message in client.Uplink) message.Packet.Return();
+            client.Uplink.Clear();
+            client.Downlink.Clear();
+            client.DownlinkDeliverAt.Clear();
+            while (client.Incoming.TryDequeue(out _)) { }
+            client.Player = null;
+            client.Gone = true;
+        }
+
+        /// <summary>
         /// A client that quit comes back as a real player's game does: on the network again, then its player asked for
         /// (<c>MyPlayerCollection.OnNewPlayerRequest</c>: the identity it had) and the join's respawn request
         /// (<c>OnRespawnRequest</c> with <c>JoinGame</c>), all as from that client. What the game does with the character it
