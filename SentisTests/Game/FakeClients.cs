@@ -109,6 +109,7 @@ namespace SentisTests.Game
             public EndpointId Id;
             public Endpoint Endpoint;
             public MyClientStateBase State;
+            public long SelectedBlock, SelectedGrid;
             public Sandbox.Game.World.MyPlayer Player;
             public Vector3D Center;
             public double Radius;
@@ -365,6 +366,16 @@ namespace SentisTests.Game
 
         /// <summary>The client state of one fake client, to look at what the server has queued for it.</summary>
         public static MyClientStateBase StateOf(int index) => _clients[index].State;
+
+        /// <summary>
+        /// The block and grid the fake client says, in its client updates, it has picked in its terminal (0: none), as a
+        /// real client does while its terminal is open (<c>MyTerminalControlPanel</c>).
+        /// </summary>
+        public static void Select(int index, long block, long grid)
+        {
+            _clients[index].SelectedBlock = block;
+            _clients[index].SelectedGrid = grid;
+        }
 
         /// <summary>
         /// Puts an entity in front of a fake client, the way opening a terminal does on a real one.
@@ -906,8 +917,9 @@ namespace SentisTests.Game
             Writer.WriteBool(false);
             Writer.WriteInt16(16);
             Writer.WriteInt16((short)Math.Min(_profile.RttMs, short.MaxValue));
-            Writer.WriteInt64(0);
-            Writer.WriteInt64(0);
+            // the block and grid picked in the client's terminal (MyClientStateBase.SelectedBlockEntityId / SelectedGridEntityId)
+            Writer.WriteInt64(client.SelectedBlock);
+            Writer.WriteInt64(client.SelectedGrid);
             Writer.Terminate();
             Queue(client, MyMessageId.CLIENT_UPDATE, false, now, ticksPerMs, halfRtt);
         }

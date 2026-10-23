@@ -77,8 +77,8 @@ namespace SentisTests.Scenarios
             // as freezer_stress has it: the frozen ones get fixed bodies
             _config.Set("FreezePhysics", !_toggle);
 
-            var anchor = WorldApi.LoadAuthoredGroup(WheelPerfScenario.ResourceName, WorldApi.EntityPrefix + Prefix + "anchor")[0]
-                .PositionAndOrientation.Value.GetMatrix().Translation;
+            // (a world without the planet it was authored by: the anchor goes onto the biggest planet there is)
+            var anchor = WorldApi.PlanetAnchor(WorldApi.EntityPrefix + Prefix + "anchor").Translation;
             var planet = MyGamePruningStructure.GetClosestPlanet(anchor);
             Check(planet != null, "no planet");
             var centre = planet.PositionComp.GetPosition();

@@ -664,6 +664,16 @@ namespace SentisTests.Game
             var grids = definitions?.ShipBlueprints?.FirstOrDefault()?.CubeGrids?.ToList();
             if (grids == null || grids.Count == 0)
                 throw new Core.ScenarioFailedException(source + " holds no grids");
+            return CopyGroup(grids, name, keepOwners: false);
+        }
+
+        /// <summary>
+        /// Builders of a group of grids (a blueprint's, or taken from the world) readied for a spawn of their own: fresh entity
+        /// ids, the links between them (landing gears, tops) on the new ids, names from <paramref name="name"/>. With
+        /// <paramref name="keepOwners"/> the blocks keep whose they were, else they are the player's.
+        /// </summary>
+        public static List<MyObjectBuilder_CubeGrid> CopyGroup(List<MyObjectBuilder_CubeGrid> grids, string name, bool keepOwners)
+        {
             // Landing gears keep the id of the grid they are locked to, and their object builder has
             // no Remap: without this a copy would reach for the original station.
             var oldIds = grids.Select(g => g.EntityId).ToList();
@@ -691,6 +701,7 @@ namespace SentisTests.Game
                 ob.Name = i == 0 ? name : name + "-part" + i;
                 if (i == 0) ob.DisplayName = name;
                 ob.PersistentFlags = VRage.ObjectBuilders.MyPersistentEntityFlags2.InScene;
+                if (keepOwners) continue;
                 foreach (var block in ob.CubeBlocks)
                 {
                     block.Owner = owner;

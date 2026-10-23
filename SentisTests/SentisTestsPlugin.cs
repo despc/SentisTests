@@ -168,6 +168,12 @@ namespace SentisTests
                 ScenarioRegistry.Register(WheelPerfScenario.ParkedScenarioName, () => new WheelPerfScenario(64, parked: true));
                 ScenarioRegistry.Register(GearProbeScenario.ScenarioName, () => new GearProbeScenario());
                 ScenarioRegistry.Register(FreezerPhysicsScenario.ScenarioName, () => new FreezerPhysicsScenario());
+                ScenarioRegistry.Register(RoverThawScenario.ScenarioName, () => new RoverThawScenario());
+                ScenarioRegistry.Register(RoverSpawnProbeScenario.ScenarioName, () => new RoverSpawnProbeScenario());
+                ScenarioRegistry.Register(ChatReachScenario.ScenarioName, () => new ChatReachScenario());
+                ScenarioRegistry.Register(ChatBridgeDupScenario.ScenarioName, () => new ChatBridgeDupScenario());
+                ScenarioRegistry.Register(SafeZoneListScenario.ScenarioName, () => new SafeZoneListScenario());
+                ScenarioRegistry.Register(JumpFreezeScenario.ScenarioName, () => new JumpFreezeScenario());
                 ScenarioRegistry.Register(PhysicsResumeScenario.ScenarioName, () => new PhysicsResumeScenario());
                 ScenarioRegistry.Register(UnsteppedBlocksScenario.ScenarioName, () => new UnsteppedBlocksScenario());
                 ScenarioRegistry.Register(PowerSwitchScenario.ScenarioName, () => new PowerSwitchScenario());
@@ -394,6 +400,8 @@ namespace SentisTests
                 FreezeDisassemblyScenario.ScenarioName,
                 FreezePowerScenario.ScenarioName,
                 FreezerPhysicsScenario.ScenarioName,
+                RoverThawScenario.ScenarioName,
+                RoverSpawnProbeScenario.ScenarioName,
                 FreezerStressScenario.ScenarioName, FreezerStressScenario.ProfileScenarioName,
                 ProductionFreezerStressScenario.ScenarioName,
                 FrozenRadiusWeldScenario.ScenarioName,

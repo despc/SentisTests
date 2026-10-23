@@ -327,8 +327,19 @@ namespace SentisTests.Regression.Checks
             Sandbox.Game.World.MySession.Static.Players.TryGetIdentity(Identity).LastLoginTime = System.DateTime.Now.AddMinutes(-2);
             var suit = Inventory(Body);
             suit.Clear();
-            yield return Until(() => Amount(suit, "Component/SteelPlate"), v => v >= 7, "the reward in the player's suit", 45);
-            yield return Seconds(2);
+            // the reward goes to every player online that long: the other checks' players are kept just logged in while it is
+            // on, or 7 plates came into their suits and containers (hand_grind, remote_transfer, weld_without_components)
+            void OthersJustIn()
+            {
+                foreach (var player in Sandbox.Game.World.MySession.Static.Players.GetOnlinePlayers())
+                    if (player.Identity != null && player.Identity.IdentityId != Identity) player.Identity.LastLoginTime = System.DateTime.Now;
+            }
+            OthersJustIn();
+            yield return Until(() => { OthersJustIn(); return Amount(suit, "Component/SteelPlate"); }, v => v >= 7, "the reward in the player's suit", 45);
+            var hold = System.DateTime.UtcNow;
+            while ((System.DateTime.UtcNow - hold).TotalSeconds < 2) { OthersJustIn(); yield return null; }
+            _gameplay.Restore();
+            _gameplay = null;
             Check(Amount(suit, "Component/SteelPlate") == 7, "the reward came as " + F(Amount(suit, "Component/SteelPlate")) + " plates, 7 once");
             Result("2 minutes online, a reward each minute: 7 plates once");
         }

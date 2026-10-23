@@ -77,6 +77,10 @@ namespace SentisTests.Regression.Checks
             _admin = steamId;
             MySession.Static.CreativeTools.Add(steamId);
             Request(grid, "RazeBlocksAreaRequest", min, size, Body.EntityId, steamId);
+            // the rights for the request alone (the area is razed in it)
+            MySession.Static.CreativeTools.Remove(steamId);
+            MySession.Static.SetUserPromoteLevel(steamId, MyPromoteLevel.None);
+            _admin = 0;
             yield return Until(() => blocks - grid.BlocksCount, v => v >= 2, "the box of 2 blocks razed", 5);
             Check(grid.BlocksCount == blocks - 2, "the admin's area delete razed " + (blocks - grid.BlocksCount) + " blocks, not the box's 2");
             Check(grid.GetCubeBlock(min) == null && grid.GetCubeBlock(min + Vector3I.UnitX) == null, "a block of the box is still there");

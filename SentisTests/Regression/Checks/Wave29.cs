@@ -24,8 +24,6 @@ namespace SentisTests.Regression.Checks
         private static readonly HashSet<(string Text, ulong Endpoint)> Sent = new HashSet<(string, ulong)>();
         private static Harmony _harmony;
         public static int Seen;
-        public static int Entered;
-        public static string Probe = "";
 
         protected override IEnumerator Check()
         {
@@ -68,7 +66,7 @@ namespace SentisTests.Regression.Checks
             // did not are this check's
             var global = To("global");
             Check(global.Contains(mateSteam) && global.Contains(strangerSteam) && !global.Contains(meSteam),
-                "a global message went to " + string.Join(",", global) + " (patch saw " + Seen + " of " + Entered + " entries: " + Probe + "), not to both other players and not the sender");
+                "a global message went to " + string.Join(",", global) + " (patch saw " + Seen + "), not to both other players and not the sender");
 
             // the game's anti-spam of the dedicated server: a second message of the same player within its spam time is
             // dropped whole, and the sender put on a timeout
@@ -104,18 +102,8 @@ namespace SentisTests.Regression.Checks
                 .MakeGenericMethod(typeof(IMyEventOwner), typeof(ChatMsg), typeof(DBNull), typeof(DBNull), typeof(DBNull), typeof(DBNull), typeof(DBNull), typeof(IMyEventOwner));
             _harmony = new Harmony("SentisTests.ChatRouting");
             _harmony.Patch(raise, prefix: new HarmonyMethod(typeof(ChatRoutingCheck).GetMethod(nameof(Delivered), BindingFlags.Static | BindingFlags.NonPublic)));
-            var enter = typeof(Sandbox.Engine.Multiplayer.MyMultiplayerBase).GetMethod("OnChatMessageReceived_Server", BindingFlags.Static | BindingFlags.NonPublic);
-            _harmony.Patch(enter, prefix: new HarmonyMethod(typeof(ChatRoutingCheck).GetMethod(nameof(EnteredPrefix), BindingFlags.Static | BindingFlags.NonPublic)));
-        }
-
-        private static void EnteredPrefix(ChatMsg msg)
-        {
-            if (msg.Text == null || !msg.Text.StartsWith(Marker)) return;
-            Entered++;
-            Probe = "sender=" + VRage.Network.MyEventContext.Current.Sender.Value + ", online=" +
-                    string.Join(",", Sandbox.Game.World.MySession.Static.Players.GetOnlinePlayers().Where(p => p.Id.SteamId != 0).Select(p => p.Id.SteamId)) +
-                    ", spam=" + Sandbox.MySandboxGame.ConfigDedicated.ChatAntiSpamEnabled + ", identity=" +
-                    Sandbox.Game.World.MySession.Static.Players.TryGetIdentityId(VRage.Network.MyEventContext.Current.Sender.Value);
+            // nothing on OnChatMessageReceived_Server itself: Torch's patch (Essentials, the chat commands) is there, and a
+            // Harmony patch on the same method leaves only the one written last - the commands went into the chat as text
         }
 
         private static void Delivered(VRage.Network.CallSite callSite, EndpointId recipient, ref ChatMsg arg2)
