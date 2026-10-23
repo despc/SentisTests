@@ -358,6 +358,8 @@ namespace SentisTests.Regression
             Add(() => new CompetitiveDropCheck());
             Add(() => new VoxelCacheResendCheck());
             Add(() => new CrashDeformationCheck());
+            Add(() => new SpaceBallCheck());
+            Add(() => new SafeZoneUpkeepCheck());
 
             foreach (var make in Added)
                 Add(make);
