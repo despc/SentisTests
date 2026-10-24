@@ -1,7 +1,7 @@
 # Механики игры и покрытие регрессией
 
 На 24.10.2026. Из 159 механик игры, которые видны серверу, проверками покрыты все 159.
-Регрессия — 313 проверок `reg_*` (`SentisTests/Regression/Checks`), прогон: `python C:/SE/tools/run_regression.py`.
+Регрессия — 318 проверок `reg_*` (`SentisTests/Regression/Checks`), прогон: `python C:/SE/tools/run_regression.py`.
 
 | Раздел | Механик | Покрыто | Частично | Не покрыто |
 | --- | --- | --- | --- | --- |
@@ -130,12 +130,12 @@
 | Предел скорости | `speed_limit_large`, `speed_limit_small` | Покрыто |
 | Переопределение тяги и гироскопов | `overrides` | Покрыто |
 | Масса: пилот с грузом, искусственная масса | `pilot_mass`, `artificial_mass` | Покрыто |
-| Прыжковый двигатель и его заряд | `jump_drive`, `jump_drive_charge` | Покрыто |
+| Прыжковый двигатель: прыжок, заряд, обрезка дальности по пределу двигателя | `jump_drive`, `jump_drive_charge`, `jump_drive_distance` | Покрыто |
 | Шасси и парковка | `landing_gear`, `landing_gear_ship`, `parking` | Покрыто |
 | Роторы, шарниры, поршни, фиксация | `rotor`, `rotor_lock`, `hinge`, `hinge_lock`, `piston` | Покрыто |
 | Колёса | `wheels` | Покрыто |
 | Гравитационные генераторы | `gravity_generator`, `spherical_gravity` | Покрыто |
-| Автопилот и блоки ИИ | `remote_autopilot`, `ai_flight`, `basic_follow_player`, `path_recorder`, `offensive_combat`, `defensive_combat` | Покрыто |
+| Автопилот и блоки ИИ | `remote_autopilot`, `ai_flight`, `basic_follow_player`, `path_recorder`, `offensive_combat`, `defensive_combat`, `defensive_flee_damage` | Покрыто |
 | Автоматика: таймер, сенсор, событийный контроллер, кнопки | `timer`, `sensor`, `sensor_relations`, `event_controller`, `button_panel` | Покрыто |
 | Программируемый блок: запуск, лимит инструкций, самозапуск, редактор у одного игрока | `programmable_block`, `programmable_limits`, `programmable_self_run`, `programmable_editor` | Покрыто |
 | Камера (луч и его предел), прожектор, ЖК-панели | `camera_raycast`, `raycast_limit`, `searchlight`, `lcd_text` | Покрыто |
@@ -214,6 +214,7 @@
 | Контракты станций на перевозку грида (Grid Hauling) | `contract_grid_hauling` | Покрыто |
 | Услуги станции: ремонт и утилизация корабля | `repair_service`, `salvage_service` | Покрыто |
 | Хранилище гридов у станции | `grid_storage` | Покрыто |
+| Несколько игроков на одном объекте: общий сборщик, выход игрока с кокпитом и редактором ПБ | `shared_assembler`, `programmable_editor_quit`, `rejoin` | Покрыто |
 | Общее исследование фракции | `research_share` | Покрыто |
 | Правка фракции лидером, автоприём | `faction_edit` | Покрыто |
 | Снятие предложений и заказов в магазине игрока | `store_cancel` | Покрыто |
@@ -230,9 +231,7 @@
 
 ## Что не покрыто
 
-Всё из таблиц выше покрыто. Замечено и ещё не проверено:
-
-- отход блока AI Defensive (точка отхода ставится, дрон не летит — README);
+Всё из таблиц выше покрыто.
 
 Контрактов сопровождения (Escort) в этой версии игры нет: типа нет в `ContractTypes_Economy.sbc`. Чисто клиентские вещи
 (интерфейс, эмоции, метки детектора руды) сервер не видит.

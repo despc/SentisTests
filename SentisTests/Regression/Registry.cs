@@ -256,6 +256,7 @@ namespace SentisTests.Regression
             Add(() => new RelativeDampenersCheck());
             Add(() => new DrillOresCheck());
             Add(() => new DefensiveCombatCheck());
+            Add(() => new DefensiveFleeDamageCheck());
             Add(() => new CleanupExceptionCheck());
             Add(() => new AutoRenameCheck());
             Add(() => new OnlineRewardCheck());
@@ -364,6 +365,9 @@ namespace SentisTests.Regression
             Add(() => new AdminEntityActionsCheck());
             Add(() => new AdminSettingsCheck());
             Add(() => new AdminPlayerToolsCheck());
+            Add(() => new SharedAssemblerCheck());
+            Add(() => new ProgrammableEditorQuitCheck());
+            Add(() => new JumpDriveDistanceCheck());
 
             foreach (var make in Added)
                 Add(make);
