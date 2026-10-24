@@ -155,7 +155,7 @@ namespace SentisTests.Regression
             if (!InSuite && NeedsBags && Integrations.IsLoaded(Scenarios.ConfigOverride.Essentials))
             {
                 _essentials = new Scenarios.ConfigOverride(Scenarios.ConfigOverride.Essentials);
-                _essentials.Set("BackpackLimit", -1);
+                _essentials.Set("BackpackLimit", int.MaxValue);
             }
             Note(Site.ToString());
             yield return Check();

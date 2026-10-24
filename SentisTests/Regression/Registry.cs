@@ -360,6 +360,10 @@ namespace SentisTests.Regression
             Add(() => new CrashDeformationCheck());
             Add(() => new SpaceBallCheck());
             Add(() => new SafeZoneUpkeepCheck());
+            Add(() => new ProgrammableEditorCheck());
+            Add(() => new AdminEntityActionsCheck());
+            Add(() => new AdminSettingsCheck());
+            Add(() => new AdminPlayerToolsCheck());
 
             foreach (var make in Added)
                 Add(make);

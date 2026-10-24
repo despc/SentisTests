@@ -91,11 +91,11 @@ namespace SentisTests.Regression
             // Essentials' limit of death bags (BackpackLimit, 1 on the stand) counts them by the owner it reads as a bag
             // comes into the world, and the game sets the owner after that: every bag counts as nobody's, and past the
             // limit all but the newest of the whole server are closed 30 s on. The suite's deaths come together, so the
-            // limit is off while it runs (as on V5)
+            // limit is out of reach while it runs: int.MaxValue, not -1 - Essentials skips tracking bags at -1 only for bags that come after; the ones it tracks already (the stand runs at 1) then loop to an empty list and throw every frame
             if (Integrations.IsLoaded(ConfigOverride.Essentials))
             {
                 _essentials = new ConfigOverride(ConfigOverride.Essentials);
-                _essentials.Set("BackpackLimit", -1);
+                _essentials.Set("BackpackLimit", int.MaxValue);
             }
 
             var next = new Dictionary<SiteKind, int>();

@@ -37,11 +37,23 @@ namespace SentisTests.Regression.Checks
         {
             var terminal = (Sandbox.ModAPI.IMyTerminalBlock)block;
             // an AI block raises its terminal controls as it comes up; under the suite's load that can lag a few frames
-            for (var frame = 0; frame < 120 && terminal.GetProperty("ActivateBehavior") == null; frame++)
+            for (var frame = 0; frame < 60 && terminal.GetProperty("ActivateBehavior") == null; frame++)
                 yield return null;
-            if (terminal.GetProperty("ActivateBehavior") == null)
-                throw new Core.ScenarioFailedException(block.BlockDefinition.Id.SubtypeName + " has no \"ActivateBehavior\" in its terminal");
-            terminal.SetValueBool("ActivateBehavior", true);
+            if (terminal.GetProperty("ActivateBehavior") != null)
+            {
+                terminal.SetValueBool("ActivateBehavior", true);
+                yield break;
+            }
+            // the game makes the AI component's controls once per component type, for the block type that came first
+            // (MyTerminalBlock.CreateTerminalsComponentControls checks AreControlsCreated of the component's type): a path
+            // recorder made after another AI block of the session has no "ActivateBehavior" of its own. What the control
+            // sets is the component's synced flag: set straight
+            var component = block.Components.Get<Sandbox.Game.EntityComponents.MyAiBlockComponent>()
+                            ?? throw new Core.ScenarioFailedException(block.BlockDefinition.Id.SubtypeName + " has no \"ActivateBehavior\" in its terminal and no AI component");
+            var flag = typeof(Sandbox.Game.EntityComponents.MyAiBlockComponent).GetField("m_isActivated", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                           ?.GetValue(component) as VRage.Sync.Sync<bool, VRage.Sync.SyncDirection.BothWays>
+                       ?? throw new Core.ScenarioFailedException("MyAiBlockComponent.m_isActivated is not in this game");
+            flag.Value = true;
         }
 
         public static string Info(MyCubeBlock block) => ((Sandbox.ModAPI.IMyTerminalBlock)block).DetailedInfo.Trim().Replace("\n", " ");

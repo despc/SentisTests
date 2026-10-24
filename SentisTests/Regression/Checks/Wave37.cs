@@ -565,7 +565,12 @@ namespace SentisTests.Regression.Checks
             yield return Arrive(Site.At(-15, 10, -15));
             var group = WorldApi.LoadAuthoredGroup(TurretControllerCheck.ResourceName, WorldApi.EntityPrefix + "custom-turret");
             var base0 = group[0].PositionAndOrientation.Value.GetMatrix();
-            var move = MatrixD.Invert(base0) * MatrixD.CreateWorld(Site.Origin, Site.Forward, Site.Up);
+            // the base turned so that the sun stands about 45 degrees over its horizon: the elevation rotor reaches it
+            // whatever time of the game's day it is (straight up from the site's floor it may be past the rotor's reach)
+            var tilt = Vector3D.CalculatePerpendicularVector(sun);
+            var up = Vector3D.Normalize(sun + tilt);
+            var forward = Vector3D.Normalize(Vector3D.Reject(tilt, up));
+            var move = MatrixD.Invert(base0) * MatrixD.CreateWorld(Site.Origin, forward, up);
             foreach (var ob in group)
             {
                 ob.PositionAndOrientation = new MyPositionAndOrientation(ob.PositionAndOrientation.Value.GetMatrix() * move);
@@ -579,7 +584,8 @@ namespace SentisTests.Regression.Checks
             yield return Until(() => controller.IsWorking && turret.AzimuthRotor != null && turret.ElevationRotor != null && turret.GetDirectionSource() != null ? 1 : 0, v => v > 0,
                 "the turret controller working with its rotors and direction source", 15, () => State(controller));
             var source = (MyCubeBlock)turret.GetDirectionSource();
-            double Off() => MathHelper.ToDegrees(Math.Acos(MathHelper.Clamp(Vector3D.Dot(source.WorldMatrix.Forward, sun), -1, 1)));
+            // the sun as it is now: it turns a full circle in the game's day
+            double Off() => MathHelper.ToDegrees(Math.Acos(MathHelper.Clamp(Vector3D.Dot(source.WorldMatrix.Forward, (Vector3D)Sandbox.Game.World.MySector.DirectionToSunNormalized), -1, 1)));
             var before = Off();
             Request(controller, "ChangeSunTrackingEnabled", true);
             yield return Until(Off, v => v < 5, "the direction source turned to the sun, degrees off", 60,
