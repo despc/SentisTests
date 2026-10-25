@@ -102,6 +102,8 @@ namespace SentisTests
                 ScenarioRegistry.Register(ProjectorWeldScenario.ScenarioName, () => new ProjectorWeldScenario());
                 ScenarioRegistry.Register(FrozenRadiusWeldScenario.ScenarioName, () => new FrozenRadiusWeldScenario());
                 ScenarioRegistry.Register(WelderPerfScenario.ScenarioName, () => new WelderPerfScenario());
+                ScenarioRegistry.Register(WelderPerfScenario.DetachScenarioName,
+                    () => new WelderPerfScenario(WelderPerfScenario.DetachScenarioName, inZone: false, dynamicPlatform: true, detach: true));
                 ScenarioRegistry.Register(WelderSpreadScenario.ScenarioName, () => new WelderSpreadScenario());
                 ScenarioRegistry.Register(ToolOffsetScenario.ScenarioName, () => new ToolOffsetScenario());
                 ScenarioRegistry.Register(PistonProjectionScenario.ScenarioName, () => new PistonProjectionScenario());
@@ -250,6 +252,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(PcuLimitCostScenario.ScenarioName, () => new PcuLimitCostScenario());
                 ScenarioRegistry.Register(WorldSweepsScenario.ScenarioName, () => new WorldSweepsScenario());
                 ScenarioRegistry.Register("load_test_40", () => new LoadTestScenario("load_test_40", 40));
+                ScenarioRegistry.Register(TurretDetachScenario.ScenarioName, () => new TurretDetachScenario());
                 ScenarioRegistry.Register("load_test_128", () => new LoadTestScenario("load_test_128", 128));
                 ScenarioRegistry.Register("load_test_300", () => new LoadTestScenario("load_test_300", 300));
                 ScenarioRegistry.Register("load_test_500", () => new LoadTestScenario("load_test_500", 500));

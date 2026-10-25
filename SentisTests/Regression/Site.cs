@@ -47,17 +47,32 @@ namespace SentisTests.Regression
     }
 
     /// <summary>
-    /// The sites of the regression checks. Space sites stand in a square 1 km apart, far out of every planet's gravity;
-    /// planet sites lie 300 m apart on the surface of the planet by the stand's anchor, a few km off it, so the other
-    /// scenarios built there stay clear.
+    /// The sites of the regression checks, <see cref="Spacing"/> apart: each in a cluster of the physics of its own (with
+    /// SentisClusters' 5 km clusters), so the clusters' threads update the checks side by side.
+    ///
+    /// The game puts what moves in one cluster while the boxes round the objects, half a cluster wide on every side,
+    /// touch, and parts a cluster only along the world's axes: it sorts the objects along the longest axis and cuts
+    /// where the boxes leave a gap (MyClusterTree.ReorderClusters). A square turned to the world's axes casts its sites
+    /// on each axis closer than a cluster and stays one cluster, so the squares here run along the world's axes:
+    /// space sites in a square <see cref="SpaceSide"/> a side across a world axis out of the planet, far out of every
+    /// planet's gravity, with nothing over them (checks send their grids up: the weapon lanes 5-36 km over the site,
+    /// jumps); planet sites in a square <see cref="PlanetSide"/> a side round the point of the planet's surface where its
+    /// up is a world axis - the one nearest the stand's anchor whose square stays clear of it and the scenarios there.
     /// </summary>
     public static class Sites
     {
-        public const double SpaceSpacing = 1000;
-        public const double PlanetSpacing = 300;
+        public const double Spacing = 8000;
 
-        /// <summary>How far from the wheel_perf anchor the planet sites start, along the surface.</summary>
-        private const double PlanetOffset = 3000;
+        /// <summary>Space sites in a row of the square; the rows go on past it when there are more.</summary>
+        public const int SpaceSide = 19;
+
+        /// <summary>The rows of space sites checked to be out of gravity when the place is found.</summary>
+        private const int SpaceRows = 24;
+
+        /// <summary>Planet sites a side of the square; the rows go on past it when there are more.</summary>
+        public const int PlanetSide = 6;
+
+        private static readonly Vector3D[] Axes = { Vector3D.Right, Vector3D.Left, Vector3D.Up, Vector3D.Down, Vector3D.Backward, Vector3D.Forward };
 
         private static MatrixD? _space;
         private static MatrixD? _planet;
@@ -95,9 +110,7 @@ namespace SentisTests.Regression
         {
             if (!_space.HasValue) _space = FindSpace();
             var basis = _space.Value;
-            var row = index / 8;
-            var column = index % 8;
-            var origin = basis.Translation + basis.Right * (column * SpaceSpacing) + basis.Forward * (row * SpaceSpacing);
+            var origin = SpacePoint(basis, index);
             return new Site
             {
                 Kind = SiteKind.Space,
@@ -113,10 +126,9 @@ namespace SentisTests.Regression
             var planet = _planetEntity;
             var centre = planet.PositionComp.GetPosition();
             var radius = (basis.Translation - centre).Length();
-            // along the surface: one row of sites, each a turn of PlanetSpacing metres about the planet's centre
-            var angle = (PlanetOffset + index * PlanetSpacing) / radius;
-            var axis = Vector3D.Normalize(basis.Right);
-            var up = Vector3D.Transform(Vector3D.Normalize(basis.Translation - centre), MatrixD.CreateFromAxisAngle(axis, angle));
+            // a point of the square over the axis' point of the surface, straight down onto the ground: along the
+            // world's axes the sites stay about Spacing apart (a little less towards the edges, where the ground falls away)
+            var up = Vector3D.Normalize(SquarePoint(basis, index, PlanetSide) - centre);
             var probe = centre + up * radius;
             var surface = planet.GetClosestSurfacePointGlobal(ref probe);
             var forward = Vector3D.Normalize(Vector3D.Reject(basis.Forward, up));
@@ -131,8 +143,8 @@ namespace SentisTests.Regression
         }
 
         /// <summary>
-        /// A point in open space: straight out from the stand's planet, past where its gravity ends, then on until
-        /// nothing of any planet pulls there.
+        /// A point in open space: out from the stand's planet along the world axis nearest the anchor's up, past where
+        /// its gravity ends, then on until nothing of any planet pulls at any site.
         /// </summary>
         private static MatrixD FindSpace()
         {
@@ -148,28 +160,92 @@ namespace SentisTests.Regression
             else
             {
                 var centre = planet.PositionComp.GetPosition();
-                direction = Vector3D.Normalize(anchor.Translation - centre);
+                direction = Axes.OrderByDescending(a => Vector3D.Dot(a, anchor.Translation - centre)).First();
                 start = centre + direction * (planet.MaximumRadius + 10000);
             }
-            var point = start;
-            for (var i = 0; i < 400 && MyGravityProviderSystem.CalculateNaturalGravityInPoint(point).LengthSquared() > 0; i++)
-                point += direction * 5000;
-            // and clear of the planet's influence on the sides too: the square of sites spans 8 km
-            point += direction * 5000;
-            var forward = Vector3D.CalculatePerpendicularVector(direction);
-            WorldApi.Log.Info("regression: space sites start at {0}", point.ToString("F0"));
-            return MatrixD.CreateWorld(point, forward, direction);
+            var basis = MatrixD.CreateWorld(start, AxisAcross(direction), direction);
+            // on out until no site of the first SpaceRows rows has gravity: the square is 144 km a side, and a moon may
+            // stand by the planet
+            for (var i = 0; i < 400 && !OutOfGravity(basis); i++)
+                basis.Translation += direction * 5000;
+            WorldApi.Log.Info("regression: space sites start at {0}, {1} km apart along the world's axes", basis.Translation.ToString("F0"), Spacing / 1000);
+            return basis;
         }
 
+        /// <summary>A world axis square to the given one.</summary>
+        private static Vector3D AxisAcross(Vector3D axis) => Axes.First(a => Math.Abs(Vector3D.Dot(a, axis)) < 0.5);
+
+        /// <summary>A site's point of a square: rows of the side along Right, the square centred on the basis.</summary>
+        private static Vector3D SquarePoint(MatrixD basis, int index, int side)
+        {
+            var row = index / side - (side - 1) / 2.0;
+            var column = index % side - (side - 1) / 2.0;
+            return basis.Translation + basis.Right * (column * Spacing) + basis.Forward * (row * Spacing);
+        }
+
+        private static Vector3D SpacePoint(MatrixD basis, int index) => SquarePoint(basis, index, SpaceSide);
+
+        /// <summary>The heavy clumps of <c>regression_heavy</c>: how many, the share of the space checks in them, their sites apart.</summary>
+        public const int HeavyClumps = 3;
+        public const double HeavyShare = 0.9;
+        public const double ClumpSpacing = 1000;
+        private const int ClumpSide = 10;
+        private const double ClumpsApart = 40000;
+
+        /// <summary>
+        /// A space site of <c>regression_heavy</c>: <see cref="HeavyShare"/> of the space checks in <see cref="HeavyClumps"/>
+        /// clumps, their sites <see cref="ClumpSpacing"/> apart (each clump one cluster of the physics, tens of grids and
+        /// players: what SentisClusters detaches), the clumps 40 km apart along Right; the rest light, one a cluster,
+        /// <see cref="Spacing"/> apart in rows of 6 well forward of the clumps. The checks go to the clumps in turn, so
+        /// each clump gets a share of every kind.
+        /// </summary>
+        public static Site HeavySpace(int index, int count, out int clump)
+        {
+            if (!_space.HasValue) _space = FindSpace();
+            var basis = _space.Value;
+            var heavy = (int)Math.Round(count * HeavyShare);
+            Vector3D origin;
+            if (index < heavy)
+            {
+                clump = index % HeavyClumps;
+                var k = index / HeavyClumps;
+                var centre = basis.Translation + basis.Right * ((clump - (HeavyClumps - 1) / 2.0) * ClumpsApart) - basis.Forward * 20000;
+                origin = centre + basis.Right * ((k % ClumpSide - (ClumpSide - 1) / 2.0) * ClumpSpacing) + basis.Forward * ((k / ClumpSide - 5) * ClumpSpacing);
+            }
+            else
+            {
+                clump = -1;
+                var j = index - heavy;
+                origin = basis.Translation + basis.Right * ((j % 6 - 2.5) * Spacing) + basis.Forward * (20000 + j / 6 * Spacing);
+            }
+            return new Site { Kind = SiteKind.Space, Index = index, Frame = MatrixD.CreateWorld(origin, basis.Forward, basis.Up) };
+        }
+
+        private static bool OutOfGravity(MatrixD basis)
+        {
+            for (var i = 0; i < SpaceSide * SpaceRows; i++)
+                if (MyGravityProviderSystem.CalculateNaturalGravityInPoint(SpacePoint(basis, i)).LengthSquared() > 0) return false;
+            return true;
+        }
+
+        /// <summary>
+        /// The point of the surface over which the planet square stands: where the planet's up is the world axis
+        /// nearest the anchor's, unless its square comes within a cluster of the anchor - then the next nearest.
+        /// </summary>
         private static MatrixD FindPlanet()
         {
             var anchor = WorldApi.PlanetAnchor(WorldApi.EntityPrefix + "regression-anchor");
             _planetEntity = MyGamePruningStructure.GetClosestPlanet(anchor.Translation)
                             ?? throw new Core.ScenarioSkippedException("no planet in this world for the planet checks");
             var centre = _planetEntity.PositionComp.GetPosition();
-            var up = Vector3D.Normalize(anchor.Translation - centre);
-            var forward = Vector3D.CalculatePerpendicularVector(up);
-            return MatrixD.CreateWorld(anchor.Translation, forward, up);
+            var radius = (anchor.Translation - centre).Length();
+            var reach = PlanetSide * Spacing / Math.Sqrt(2) + Spacing;
+            var axis = Axes.OrderByDescending(a => Vector3D.Dot(a, anchor.Translation - centre))
+                .First(a => Vector3D.Distance(centre + a * radius, anchor.Translation) > reach);
+            var point = centre + axis * radius;
+            WorldApi.Log.Info("regression: planet sites round {0} on {1}, {2} km from the anchor", point.ToString("F0"), _planetEntity.StorageName,
+                (Vector3D.Distance(point, anchor.Translation) / 1000).ToString("F0"));
+            return MatrixD.CreateWorld(point, AxisAcross(axis), axis);
         }
     }
 }

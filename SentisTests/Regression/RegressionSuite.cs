@@ -10,8 +10,8 @@ using SentisTests.Scenarios;
 namespace SentisTests.Regression
 {
     /// <summary>
-    /// All the regression checks at once, each at a site of its own (<see cref="Sites"/>): space checks 1 km apart, planet
-    /// checks 300 m apart on the surface. Every check is stepped once a frame as the runner steps a scenario; each one's
+    /// All the regression checks at once, each at a site of its own (<see cref="Sites"/>), 8 km apart in space and on the
+    /// surface: each in a cluster of the physics of its own. Every check is stepped once a frame as the runner steps a scenario; each one's
     /// verdict goes to the log and the results as a scenario of its own (<c>[TEST] PASSED reg_reactor</c>), and the suite
     /// fails when any of them did. A check that is over is cleaned up at once, while the others go on.
     ///
@@ -22,11 +22,21 @@ namespace SentisTests.Regression
     {
         public const string ScenarioName = "regression";
 
+        /// <summary>
+        /// The same checks with the space ones packed into a few heavy clusters and a few light ones apart
+        /// (<see cref="Sites.HeavySpace"/>): for SentisClusters' detaching, which cluster runs at what speed.
+        /// </summary>
+        public const string HeavyName = "regression_heavy";
+
+        private readonly bool _heavy;
+
+        public RegressionSuite(bool heavy = false) { _heavy = heavy; }
+
         private readonly List<Running> _runs = new List<Running>();
         private ConfigOverride _gameplay;
         private ConfigOverride _essentials;
 
-        public override string Name => ScenarioName;
+        public override string Name => _heavy ? HeavyName : ScenarioName;
 
         public override int TimeoutSeconds => Math.Max(300, Registry.All.Select(c => c.Make().TimeoutSeconds).DefaultIfEmpty(0).Max() + 120);
 
@@ -98,13 +108,22 @@ namespace SentisTests.Regression
                 _essentials.Set("BackpackLimit", int.MaxValue);
             }
 
+            var made = chosen.Select(entry => entry.Make()).ToList();
+            // the heavy layout's light sites are the last indices: the checks that need a cluster of their own go there
+            if (_heavy) made = made.Where(c => !c.NeedsOwnCluster).Concat(made.Where(c => c.NeedsOwnCluster)).ToList();
+            var spaceCount = made.Count(c => c.Kind == SiteKind.Space);
+            var clumps = new int[Sites.HeavyClumps + 1];
             var next = new Dictionary<SiteKind, int>();
-            foreach (var entry in chosen)
+            foreach (var check in made)
             {
-                var check = entry.Make();
                 next.TryGetValue(check.Kind, out var index);
                 next[check.Kind] = index + 1;
-                check.Site = Sites.Get(check.Kind, index);
+                if (_heavy && check.Kind == SiteKind.Space)
+                {
+                    check.Site = Sites.HeavySpace(index, spaceCount, out var clump);
+                    clumps[clump + 1]++;
+                }
+                else check.Site = Sites.Get(check.Kind, index);
                 check.InSuite = true;
                 var run = new Running { Check = check };
                 run.Stack.Push(check.Run());
@@ -113,6 +132,9 @@ namespace SentisTests.Regression
                 _runs.Add(run);
             }
             Note(_runs.Count + " checks: " + string.Join(", ", next.Select(p => p.Value + " " + p.Key.ToString().ToLowerInvariant())));
+            if (_heavy)
+                Note("heavy layout: " + string.Join(", ", Enumerable.Range(0, Sites.HeavyClumps).Select(i => "clump " + (i + 1) + " " + clumps[i + 1] + " checks at " +
+                     Sites.HeavySpace(i, spaceCount, out _).Origin.ToString("F0"))) + "; " + clumps[0] + " light, one a cluster");
 
             DispatchWatch.Start();
             var watch = Stopwatch.StartNew();

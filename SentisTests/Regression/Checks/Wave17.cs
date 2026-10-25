@@ -85,7 +85,7 @@ namespace SentisTests.Regression.Checks
 
     /// <summary>
     /// A planetary encounter, as the game sends one to a player on a planet: an NPC installation set down on the ground
-    /// some kilometres from where the player is (here a spot 40 km off the sites: the game keeps 7 km off structures).
+    /// some kilometres from where the player is (here a spot on the other side of the planet: the game keeps 7 km off structures).
     /// Removed after, and with it the generator's record of it.
     /// </summary>
     public sealed class PlanetaryEncounterCheck : RegressionCheck
@@ -122,14 +122,15 @@ namespace SentisTests.Regression.Checks
             var grids = new System.Collections.Generic.List<MyCubeGrid>();
             Action<System.Collections.Generic.List<MyCubeGrid>, Sandbox.Definitions.MySpawnGroupDefinition, Sandbox.Definitions.MySpawnGroupDefinition.SpawnGroupPrefab, long> created =
                 (list, group, prefab, owner) => { if (group.IsPlanetaryEncounter) grids.AddRange(list); };
-            var far = Site.Origin + Site.Right * 40000;
+            // the other side of the planet: the sites spread tens of km over this one
+            var far = 2 * Site.Planet.PositionComp.GetPosition() - Site.Origin;
             var spot = Site.Planet.GetClosestSurfacePointGlobal(ref far);
             spot += Vector3D.Normalize(spot - Site.Planet.PositionComp.GetPosition()) * 3;
             Sandbox.Definitions.MySpawnGroupDefinition.OnSpawnGroupGridsCreated += created;
             try
             {
                 // the game looks for a free place at random, 7 km off any structure: the sites are full of them, so the
-                // encounter is sent round a spot on the ground 40 km off them (as for a player there); tried again until it finds one
+                // encounter is sent round a spot on the ground on the other side of the planet (as for a player there); tried again until it finds one
                 Func<MyCubeGrid, double> off = g => Vector3D.Distance(g.PositionComp.GetPosition(), spot);
                 for (var attempt = 0; attempt < 6 && grids.Count == 0; attempt++)
                 {

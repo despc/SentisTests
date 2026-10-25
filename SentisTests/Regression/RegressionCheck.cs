@@ -89,6 +89,12 @@ namespace SentisTests.Regression
         protected virtual bool NeedsDamage => false;
 
         /// <summary>
+        /// The check needs a cluster of the physics of its own round its site, with empty space round it to leave it
+        /// for: <c>regression_heavy</c> puts it at a light site, not in a heavy clump.
+        /// </summary>
+        public virtual bool NeedsOwnCluster => false;
+
+        /// <summary>
         /// The check throws grids into a planet fast: where the planet has no physics yet one may go through the ground
         /// (the game itself does it on the first fast fall on a place), and SentisGameplayImprovements' bringing back of
         /// such grids (<c>AutoRestoreFromVoxel</c>) is on while the check runs (the suite does it once for all).
@@ -706,6 +712,28 @@ namespace SentisTests.Regression
 
         protected static string F(double value) => value.ToString(value >= 100 ? "F0" : "F2");
 
+        /// <summary>
+        /// The id of the cluster of the physics the entity's body is in (the cluster whose Havok world it is), -1 without a
+        /// body or a cluster. Not the body's ClusterObjectID: that is its number in the cluster tree, the same in every cluster.
+        /// </summary>
+        protected static int ClusterId(VRage.Game.Entity.MyEntity entity)
+        {
+            var world = (entity?.Physics as Sandbox.Engine.Physics.MyPhysicsBody)?.HavokWorld;
+            if (world == null) return -1;
+            foreach (var cluster in Sandbox.Engine.Physics.MyPhysics.Clusters.GetClusters())
+                if (ReferenceEquals(cluster.UserData, world)) return cluster.ClusterId;
+            return -1;
+        }
+
+        /// <summary>The grid's body as the physics sees it, for a failure line.</summary>
+        protected static string PhysicsState(MyCubeGrid grid)
+        {
+            var physics = grid.Physics;
+            if (physics == null) return "no physics";
+            var body = physics.RigidBody;
+            return "enabled " + physics.Enabled + (body == null ? ", no body" : ", body active " + body.IsActive + ", cluster " + ClusterId(grid));
+        }
+
         // ------------------------------------------------------------------ waits
 
         /// <summary>
@@ -759,6 +787,51 @@ namespace SentisTests.Regression
             if (block is MyMechanicalConnectionBlockBase mechanical)
                 text += ", head " + (mechanical.TopGrid == null ? "none" : ((Sandbox.ModAPI.Ingame.IMyMechanicalConnectionBlock)mechanical).IsAttached ? "attached" : "not attached");
             return text;
+        }
+
+        /// <summary>
+        /// What a character's body is doing, for a failure: its physics (on, active, in which world and whether the game
+        /// steps that world), the jetpack and the suit's energy, the movement state.
+        /// </summary>
+        protected static string CharacterState(Sandbox.Game.Entities.Character.MyCharacter character)
+        {
+            if (character == null) return "no character";
+            string T(Func<string> part) { try { return part(); } catch (Exception e) { return e.GetType().Name; } }
+            var physics = character.Physics;
+            return "character " + character.EntityId +
+                   ": physics " + (physics == null ? "none" : "enabled " + T(() => physics.Enabled.ToString()) + ", active " + T(() => physics.IsActive.ToString()) +
+                                   ", rigid body " + T(() => (physics.RigidBody != null).ToString()) + ", character proxy " + T(() => (physics.CharacterProxy != null).ToString()) +
+                                   ", world " + T(() => (physics.HavokWorld != null).ToString()) + ", cluster " + T(() => ClusterId(character).ToString()) +
+                                   ", cluster stepped " + T(() =>
+                                   {
+                                       var world = physics.HavokWorld;
+                                       foreach (var c in Sandbox.Engine.Physics.MyPhysics.Clusters.GetClusters())
+                                           if (ReferenceEquals(c.UserData, world))
+                                               return typeof(Sandbox.Engine.Physics.MyPhysics).GetMethod("IsClusterActive", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public)
+                                                   ?.Invoke(null, new object[] { c.ClusterId, world.CharacterRigidBodies.Count })?.ToString();
+                                       return "no cluster with its world";
+                                   }) + ", velocity " + T(() => physics.LinearVelocity.Length().ToString("F2"))) +
+                   ", jetpack " + T(() => character.JetpackComp == null ? "none" : "on " + character.JetpackComp.TurnedOn + ", thrust " + character.JetpackComp.FinalThrust.Length().ToString("F0") +
+                                         ", powered " + character.JetpackComp.IsPowered + ", flying " + character.JetpackComp.IsFlying) +
+                   ", suit energy " + T(() => character.SuitEnergyLevel.ToString("F2")) + ", movement " + T(() => character.GetCurrentMovementState().ToString()) +
+                   ", updates " + character.NeedsUpdate + ", in scene " + character.InScene + ", closed " + character.Closed +
+                   ", controller " + T(() => (character.ControllerInfo?.Controller != null).ToString()) + ", dead " + character.IsDead + "; " + T(() => SelectiveView(character));
+        }
+
+        /// <summary>SentisOptimisations' SelectivePhysicsBodies on the character's world: counted as controlled, stepped.</summary>
+        private static string SelectiveView(Sandbox.Game.Entities.Character.MyCharacter character)
+        {
+            var type = AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("Optimizer.Optimizations.SelectivePhysicsBodies")).FirstOrDefault(t => t != null);
+            if (type == null) return "no SelectivePhysicsBodies";
+            const System.Reflection.BindingFlags st = System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public;
+            var world = character.Physics?.HavokWorld;
+            var unstepped = type.GetField("_unstepped", st)?.GetValue(null) as System.Collections.IEnumerable;
+            var controlled = type.GetField("_controlled", st)?.GetValue(null) as System.Collections.Generic.Dictionary<int, int>;
+            var cluster = ClusterId(character);
+            var stepped = type.GetMethod("Stepped", new[] { typeof(Sandbox.Game.Entities.Character.MyCharacter) })?.Invoke(null, new object[] { character });
+            return "SO: character counted " + stepped + ", controlled in its cluster " + (controlled != null && controlled.TryGetValue(cluster, out var n) ? n.ToString() : "none") +
+                   ", its world unstepped " + (unstepped?.Cast<object>().Any(w => ReferenceEquals(w, world))) + " (" + unstepped?.Cast<object>().Count() + " worlds unstepped)" +
+                   ", characters in its world " + world?.CharacterRigidBodies.Count;
         }
 
         /// <summary>Waits a span of game time (frames, not the clock).</summary>

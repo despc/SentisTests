@@ -189,20 +189,26 @@ namespace SentisTests.Regression.Checks
                 }
                 Check(reactors.Count > 0, id + ": no reactor on the head's conveyors");
 
-                double Pulled() => reactors.Sum(r => Amount(Inventory(r), "Ingot/Uranium"));
+                double Pulled() => reactors.Sum(r => r.GetInventory(0) is Sandbox.Game.MyInventory inventory ? Amount(inventory, "Ingot/Uranium") : 0);
+                string Reactors() => string.Join(", ", reactors.Select(r => "reactor " + r.EntityId + (r.Closed ? " closed" : r.MarkedForClose ? " closing" : "") +
+                                                                            (r.GetInventory(0) == null ? " no inventory" : "") + (r.CubeGrid == head ? "" : " on another grid " + r.CubeGrid?.EntityId))) +
+                                     "; head grid " + head.EntityId + (head.Closed ? " closed" : "") + ", the mechanism's head now " + (mechanism.TopGrid?.EntityId.ToString() ?? "none") +
+                                     (mechanism.Closed ? ", the mechanism closed" : "");
                 string Why() => id + ": reachable " + reactors.Count(r => cargos.Any(c => MyGridConveyorSystem.Reachable(c.ConveyorEndpoint, r.ConveyorEndpoint))) + " of " +
                                 reactors.Count + " head reactors from the base, attached " + ((Sandbox.ModAPI.Ingame.IMyMechanicalConnectionBlock)mechanism).IsAttached +
                                 "; containers to the base " + (baseEnd == null ? "no endpoint" : cargos.Count(c => MyGridConveyorSystem.Reachable(c.ConveyorEndpoint, baseEnd)) + " of " + cargos.Count) +
                                 ", base to head " + (baseEnd == null || topEnd == null ? "no endpoint" : MyGridConveyorSystem.Reachable(baseEnd, topEnd).ToString()) +
                                 ", head to reactors " + (topEnd == null ? "no endpoint" : reactors.Count(r => MyGridConveyorSystem.Reachable(topEnd, r.ConveyorEndpoint)) + " of " + reactors.Count) +
-                                "; head " + top.BlockDefinition.Id.SubtypeName + ", base power " + grid.GridSystems.ResourceDistributor.ResourceState;
+                                "; head " + top.BlockDefinition.Id.SubtypeName + ", base power " + grid.GridSystems.ResourceDistributor.ResourceState + "; " + Reactors();
                 if (id == "MotorStator/LargeStator")
                 {
                     yield return Seconds(10);
                     Check(Pulled() == 0, "uranium went through a plain rotor, which has no conveyor: " + F(Pulled()) + " kg");
+                    Check(reactors.All(r => !r.Closed && r.GetInventory(0) != null), id + ": " + Reactors());
                     break;
                 }
                 yield return Until(Pulled, v => v > 0, "uranium pulled from the base to the head through " + id, 30, Why);
+                Check(reactors.All(r => !r.Closed && r.GetInventory(0) != null), id + ": " + Reactors());
                 done.Add(mechanism.BlockDefinition.Id.SubtypeName + " " + F(Pulled()) + " kg");
             }
             Result("uranium went from the base to a reactor on the head through: " + string.Join(", ", done) + "; not through a plain rotor");

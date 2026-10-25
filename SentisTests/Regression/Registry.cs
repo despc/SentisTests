@@ -368,6 +368,11 @@ namespace SentisTests.Regression
             Add(() => new SharedAssemblerCheck());
             Add(() => new ProgrammableEditorQuitCheck());
             Add(() => new JumpDriveDistanceCheck());
+            Add(() => new JumpAcrossClustersCheck());
+            Add(() => new RespawnAcrossClustersCheck());
+            Add(() => new FlightClusterBorderCheck());
+            Add(() => new AsteroidMaterialCheck());
+            Add(() => new EntityStoreCheck());
 
             foreach (var make in Added)
                 Add(make);
@@ -377,8 +382,14 @@ namespace SentisTests.Regression
                 RegisterScenario(entry);
             _registered = true;
             ScenarioRegistry.Register(RegressionSuite.ScenarioName, () => new RegressionSuite());
+            ScenarioRegistry.Register(RegressionSuite.HeavyName, () => new RegressionSuite(heavy: true));
             // 100 ships into the planet at once: the load is its own, run alone
             ScenarioRegistry.Register(PlanetTunnelCheck.MassName, () => new PlanetTunnelCheck(100));
+            // with SentisClusters: scripts against detached clusters; it switches detaching, so not in the suite
+            ScenarioRegistry.Register(PbDetachCheck.ScenarioName, () => new PbDetachCheck());
+            ScenarioRegistry.Register(RaycastDetachCheck.ScenarioName, () => new RaycastDetachCheck());
+            ScenarioRegistry.Register(ProjectileDetachCheck.ScenarioName, () => new ProjectileDetachCheck());
+            ScenarioRegistry.Register(ClusterStressCheck.ScenarioName, () => new ClusterStressCheck());
         }
     }
 }

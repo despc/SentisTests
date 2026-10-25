@@ -36,6 +36,12 @@ namespace SentisTests.Scenarios
                 Note(idle.Count + " pistons not working, left as they are: " + string.Join("; ", idle.Take(6).Select(p =>
                     "'" + p.CubeGrid.DisplayName + "' " + p.EntityId + (p.Enabled ? "" : " (off)") + ", owner " + p.OwnerId)));
             pistons = pistons.Where(p => p.IsWorking).ToList();
+            // a bot's rig (SentisAi) is driven by its bot, which sets its pistons as its drilling goes: left to the bot
+            bool OfBot(MyPistonBase p) =>
+                (Sandbox.Game.World.MySession.Static.Players.TryGetIdentity(p.OwnerId)?.DisplayName ?? "").StartsWith("[BOT]", StringComparison.Ordinal);
+            var bots = pistons.Where(OfBot).ToList();
+            if (bots.Count > 0) Note(bots.Count + " pistons of bots' rigs left to their bots");
+            pistons = pistons.Where(p => !OfBot(p)).ToList();
             foreach (var p in pistons)
             {
                 var piston = (Sandbox.ModAPI.IMyPistonBase)p;
