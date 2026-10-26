@@ -169,6 +169,7 @@ namespace SentisTests.Regression.Checks
             var body = Body;
             body.DoDamage(1000f, MyDamageType.Suicide, true, attackerId: 0);
             yield return Until(() => body.IsDead ? 1 : 0, v => v > 0, "the player dead", 10);
+            yield return UntilRespawnable(body);
             var message = new Sandbox.Game.Multiplayer.MyPlayerCollection.RespawnMsg
             {
                 JoinGame = false,

@@ -50,8 +50,7 @@ namespace SentisTests.Scenarios
             Check(_lastPass != null && _queue != null && _cursor != null && _checkGroup != null && _checkSlice != null && _gridPcu != null,
                 "the limiter has changed");
 
-            var anchor = WorldApi.LoadAuthoredGroup(WheelPerfScenario.ResourceName, WorldApi.EntityPrefix + Prefix + "anchor")[0]
-                .PositionAndOrientation.Value.GetMatrix().Translation;
+            var anchor = WorldApi.PlanetAnchor(WorldApi.EntityPrefix + Prefix + "anchor").Translation;
             var planet = MyGamePruningStructure.GetClosestPlanet(anchor);
             var up = Vector3D.Normalize(anchor - planet.PositionComp.GetPosition());
             var side = Vector3D.Normalize(Vector3D.CalculatePerpendicularVector(up));

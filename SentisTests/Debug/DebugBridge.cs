@@ -503,7 +503,7 @@ namespace SentisTests.Debug
         private static JObject ListGrids(string filter)
         {
             var arr = new JArray();
-            foreach (var g in AllGrids(1e6)
+            foreach (var g in AllGrids(1e9)
                 .Where(g => string.IsNullOrEmpty(filter)
                     || (g.Name ?? g.EntityId.ToString()).IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0
                     || (g.DisplayName ?? "").IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)

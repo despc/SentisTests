@@ -124,6 +124,29 @@ namespace SentisTests.Regression
         protected static int LooseItems => MyEntities.GetEntities().Count(e => e is MyFloatingObject && !e.MarkedForClose && !e.Closed);
 
         private Scenarios.ConfigOverride _gameplay;
+        private Scenarios.ConfigOverride _clusters;
+
+        /// <summary>
+        /// The size of SentisClusters' clusters the sites are laid out for (<see cref="Sites"/>: 8 km apart, a cluster each;
+        /// the checks of the borders fly across them): the plugin's default. A server's own (10 km on the stand,
+        /// 25.10.2026) put neighbouring sites in one cluster, and the checks of the clusters' borders failed.
+        /// </summary>
+        public const float TestClusterSize = 5000f;
+
+        /// <summary>
+        /// SentisClusters' cluster size set to <see cref="TestClusterSize"/> for a run (the split size and the border
+        /// derived from it), the server's own put back by the override's Restore; null without SentisClusters. The plugin
+        /// applies a change of it at once.
+        /// </summary>
+        internal static Scenarios.ConfigOverride ClustersForTests()
+        {
+            if (!Integrations.IsLoaded(Scenarios.ConfigOverride.Clusters)) return null;
+            var o = new Scenarios.ConfigOverride(Scenarios.ConfigOverride.Clusters);
+            o.Set("ClusterSize", TestClusterSize);
+            o.Set("ClusterSplitSize", 0f);
+            o.Set("ClusterBorder", 0f);
+            return o;
+        }
 
         /// <summary>Where this run builds; the suite sets it, alone it is site 0.</summary>
         public Site Site { get; set; }
@@ -138,6 +161,22 @@ namespace SentisTests.Regression
         protected long Identity => Player.Identity.IdentityId;
         protected MyCharacter Body => FakeClients.Character(Me);
 
+        /// <summary>
+        /// After the player's death, until the game lets go of the dead body as it does for a real player: the dead
+        /// character's update counts its respawn time down (5 s) and then kills the player (MyPlayerCollection.KillPlayer),
+        /// which takes the dead body out of the player's control - only then does a client see the respawn screen. A
+        /// respawn asked for before that left the player controlling the dead body and the new astronaut controlled by
+        /// nobody (MyPlayerCollection.ChangePlayerCharacter takes control only of a player who controls nothing): its
+        /// cluster unstepped by SentisOptimisations, it could not fly (reg_respawn_across_clusters, 25.10.2026).
+        /// </summary>
+        protected IEnumerator UntilRespawnable(MyCharacter dead)
+        {
+            var within = Within(15);
+            while (within() && ReferenceEquals(Player.Controller?.ControlledEntity, dead))
+                yield return null;
+            if (ReferenceEquals(Player.Controller?.ControlledEntity, dead)) Note("the game did not let go of the dead body in 15 s: the respawn asked for all the same");
+        }
+
         /// <summary>What the check found worth saying at the end: the PASSED line carries it.</summary>
         protected void Result(string message) => Note(message);
 
@@ -146,6 +185,7 @@ namespace SentisTests.Regression
             WorldApi.EnsureUnpaused(Name);
             if (Site == null) Site = TestRunner.RunOrigin.HasValue ? Sites.InFrontOfPlayer(Kind, TestRunner.RunOrigin.Value) : Sites.Get(Kind, 0);
             if (!InSuite) FakeClients.RemoveAll();
+            if (!InSuite) _clusters = ClustersForTests();
             if (!InSuite && (NeedsDamage || NeedsFallRestore || NeedsLooseItems) && Integrations.Missing(new[] { Integrations.Gameplay }).Count == 0)
             {
                 _gameplay = new Scenarios.ConfigOverride(Scenarios.ConfigOverride.Gameplay);
@@ -295,15 +335,27 @@ namespace SentisTests.Regression
         public static double DeletingSeconds => TimeSpan.FromTicks(System.Threading.Interlocked.Read(ref _deletingTicks)).TotalSeconds;
 
         /// <summary>
-        /// The clock's time a wait counts: what went by, less what <see cref="DeleteClosed"/> took meanwhile - a cleanup of
-        /// thousands of grids is one frame of seconds, and the waits by the clock (four times their frames) ran out in it.
+        /// The clock's time a wait counts, for a wait that reads it once a frame: what went by, each frame no more than
+        /// <see cref="LongestFrameSeconds"/>. A frame of seconds is the suite's own (its next batch of sites built, a
+        /// cleanup of thousands of grids deleted, <see cref="DeleteClosed"/>): the game did nothing for the wait in it,
+        /// and the waits by the clock (four times their frames) ran out in it - a batch built in frames of 15 and 21 s
+        /// failed every check then waiting on the group's terminals, food and air (25.10.2026).
         /// </summary>
         protected static Func<double> WaitClock()
         {
-            var clock = System.Diagnostics.Stopwatch.StartNew();
-            var deleting = System.Threading.Interlocked.Read(ref _deletingTicks);
-            return () => (clock.Elapsed - TimeSpan.FromTicks(System.Threading.Interlocked.Read(ref _deletingTicks) - deleting)).TotalSeconds;
+            var last = System.Diagnostics.Stopwatch.GetTimestamp();
+            var counted = 0.0;
+            return () =>
+            {
+                var now = System.Diagnostics.Stopwatch.GetTimestamp();
+                counted += Math.Min(LongestFrameSeconds, (now - last) / (double)System.Diagnostics.Stopwatch.Frequency);
+                last = now;
+                return counted;
+            };
         }
+
+        /// <summary>The most a frame adds to a wait's clock (<see cref="WaitClock"/>), s.</summary>
+        private const double LongestFrameSeconds = 1.0;
 
         /// <summary>
         /// A wait of so many seconds of game time, for a loop that yields once a frame: true while fewer frames than
@@ -315,8 +367,20 @@ namespace SentisTests.Regression
             var frames = 0;
             var limit = Frames(seconds);
             var clock = WaitClock();
-            return () => frames++ < limit && clock() < seconds * 4;
+            return () => frames++ < limit && !ClockOut(clock, seconds, frames);
         }
+
+        /// <summary>
+        /// The frames a wait gets at the least before its clock may end it: the game's 100-frame updates are spread over
+        /// 100 frames and take a new entry in at the next round (MyDistributedTypeUpdater), up to 200 frames - a block's
+        /// power check among them (MyBlockPowerCheckComponent: contract, services and cryo blocks working only after
+        /// it ran). On a server at 0.06 the clock ended waits of 10 s after some 150 frames (25.10.2026).
+        /// </summary>
+        public const int LeastFrames = 250;
+
+        /// <summary>A wait's clock run out: four times its seconds, and no fewer than <see cref="LeastFrames"/> frames gone.</summary>
+        private static bool ClockOut(Func<double> clock, double seconds, int frames) =>
+            clock() > seconds * 4 && frames >= Math.Min(Frames(seconds), LeastFrames);
 
         protected IEnumerator HoldShip(double seconds, MyShipController seat, Vector3 move, Vector2 rotate = default(Vector2), float roll = 0)
         {
@@ -731,8 +795,26 @@ namespace SentisTests.Regression
             var physics = grid.Physics;
             if (physics == null) return "no physics";
             var body = physics.RigidBody;
-            return "enabled " + physics.Enabled + (body == null ? ", no body" : ", body active " + body.IsActive + ", cluster " + ClusterId(grid));
+            var detached = DescribeDetached?.Invoke(grid);
+            return "enabled " + physics.Enabled + (body == null ? ", no body" : ", body active " + body.IsActive + ", cluster " + ClusterId(grid)) +
+                   (detached == null ? "" : "; " + detached + "; " + GridUpdates(grid));
         }
+
+        /// <summary>What the grid asked the game to update it for: its parallel flags and its queued updates.</summary>
+        private static string GridUpdates(MyCubeGrid grid)
+        {
+            const System.Reflection.BindingFlags any = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public;
+            object Field(string name) => typeof(MyCubeGrid).GetField(name, any)?.GetValue(grid);
+            return "parallel " + ((Sandbox.Game.Entities.IMyParallelUpdateable)grid).UpdateFlags + ", queued parallel " + Field("m_totalQueuedParallelUpdates") +
+                   ", before " + Field("m_totalQueuedSynchronousUpdatesBefore") + ", after " + Field("m_totalQueuedSynchronousUpdatesAfter") +
+                   ", in scene " + grid.InScene;
+        }
+
+        // SentisClusters.ClustersApi.Describe, when that plugin is loaded (and has it)
+        private static readonly Func<VRage.Game.Entity.MyEntity, string> DescribeDetached =
+            Integrations.TypeOf("SentisClusters", "SentisClusters.ClustersApi")?.GetMethod("Describe") is System.Reflection.MethodInfo m
+                ? (Func<VRage.Game.Entity.MyEntity, string>)Delegate.CreateDelegate(typeof(Func<VRage.Game.Entity.MyEntity, string>), m)
+                : null;
 
         // ------------------------------------------------------------------ waits
 
@@ -751,7 +833,7 @@ namespace SentisTests.Regression
                 try { value = read(); }
                 catch (Exception e) { throw new ScenarioFailedException(what + ": " + e.GetType().Name + ": " + e.Message); }
                 if (done(value)) yield break;
-                if (frames > Frames(seconds) || clock() > seconds * 4)
+                if (frames > Frames(seconds) || ClockOut(clock, seconds, frames))
                     throw new ScenarioFailedException(what + ": not in " + seconds + " s, at " + F(value) + (why == null ? "" : " (" + Describe(why) + ")"));
                 if ((DateTime.UtcNow - told).TotalSeconds > 10)
                 {
@@ -786,6 +868,54 @@ namespace SentisTests.Regression
             }
             if (block is MyMechanicalConnectionBlockBase mechanical)
                 text += ", head " + (mechanical.TopGrid == null ? "none" : ((Sandbox.ModAPI.Ingame.IMyMechanicalConnectionBlock)mechanical).IsAttached ? "attached" : "not attached");
+            // a block's IsWorking is worked out again on events (power, functional, on): stale when one did not come
+            try
+            {
+                var check = typeof(MyCubeBlock).GetMethod("CheckIsWorking", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+                if (check != null) text += ", would be working " + check.Invoke(block, null);
+                // whoever else has a say (MyCubeBlock.GetIsWorking): each one and its answer
+                if (typeof(MyCubeBlock).GetField("GetIsWorking", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)?.GetValue(block) is Delegate say)
+                    foreach (var one in say.GetInvocationList())
+                        text += ", says " + one.Method.DeclaringType?.FullName + "." + one.Method.Name + " = " + one.DynamicInvoke();
+            }
+            catch (Exception e) { text += ", would be working: " + e.GetType().Name; }
+            text += ", block updates " + block.NeedsUpdate + ", grid updates " + block.CubeGrid.NeedsUpdate + ", invoke queue " + (Sandbox.MySandboxGame.Static?.InvokeQueueCount ?? -1);
+            try { text += ComponentUpdates(block); }
+            catch (Exception e) { text += ", component updates: " + e.GetType().Name + " " + e.Message; }
+            return text;
+        }
+
+        /// <summary>
+        /// Where the block's updating components are in the game's updater (MyEntityComponentUpdater): in the 100-frame
+        /// list after the frame, waiting to be added, or nowhere; and the list's own step.
+        /// </summary>
+        private static string ComponentUpdates(MyCubeBlock block)
+        {
+            const System.Reflection.BindingFlags any = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public;
+            var updater = MySession.Static?.GetComponent<VRage.Game.Components.Session.MyEntityComponentUpdater>();
+            if (updater == null) return ", no component updater";
+            var type = updater.GetType();
+            var after100 = type.GetField("m_componentsForUpdateAfter100", any)?.GetValue(updater) as VRage.Collections.MyDistributedTypeUpdater<VRage.Game.Entity.EntityComponents.Interfaces.IMyUpdatingEntityComponent>;
+            var toAdd = type.GetField("m_componentsToAdd", any)?.GetValue(updater) as System.Collections.IEnumerable;
+            var text = "";
+            foreach (var c in block.Components)
+            {
+                if (!(c is VRage.Game.Entity.EntityComponents.Interfaces.IMyUpdatingEntityComponent u)) continue;
+                var inList = -1;
+                if (after100 != null)
+                    for (var i = 0; i < after100.Count; i++)
+                        if (ReferenceEquals(after100[i], u)) { inList = i; break; }
+                var waiting = false;
+                if (toAdd != null)
+                    foreach (var w in toAdd)
+                        if (ReferenceEquals(w, u)) { waiting = true; break; }
+                text += ", " + u.GetType().Name + " needs " + u.NeedsUpdate + " as " + u.UpdatingType + ": in the 100-frame list at " + inList + ", waiting to be added " + waiting;
+            }
+            if (after100 != null)
+            {
+                int F(string name) => (int)(typeof(VRage.Collections.MyDistributedTypeUpdater<VRage.Game.Entity.EntityComponents.Interfaces.IMyUpdatingEntityComponent>).GetField(name, any)?.GetValue(after100) ?? -1);
+                text += "; the list: " + after100.Count + " entries, index " + F("m_updateIndex") + ", step " + F("m_step") + ", steps " + F("m_stepCount");
+            }
             return text;
         }
 
@@ -868,6 +998,7 @@ namespace SentisTests.Regression
                 ReleaseHighQuality();
                 _gameplay?.Restore();
                 _essentials?.Restore();
+                _clusters?.Restore();
                 if (!InSuite) FakeClients.RemoveAll();
             }
             finally { base.Cleanup(); }

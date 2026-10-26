@@ -398,9 +398,13 @@ namespace SentisTests.Game
         /// </summary>
         public static bool KeepOnRemoveAll;
 
-        public static void RemoveAll()
+        /// <summary>
+        /// Every fake client gone, its character with it. <paramref name="force"/>: also while <see cref="KeepOnRemoveAll"/>
+        /// holds (an admin's !remove_bots: a suite cut short left it set, and the command did nothing). Game thread.
+        /// </summary>
+        public static void RemoveAll(bool force = false)
         {
-            if (KeepOnRemoveAll) return;
+            if (KeepOnRemoveAll && !force) return;
             var clients = _clients;
             var count = _clientCount;
             _clientCount = 0;

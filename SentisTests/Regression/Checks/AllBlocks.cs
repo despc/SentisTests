@@ -43,6 +43,9 @@ namespace SentisTests.Regression.Checks
             var definitions = MyDefinitionManager.Static.GetAllDefinitions().OfType<MyCubeBlockDefinition>()
                 .Where(d => d.Public && d.CubeSize == _size && typeof(MyObjectBuilder_FunctionalBlock).IsAssignableFrom(d.Id.TypeId))
                 .OrderBy(d => d.Id.TypeId.ToString()).ThenBy(d => d.Id.SubtypeName).ToList();
+            // focus from=N count=M: a part of the list (to find which block a fault comes with)
+            int Arg(string name, int otherwise) => System.Text.RegularExpressions.Regex.Match(Core.TestRunner.Focus ?? "", name + @"=(\d+)") is var m && m.Success ? int.Parse(m.Groups[1].Value) : otherwise;
+            definitions = definitions.Skip(Arg("from", 0)).Take(Arg("count", int.MaxValue)).ToList();
             var battery = _size == MyCubeSize.Large ? "BatteryBlock/LargeBlockBatteryBlock" : "BatteryBlock/SmallBlockBatteryBlock";
             var batterySize = Definition(battery).Size;
             var cell = _size == MyCubeSize.Large ? 2.5 : 0.5;
@@ -55,6 +58,7 @@ namespace SentisTests.Regression.Checks
             for (var start = 0; start < definitions.Count; start += batch)
             {
                 var placed = new List<(MyCubeBlockDefinition Definition, MyCubeGrid Grid, MyCubeBlock Block)>();
+                Note("batch from " + start + ": " + string.Join(", ", definitions.Skip(start).Take(batch).Select(Short)));
                 foreach (var (definition, i) in definitions.Skip(start).Take(batch).Select((d, i) => (d, i)))
                 {
                     // each batch a layer of its own: the last batch's grids are closed but may not be gone yet (deletes wait

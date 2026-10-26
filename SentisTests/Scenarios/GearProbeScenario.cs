@@ -44,8 +44,7 @@ namespace SentisTests.Scenarios
         public override IEnumerator Run()
         {
             WorldApi.EnsureUnpaused(Name);
-            var anchor = WorldApi.LoadAuthoredGroup(WheelPerfScenario.ResourceName, WorldApi.EntityPrefix + "gear-probe-anchor")[0]
-                .PositionAndOrientation.Value.GetMatrix().Translation;
+            var anchor = WorldApi.PlanetAnchor(WorldApi.EntityPrefix + "gear-probe-anchor").Translation;
             var planet = MyGamePruningStructure.GetClosestPlanet(anchor);
             var up = Vector3D.Normalize(anchor - planet.PositionComp.GetPosition());
             var east = Vector3D.Normalize(Vector3D.Cross(up, Vector3D.Forward));

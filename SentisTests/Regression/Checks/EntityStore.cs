@@ -41,18 +41,25 @@ namespace SentisTests.Regression.Checks
             // a few of the world's grids, looked up from a worker thread
             var grids = MyEntities.GetEntities().OfType<MyCubeGrid>().Take(50).Select(g => g.EntityId).ToList();
             var missed = 0;
+            // and an id for an entity made there: the process' store had its allocation of ids suspended since the
+            // world's load, every entity made off the game thread got id 0 and MyEntities.CreateFromObjectBuilderAndAdd
+            // threw it away (a dead character's backpack in a detached cluster, 25.10.2026)
+            var madeId = -1L;
+            var suspended = false;
             var thread = new Thread(() =>
             {
                 foreach (var id in grids)
                     if (MyEntities.GetEntityById(id) == null) missed++;
+                suspended = MyEntityIdentifier.AllocationSuspended;
+                madeId = suspended ? 0 : MyEntityIdentifier.AllocateId();
             });
             thread.Start();
             thread.Join();
 
             var state = "game thread's store " + (own == null ? "none" : ReferenceEquals(own, main) ? "the world's" : "its own (" + ownCount + ")") +
                         ", world's store " + mainCount + " entities, swapped " + type.GetField("m_isSwapped", st)?.GetValue(null) + "; " +
-                        missed + " of " + grids.Count + " grids not found from another thread";
-            Check(missed == 0, state);
+                        missed + " of " + grids.Count + " grids not found from another thread; an id made there " + (madeId != 0 ? "fine" : "none (allocation suspended " + suspended + ")");
+            Check(missed == 0 && madeId != 0, state);
             Result(state);
         }
     }

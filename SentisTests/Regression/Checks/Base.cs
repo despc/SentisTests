@@ -136,7 +136,9 @@ namespace SentisTests.Regression.Checks
             yield return Until(() => airVent.CanPressurize ? 1 : 0, v => v > 0, "the room airtight for the vent", 10);
             var full = gasTank.FilledRatio;
             yield return Until(() => airVent.GetOxygenLevel(), v => v > 0.9, "the room's air", 30, () => "tank " + gasTank.FilledRatio.ToString("F4") + ", " + State((MyCubeBlock)airVent));
-            Check(gasTank.FilledRatio < full, "the room filled and the tank gave nothing");
+            // the tank takes off what it gave in its own update, after the room's level is up (in a cluster detached by
+            // hand the room filled in 3 s, before the tank's next update: 26.10.2026)
+            yield return Until(() => full - gasTank.FilledRatio, v => v > 0, "the tank giving the room's air", 10, () => "tank " + gasTank.FilledRatio.ToString("F4") + " of " + full.ToString("F4"));
             Result("room filled with air (" + (airVent.GetOxygenLevel() * 100).ToString("F0") + " %), the tank at " + (gasTank.FilledRatio * 100).ToString("F1") + " % (tank under the vent at " + tank.Min + ")");
         }
     }

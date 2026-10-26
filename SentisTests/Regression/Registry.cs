@@ -387,6 +387,8 @@ namespace SentisTests.Regression
             ScenarioRegistry.Register(PlanetTunnelCheck.MassName, () => new PlanetTunnelCheck(100));
             // with SentisClusters: scripts against detached clusters; it switches detaching, so not in the suite
             ScenarioRegistry.Register(PbDetachCheck.ScenarioName, () => new PbDetachCheck());
+            ScenarioRegistry.Register(JetpackDetachCheck.ScenarioName, () => new JetpackDetachCheck());
+            ScenarioRegistry.Register(JumpDetachCheck.ScenarioName, () => new JumpDetachCheck());
             ScenarioRegistry.Register(RaycastDetachCheck.ScenarioName, () => new RaycastDetachCheck());
             ScenarioRegistry.Register(ProjectileDetachCheck.ScenarioName, () => new ProjectileDetachCheck());
             ScenarioRegistry.Register(ClusterStressCheck.ScenarioName, () => new ClusterStressCheck());

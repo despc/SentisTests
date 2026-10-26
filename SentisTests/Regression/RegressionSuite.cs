@@ -35,10 +35,41 @@ namespace SentisTests.Regression
         private readonly List<Running> _runs = new List<Running>();
         private ConfigOverride _gameplay;
         private ConfigOverride _essentials;
+        private ConfigOverride _clusters;
 
         public override string Name => _heavy ? HeavyName : ScenarioName;
 
-        public override int TimeoutSeconds => Math.Max(300, Registry.All.Select(c => c.Make().TimeoutSeconds).DefaultIfEmpty(0).Max() + 120);
+        public override int TimeoutSeconds => Math.Max(300, Registry.All.Select(c => c.Make().TimeoutSeconds).DefaultIfEmpty(0).Max() * 4 + 120);
+
+        /// <summary>
+        /// Loose items at the sites, left by a run that did not end (the server gone meanwhile, the world saved with them
+        /// before the restart), taken away before the checks build there: a wheel was not put on where they lay
+        /// (reg_all_blocks_large, "head none"), or, in a cluster detached by hand, put into them (26.10.2026).
+        /// </summary>
+        private void SweepLooseItems(List<RegressionCheck> checks)
+        {
+            var origins = checks.Where(c => c.Site != null).Select(c => c.Site.Origin).ToList();
+            var swept = 0;
+            foreach (var item in Sandbox.Game.Entities.MyEntities.GetEntities().OfType<Sandbox.Game.Entities.MyFloatingObject>().ToList())
+            {
+                if (item.MarkedForClose) continue;
+                var at = item.PositionComp.GetPosition();
+                if (!origins.Any(o => VRageMath.Vector3D.DistanceSquared(o, at) < SweepRadius * SweepRadius)) continue;
+                item.Close();
+                swept++;
+            }
+            if (swept == 0) return;
+            RegressionCheck.DeleteClosed();
+            Note(swept + " loose items taken away from the sites (left by an earlier run)");
+        }
+
+        private const double SweepRadius = 300;
+
+        // SentisClusters.ClustersApi.WaitForDetachedTicks, when that plugin is loaded
+        private static readonly Action WaitForDetachedTicks =
+            Integrations.TypeOf("SentisClusters", "SentisClusters.ClustersApi")?.GetMethod("WaitForDetachedTicks") is System.Reflection.MethodInfo m
+                ? (Action)Delegate.CreateDelegate(typeof(Action), m)
+                : null;
 
         /// <summary>One check of the suite: its coroutine, stepped as the runner steps one.</summary>
         private sealed class Running
@@ -48,8 +79,24 @@ namespace SentisTests.Regression
             public readonly Stopwatch Watch = new Stopwatch();
             /// <summary><see cref="RegressionCheck.DeletingSeconds"/> when the check started: the cleanups' long frames are not its time.</summary>
             public double DeletingAtStart;
+            /// <summary>The game's frame when the check started: its timeout is game time (a loaded server runs slow).</summary>
+            public ulong StartFrame;
+
+            /// <summary>
+            /// Over its time: <see cref="RegressionCheck.TimeoutSeconds"/> of game time, or four times that by the clock
+            /// (less the cleanups' long frames). By the clock alone a safe zone's 120 s of coming up did not fit 240 s
+            /// on a server at a fifth of its speed (reg_safe_zone, 25.10.2026).
+            /// </summary>
+            public bool Over()
+            {
+                var gameSeconds = ((Sandbox.MySandboxGame.Static?.SimulationFrameCounter ?? StartFrame) - StartFrame) / 60.0;
+                var clockSeconds = Watch.Elapsed.TotalSeconds - (RegressionCheck.DeletingSeconds - DeletingAtStart);
+                return gameSeconds > Check.TimeoutSeconds || clockSeconds > Check.TimeoutSeconds * 4;
+            }
             public TestVerdict? Verdict;
             public string Message;
+            /// <summary>With <c>detach=1</c>: the check's cluster detached by SentisClusters' !clusters detach while it runs.</summary>
+            public bool Detached;
 
             public void Step()
             {
@@ -81,6 +128,10 @@ namespace SentisTests.Regression
             FakeClients.KeepOnRemoveAll = true;
 
             var focus = (TestRunner.Focus ?? "").Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            // detach=1: every check's cluster detached by hand while it runs (SentisClusters), at most 8 at once: give
+            // the checks in batches of 8. Not a name to look for
+            _detachAll = focus.Contains("detach=1");
+            focus = focus.Where(f => f != "detach=1").ToArray();
             var chosen = Registry.All.Where(c => focus.Length == 0 || focus.Any(f => c.Name.IndexOf(f, StringComparison.OrdinalIgnoreCase) >= 0)).ToList();
             Check(chosen.Count > 0, "no regression check matches '" + TestRunner.Focus + "'");
 
@@ -108,6 +159,10 @@ namespace SentisTests.Regression
                 _essentials.Set("BackpackLimit", int.MaxValue);
             }
 
+            // the clusters of the size the sites are laid out for, before any site is built
+            _clusters = RegressionCheck.ClustersForTests();
+            if (_clusters != null) Note("SentisClusters' clusters " + RegressionCheck.TestClusterSize + " m for the run");
+
             var made = chosen.Select(entry => entry.Make()).ToList();
             // the heavy layout's light sites are the last indices: the checks that need a cluster of their own go there
             if (_heavy) made = made.Where(c => !c.NeedsOwnCluster).Concat(made.Where(c => c.NeedsOwnCluster)).ToList();
@@ -128,10 +183,12 @@ namespace SentisTests.Regression
                 var run = new Running { Check = check };
                 run.Stack.Push(check.Run());
                 run.DeletingAtStart = RegressionCheck.DeletingSeconds;
+                run.StartFrame = Sandbox.MySandboxGame.Static?.SimulationFrameCounter ?? 0;
                 run.Watch.Start();
                 _runs.Add(run);
             }
             Note(_runs.Count + " checks: " + string.Join(", ", next.Select(p => p.Value + " " + p.Key.ToString().ToLowerInvariant())));
+            SweepLooseItems(made);
             if (_heavy)
                 Note("heavy layout: " + string.Join(", ", Enumerable.Range(0, Sites.HeavyClumps).Select(i => "clump " + (i + 1) + " " + clumps[i + 1] + " checks at " +
                      Sites.HeavySpace(i, spaceCount, out _).Origin.ToString("F0"))) + "; " + clumps[0] + " light, one a cluster");
@@ -139,12 +196,28 @@ namespace SentisTests.Regression
             DispatchWatch.Start();
             var watch = Stopwatch.StartNew();
             var told = 0.0;
+            var frame = 0;
             while (_runs.Any(r => r.Verdict == null))
             {
+                if (_detachAll && frame++ % 30 == 0)
+                    foreach (var run in _runs)
+                    {
+                        if (run.Verdict != null || run.Detached || run.Check.Site == null) continue;
+                        var at = run.Check.Site.Origin;
+                        var answer = string.Join(" ", ClusterCommand($"!clusters detach {at.X:F0} {at.Y:F0} {at.Z:F0}"));
+                        if (answer.Contains("detached and kept"))
+                        {
+                            run.Detached = true;
+                            Note(run.Check.Name + ": " + answer.Split('-')[0].Trim());
+                        }
+                    }
+                // the checks change the game straight from the game thread, as a client's request does: not while a
+                // detached cluster's tick runs (SentisClusters makes the requests wait for their entity's tick)
+                WaitForDetachedTicks?.Invoke();
                 foreach (var run in _runs)
                 {
                     if (run.Verdict != null) continue;
-                    if (run.Watch.Elapsed.TotalSeconds - (RegressionCheck.DeletingSeconds - run.DeletingAtStart) > run.Check.TimeoutSeconds)
+                    if (run.Over())
                     {
                         run.Verdict = TestVerdict.Timeout;
                         run.Message = "timeout after " + run.Check.TimeoutSeconds + " s at: " + run.Check.Progress;
@@ -180,9 +253,20 @@ namespace SentisTests.Regression
             var skipped = _runs.Where(r => r.Verdict == TestVerdict.Skipped).ToList();
             Note("REGRESSION RESULT | " + (_runs.Count - bad.Count - skipped.Count) + " passed, " + bad.Count + " not, " + skipped.Count + " skipped of " +
                  _runs.Count + " in " + watch.Elapsed.TotalSeconds.ToString("F0") + " s" +
-                 (bad.Count > 0 ? " | " + string.Join(" | ", bad.Select(r => r.Check.Name + ": " + r.Message)) : ""));
+                 (_detachAll ? ", " + _runs.Count(r => r.Detached) + " of them in a cluster detached by hand" : "") +
+                 (bad.Count > 0 ? " | " + string.Join(" | ", bad.Select(r => r.Check.Name + (r.Detached ? " (detached)" : "") + ": " + r.Message)) : ""));
             Check(bad.Count == 0, bad.Count + " of " + _runs.Count + " checks did not pass: " + string.Join(", ", bad.Select(r => r.Check.Name)));
             Check(thrown.Count == 0, "the entities' update pass threw " + thrown.Count + " kinds of exceptions during the run (see the log): " + string.Join(" | ", thrown.Take(3)));
+        }
+
+        private bool _detachAll;
+
+        private static List<string> ClusterCommand(string text)
+        {
+            var answers = new List<string>();
+            var commands = (Torch.Commands.CommandManager)Torch.TorchBase.Instance.CurrentSession.Managers.GetManager(typeof(Torch.Commands.CommandManager));
+            commands?.HandleCommandFromServer(text, message => answers.Add(message.Message));
+            return answers;
         }
 
         private List<Running> Bad() => _runs.Where(r => r.Verdict != null && r.Verdict != TestVerdict.Passed && r.Verdict != TestVerdict.Skipped).ToList();
@@ -192,6 +276,13 @@ namespace SentisTests.Regression
         {
             run.Watch.Stop();
             var check = run.Check;
+            if (run.Detached)
+            {
+                // its cluster attached again (and let go as one kept detached by hand) before what it built goes
+                var at = check.Site.Origin;
+                try { ClusterCommand($"!clusters attach {at.X:F0} {at.Y:F0} {at.Z:F0}"); }
+                catch (Exception e) { Log.Warn("attaching the cluster of {0} failed: {1}", check.Name, e.Message); }
+            }
             try { check.CleanupLeftovers(); }
             catch (Exception e) { Log.Warn("leftover cleanup of {0} failed: {1}", check.Name, e.Message); }
             foreach (var entity in check.TakeTracked())
@@ -233,6 +324,11 @@ namespace SentisTests.Regression
             catch (Exception e) { Log.Warn("restoring SentisGameplayImprovements' settings failed: {0}", e.Message); }
             try { _essentials?.Restore(); }
             catch (Exception e) { Log.Warn("restoring Essentials' settings failed: {0}", e.Message); }
+            if (_detachAll)
+                try { ClusterCommand("!clusters attach all"); }
+                catch (Exception e) { Log.Warn("attaching the clusters failed: {0}", e.Message); }
+            try { _clusters?.Restore(); }
+            catch (Exception e) { Log.Warn("restoring SentisClusters' settings failed: {0}", e.Message); }
             try { FakeClients.RemoveAll(); }
             finally { base.Cleanup(); }
         }

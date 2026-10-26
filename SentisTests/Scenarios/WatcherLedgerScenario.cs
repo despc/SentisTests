@@ -132,7 +132,7 @@ namespace SentisTests.Scenarios
             SkipUnless(freezer != null, "SentisOptimisations is not loaded");
             ((MyInventory)third.OutputInventory).AddItems(3, new MyObjectBuilder_Component { SubtypeName = "SteelPlate" });
             var perPlate = (double)(plate.Prerequisites[0].Amount * (MyFixedPoint)(1f / third.GetEfficiencyMultiplierForBlueprint(plate)));
-            freezer.GetMethod("FinishDisassembling", Any).Invoke(null, new object[] { plate, 6, third });
+            freezer.GetMethod("FinishDisassembling", Any).Invoke(null, new object[] { plate, 6, third, false });
             Note($"frozen assembler: plates left {third.OutputInventory.GetItemAmount(SteelPlate)}, ingots {third.InputInventory.GetItemAmount(IronIngot)} ({perPlate} a plate)");
             Check(third.OutputInventory.GetItemAmount(SteelPlate) == 0, "the three plates were not taken apart");
             Check(Math.Abs((double)third.InputInventory.GetItemAmount(IronIngot) - 3 * perPlate) < 0.001, "three plates did not give the ingots of three");
@@ -256,9 +256,27 @@ namespace SentisTests.Scenarios
             pass = Pass(sweep);
             while (pass.MoveNext()) yield return pass.Current;
             var before = new HashSet<long>(MyEntities.GetEntities().Where(IsBag).Select(x => x.EntityId));
+            var beforeAll = new HashSet<long>(MyEntities.GetEntities().Select(x => x.EntityId));
+            var diedAt = character.PositionComp.GetPosition();
+            var suitStore = character.Components.Get<MyInventoryBase>();
+            Note($"the character before its death: inventory {suitStore?.GetType().Name} with {(suitStore as MyInventory)?.GetItemsCount()} kinds, {suitStore?.GetItemAmount(IronIngot)} ingots; " +
+                 $"its cluster {ClusterIdOf(character)}");
             MyEntity NewBag(int ingots) => MyEntities.GetEntities()
                 .FirstOrDefault(x => IsBag(x) && !before.Contains(x.EntityId) && x.GetInventory(0)?.GetItemAmount(IronIngot) == ingots);
 
+            var watched = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            Action<MyEntity> created = x =>
+            {
+                if (x is MyInventoryBagEntity)
+                    watched.Enqueue($"bag created {x.EntityId} on thread '{System.Threading.Thread.CurrentThread.Name}' at {Vector3D.Distance(x.PositionComp.GetPosition(), diedAt):F0} m");
+            };
+            Action<MyEntity> removed = x =>
+            {
+                if (x is MyInventoryBagEntity)
+                    watched.Enqueue($"bag removed {x.EntityId} at {Vector3D.Distance(x.PositionComp.GetPosition(), diedAt):F0} m from the death\n{Environment.StackTrace}");
+            };
+            MyEntities.OnEntityCreate += created;
+            MyEntities.OnEntityRemove += removed;
             character.Kill(true, new VRage.Game.ModAPI.MyDamageInformation(false, 1000f, MyDamageType.Suicide, character.EntityId));
             var temporary = MySession.Static.Settings.TemporaryContainers;
             MySession.Static.Settings.TemporaryContainers = true;
@@ -273,6 +291,17 @@ namespace SentisTests.Scenarios
             }
             foreach (var x in MyEntities.GetEntities().Where(x => IsBag(x) && !before.Contains(x.EntityId)))
                 Note($"new bag: {x.DisplayName} ({x.GetType().Name}), {x.GetInventory(0)?.GetItemAmount(IronIngot)} ingots");
+            MyEntities.OnEntityCreate -= created;
+            MyEntities.OnEntityRemove -= removed;
+            while (watched.TryDequeue(out var line)) Note(line);
+            if (backpack == null)
+            {
+                foreach (var x in MyEntities.GetEntities().Where(x => !beforeAll.Contains(x.EntityId) && (Vector3D.Distance(x.PositionComp.GetPosition(), diedAt) < 50 || IsBag(x))))
+                    Note($"new near the death or a bag: {x.GetType().Name} '{x.DisplayName}' {x.EntityId} at {Vector3D.Distance(x.PositionComp.GetPosition(), diedAt):F0} m, closed {x.Closed}, inventory {x.GetInventory(0)?.GetItemAmount(IronIngot)}");
+                var left = character.Components.Get<MyInventoryBase>();
+                Note($"the dead character: dead {character.IsDead}, closed {character.Closed}, marked {character.MarkedForClose}, in scene {character.InScene}, " +
+                     $"inventory {left?.GetType().Name} with {left?.GetItemAmount(IronIngot)} ingots, its cluster now {ClusterIdOf(character)}");
+            }
             Check(character.IsDead, "the character did not die");
             Check(backpack != null, "the dead character left no bag with its ingots");
             Check(cargoBag is MyCargoContainerInventoryBagEntity, "the destroyed container left no cargo bag with its ingots");
@@ -323,6 +352,15 @@ namespace SentisTests.Scenarios
             Check(Source("PhysicalObject/Algae", "farm") == 2, "the algae are not booked to the farm");
             Check(Source("Ore/Iron", "refine") == -10, "the refinery's ore is not booked to it");
             Check(Source("Ore/Iron", "move") == 0, "a move within the grid does not cancel out");
+        }
+
+        private static int ClusterIdOf(MyEntity entity)
+        {
+            var world = (entity?.Physics as Sandbox.Engine.Physics.MyPhysicsBody)?.HavokWorld;
+            if (world == null) return -1;
+            foreach (var c in Sandbox.Engine.Physics.MyPhysics.Clusters.GetClusters())
+                if (ReferenceEquals(c.UserData, world)) return c.ClusterId;
+            return -1;
         }
 
         private static bool IsBag(MyEntity entity) => entity is MyCargoContainerInventoryBagEntity || entity is MyInventoryBagEntity;

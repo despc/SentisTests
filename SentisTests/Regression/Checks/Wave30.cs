@@ -766,6 +766,9 @@ public void Main(string argument)
             var seat = Block<MyCockpit>(ship);
             yield return Seconds(1);
             var empty = ship.GetCurrentMass();
+            var dirtyField = typeof(MyCubeGrid).GetField("m_inventoryMassDirty", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var adjusted = typeof(Sandbox.Game.Entities.Cube.MyGridShape).GetField("m_massAdjustedForItemsAndPilot", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var before = "before sitting: shape mass " + F(ship.Physics?.Shape?.MassProperties?.Mass ?? -1) + ", dirty " + dirtyField?.GetValue(ship) + ", adjusted " + adjusted?.GetValue(ship.Physics?.Shape);
             Put(Inventory(Body), "Ore/Iron", 500);
             var carried = (double)Inventory(Body).CurrentMass;
             var own = Body.BaseMass;
@@ -773,9 +776,13 @@ public void Main(string argument)
             yield return Until(() => ship.GetCurrentMass() - empty, v => Math.Abs(v - (own + carried)) < 1, "the ship's mass up by the pilot and what they carry (" + F(own) + " + " + F(carried) + " kg)", 10,
                 () => "the ship " + F(empty) + " -> " + F(ship.GetCurrentMass()) + " kg, seated " + (Body.Parent == seat));
             var seated = ship.GetCurrentMass();
+            before += "; seated: shape mass " + F(ship.Physics?.Shape?.MassProperties?.Mass ?? -1) + ", adjusted " + adjusted?.GetValue(ship.Physics?.Shape);
             seat.RemovePilot();
-            yield return Until(() => Math.Abs(ship.GetCurrentMass() - empty), v => v < 1, "the ship's mass back once the pilot is out", 10, () => F(ship.GetCurrentMass()) + " kg");
-            Result("the ship " + F(empty) + " kg; with the pilot (" + F(own) + " kg) carrying " + F(carried) + " kg of ore: " + F(seated) + " kg; out: " + F(ship.GetCurrentMass()) + " kg");
+            yield return Until(() => Math.Abs(ship.GetCurrentMass() - empty), v => v < 1, "the ship's mass back once the pilot is out", 10, () => F(ship.GetCurrentMass()) + " kg; pilot " +
+                (seat.Pilot?.DisplayName ?? "none") + ", occupied blocks " + ship.OccupiedBlocks.Count + ", shape mass " + F(ship.Physics?.Shape?.MassProperties?.Mass ?? -1) +
+                ", inventory mass dirty " + typeof(MyCubeGrid).GetField("m_inventoryMassDirty", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)?.GetValue(ship) +
+                ", player's body " + (Body == null ? "none" : Body.Parent == null ? "free" : "in " + Body.Parent.GetType().Name) + "; " + before);
+            Result("the ship " + F(empty) + " kg; with the pilot (" + F(own) + " kg) carrying " + F(carried) + " kg of ore: " + F(seated) + " kg; out: " + F(ship.GetCurrentMass()) + " kg; " + before);
         }
     }
 

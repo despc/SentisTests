@@ -40,7 +40,20 @@ namespace SentisTests.Regression.Checks
             block.BuiltBy = owner;
             block.ShareMode = MyOwnershipShareModeEnum.Faction;
             setup?.Invoke(block);
-            return ((VRage.Game.ModAPI.IMyCubeGrid)grid).AddBlock(block, false) as MySlimBlock;
+            try
+            {
+                return ((VRage.Game.ModAPI.IMyCubeGrid)grid).AddBlock(block, false) as MySlimBlock;
+            }
+            catch (Exception e)
+            {
+                // where in the game's method it fell (no line numbers there): the IL offsets of the frames
+                var frames = new System.Diagnostics.StackTrace(e).GetFrames() ?? new System.Diagnostics.StackFrame[0];
+                SentisTestsPlugin.Log.Error("Wave31.Add " + id + " into " + grid.DisplayName + " threw " + e.GetType().Name + ": " +
+                                            string.Join(" <- ", frames.Take(4).Select(f => (f.GetMethod()?.Name ?? "?") + " IL_" + f.GetILOffset().ToString("x4"))) +
+                                            "; grid systems " + (grid.GridSystems != null) + ", physics " + (grid.Physics != null) + ", closed " + grid.Closed +
+                                            ", in scene " + grid.InScene);
+                throw;
+            }
         }
 
         /// <summary>The direction of the grid's own axes closest to a direction in the world.</summary>

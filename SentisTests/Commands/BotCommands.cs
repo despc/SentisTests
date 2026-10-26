@@ -44,12 +44,12 @@ namespace SentisTests.Commands
                             " fake players now); !remove_bots takes them away, and so does any !test run");
         }
 
-        [Command("remove_bots", "Remove every fake player: the ones of !add_bot and any a test left")]
+        [Command("remove_bots", "Remove every fake player: the ones of !add_bot and any a test left (a test running now loses its own)")]
         [Permission(MyPromoteLevel.Admin)]
         public void RemoveBots()
         {
             var count = FakeClients.Count;
-            FakeClients.RemoveAll();
+            FakeClients.RemoveAll(force: true);
             Context.Respond(count == 0 ? "no fake players" : "removed " + count + " fake players");
         }
     }

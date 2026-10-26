@@ -77,8 +77,7 @@ namespace SentisTests.Scenarios
         {
             WorldApi.EnsureUnpaused(Name);
             _config.Set("SafeZoneGridTracking", !_gameTracking);
-            var anchor = WorldApi.LoadAuthoredGroup(WheelPerfScenario.ResourceName, WorldApi.EntityPrefix + Prefix + "anchor")[0]
-                .PositionAndOrientation.Value.GetMatrix().Translation;
+            var anchor = WorldApi.PlanetAnchor(WorldApi.EntityPrefix + Prefix + "anchor").Translation;
             var planet = MyGamePruningStructure.GetClosestPlanet(anchor);
             _up = Vector3D.Normalize(anchor - planet.PositionComp.GetPosition());
             _side = Vector3D.Normalize(Vector3D.CalculatePerpendicularVector(_up));

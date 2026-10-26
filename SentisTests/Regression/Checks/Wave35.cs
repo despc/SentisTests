@@ -233,7 +233,11 @@ namespace SentisTests.Regression.Checks
             Check(!((MyObjectBuilder_CubeGrid)ship.GetObjectBuilder()).DampenersEnabled, "the grid's save has the dampeners on");
             yield return HoldShip(2, seat, new Vector3(0, 0, -1));
             var speed = Motion.Speed(ship);
-            Check(speed > 1, "2 s of forward thrust gave the ship " + F(speed) + " m/s");
+            Check(speed > 1, "2 s of forward thrust gave the ship " + F(speed) + " m/s (" + PhysicsState(ship) + ", control thrust " + thrust.ControlThrust + ", final thrust " + thrust.FinalThrust +
+                             ", thrust enabled " + thrust.Enabled + ", seat move " + typeof(MyShipController).GetProperty("MoveIndicator", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic)?.GetValue(seat) + ", last motion " + seat.LastMotionIndicator +
+                             ", the control system's controller " + (ship.GridSystems.ControlSystem?.GetShipController() == null ? "none" : ReferenceEquals(ship.GridSystems.ControlSystem.GetShipController().ControllableEntity, seat) ? "this seat" : "another") +
+                             ", pilot " + (seat.Pilot?.DisplayName ?? "none") + ", controlled by " + (seat.ControllerInfo.Controller?.Player?.DisplayName ?? "nobody") +
+                             "; " + string.Join("; ", ship.GetFatBlocks().OfType<Sandbox.Game.Entities.MyThrust>().Select(t => State(t))) + ")");
             yield return HoldShip(3, seat, Vector3.Zero);
             var after = Motion.Speed(ship);
             Check(after > speed * 0.8, "with the dampeners off the let-go ship slowed from " + F(speed) + " to " + F(after) + " m/s");

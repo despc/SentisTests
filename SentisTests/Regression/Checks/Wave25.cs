@@ -106,9 +106,10 @@ namespace SentisTests.Regression.Checks
             }, ownedBy: owner);
             var floors = new[]
             {
-                ("the player's own", Floor("gear-floor-mine", Site.Origin, Identity)),
-                ("an NPC's", Floor("gear-floor-npc", Site.At(30, 0, 0), npc)),
-                ("an enemy player's", Floor("gear-floor-enemy", Site.At(-30, 0, 0), enemyId)),
+                // 6 m over the ground: the gear reaches no voxels by the floor
+                ("the player's own", Floor("gear-floor-mine", Site.At(0, 6, 0), Identity)),
+                ("an NPC's", Floor("gear-floor-npc", Site.At(30, 6, 0), npc)),
+                ("an enemy player's", Floor("gear-floor-enemy", Site.At(-30, 6, 0), enemyId)),
             };
 
             Base6Directions.Direction? facing = null;
@@ -118,6 +119,7 @@ namespace SentisTests.Regression.Checks
                 var top = floor.GridIntegerToWorld(new Vector3I(0, 0, 0)) + Site.Up * (1.25 + 0.05);
                 var faces = facing.HasValue ? new[] { facing.Value } : new[] { Base6Directions.Direction.Down, Base6Directions.Direction.Forward, Base6Directions.Direction.Backward, Base6Directions.Direction.Up, Base6Directions.Direction.Left, Base6Directions.Direction.Right };
                 var locked = false;
+                string lockedTo = null;
                 foreach (var face in faces)
                 {
                     // a container on the far side of the gear: a ship of a gear alone has no owner for the game
@@ -140,7 +142,11 @@ namespace SentisTests.Regression.Checks
                         gear.Lock();
                         yield return null;
                     }
-                    locked = gear.IsLocked;
+                    // locked onto that floor: on a planet site the gear can reach the ground by the floor too (it took the
+                    // planet's voxels by the enemy's floor, and the check read that as the floor - 25.10.2026)
+                    var held = ((SpaceEngineers.Game.ModAPI.IMyLandingGear)gear).GetAttachedEntity() as VRage.Game.Entity.MyEntity;
+                    locked = gear.IsLocked && ReferenceEquals(held?.GetTopMostParent(), floor);
+                    if (locked) lockedTo = AttachedTo(gear);
                     if (locked || facing.HasValue)
                     {
                         facing = face;
@@ -153,9 +159,25 @@ namespace SentisTests.Regression.Checks
                 Check(facing.HasValue, "the gear locked onto the player's own floor in no way it can face");
                 results.Add(whose + (locked ? ": locked" : ": not locked"));
                 if (whose == "the player's own") Check(locked, "the gear did not lock onto the player's own floor");
-                else Check(!locked, "the gear locked onto " + whose + " floor");
+                else Check(!locked, "the gear locked onto " + whose + " floor (onto " + lockedTo + "; " + Relations(enemyId, floor) + ")");
             }
             Result(string.Join("; ", results));
+        }
+
+        private static string AttachedTo(IMyLandingGear gear)
+        {
+            var e = ((SpaceEngineers.Game.ModAPI.IMyLandingGear)gear).GetAttachedEntity() as VRage.Game.Entity.MyEntity;
+            return e == null ? "nothing" : e.GetType().Name + " '" + e.DisplayName + "'";
+        }
+
+        /// <summary>Who the floor is whose, and what the player is to them: the plugin refuses an enemy's.</summary>
+        private string Relations(long enemyId, MyCubeGrid floor)
+        {
+            var factions = Sandbox.Game.World.MySession.Static.Factions;
+            string Faction(long id) => factions.TryGetPlayerFaction(id)?.Tag ?? "none";
+            var floorOwner = floor.BigOwners.Count > 0 ? floor.BigOwners[0] : 0;
+            return $"the floor's owner {floorOwner} (faction {Faction(floorOwner)}), the player {Identity} (faction {Faction(Identity)}), the enemy {enemyId}; " +
+                   $"the player to the floor's owner: {Player.GetRelationTo(floorOwner)}";
         }
 
         public override void Cleanup()
