@@ -43,7 +43,7 @@ namespace SentisTests.Regression
 
         /// <summary>
         /// Loose items at the sites, left by a run that did not end (the server gone meanwhile, the world saved with them
-        /// before the restart), taken away before the checks build there: a wheel was not put on where they lay
+        /// before the restart), and grids at the space sites, taken away before the checks build there: a wheel was not put on where they lay
         /// (reg_all_blocks_large, "head none"), or, in a cluster detached by hand, put into them (26.10.2026).
         /// </summary>
         private void SweepLooseItems(List<RegressionCheck> checks)
@@ -58,9 +58,23 @@ namespace SentisTests.Regression
                 item.Close();
                 swept++;
             }
-            if (swept == 0) return;
+            // and grids at the space sites, where only the checks build: a rotor's head broken off ("Subgrid", not named as
+            // the checks' grids are) was saved in the world and stood where reg_conveyor_mechanisms put a piston's head,
+            // every regression run that gave it that site ("the head on LargePistonBase: not in 20 s", 27.10.2026)
+            var space = checks.Where(c => c.Site != null && c.Site.Kind == SiteKind.Space).Select(c => c.Site.Origin).ToList();
+            var grids = 0;
+            foreach (var grid in Sandbox.Game.Entities.MyEntities.GetEntities().OfType<Sandbox.Game.Entities.MyCubeGrid>().ToList())
+            {
+                if (grid.MarkedForClose) continue;
+                var at = grid.PositionComp.GetPosition();
+                if (!space.Any(o => VRageMath.Vector3D.DistanceSquared(o, at) < SweepRadius * SweepRadius)) continue;
+                grid.Close();
+                grids++;
+            }
+            if (swept == 0 && grids == 0) return;
             RegressionCheck.DeleteClosed();
-            Note(swept + " loose items taken away from the sites (left by an earlier run)");
+            if (swept > 0) Note(swept + " loose items taken away from the sites (left by an earlier run)");
+            if (grids > 0) Note(grids + " grids taken away from the space sites (left by an earlier run)");
         }
 
         private const double SweepRadius = 300;

@@ -141,6 +141,7 @@
 | Камера (луч и его предел), прожектор, ЖК-панели | `camera_raycast`, `raycast_limit`, `searchlight`, `lcd_text` | Покрыто |
 | Двери и ангарные ворота | `door`, `hangar_door` | Покрыто |
 | Столкновения: стена, корабли, кубы, персонаж, земля, состыкованные | `collision_wall`, `collision_ships`, `collision_cubes`, `collision_character`, `collision_ground`, `collision_docked` | Покрыто |
+| Блоки друг в друге: корабль внутри станции, реакторы головы ротора внутри контейнеров основания | `overlap_free`, `overlap_rotor` | Покрыто |
 | Свет, звуковой блок, детектор руды: питание и настройки | `simple_blocks`, `all_blocks_*` | Покрыто |
 | Панель быстрых действий кокпита (тулбар) | `cockpit_toolbar` | Покрыто |
 | Кокпит ведёт двигатели только своего грида, подгрид — своё кресло | `subgrid_control` | Покрыто |

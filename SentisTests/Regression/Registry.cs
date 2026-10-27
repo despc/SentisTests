@@ -298,6 +298,8 @@ namespace SentisTests.Regression
             Add(() => new PilotMassCheck());
             Add(() => new ParkingCheck());
             Add(() => new ConveyorMechanismsCheck());
+            Add(() => new OverlapFreeCheck());
+            Add(() => new OverlapRotorCheck());
             Add(() => new SubgridControlCheck());
             Add(() => new ArmorDamageCheck());
             Add(() => new SubgridDamageCheck());

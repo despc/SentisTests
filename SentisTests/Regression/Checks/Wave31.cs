@@ -149,14 +149,24 @@ namespace SentisTests.Regression.Checks
                 var top = mechanism.TopBlock;
                 Check(top != null, id + " has no head block");
 
-                // the base: a battery and containers with uranium on every side of the mechanism away from its head
-                bool NearHead(Vector3D at) => head.GetBlocks().Any(b => Vector3D.Distance(head.GridIntegerToWorld(b.Position), at) < 2);
-                var free = Wave31.Around(mechanism.SlimBlock).Where(c => !NearHead(grid.GridIntegerToWorld(c))).ToList();
-                Check(free.Count >= 2, id + ": " + free.Count + " free sides on the base");
-                Check(Wave31.Add(grid, "BatteryBlock/LargeBlockBatteryBlock", free[0], Base6Directions.Direction.Forward, Base6Directions.Direction.Up, Identity,
-                    b => Motion.Charged(b)) != null, id + ": the battery was not added");
+                // the base: containers with uranium on every side of the mechanism clear of the head, of the head's cell beyond
+                // it and of the ones its conveyor ports face, a battery behind the first. A rotor's stator is two blocks tall,
+                // its head in the upper one; a hinge's head is in the hinge's own cell: a head reactor goes beyond the head or at
+                // its port, and a container there would be inside it, the collision crushing both. Boxes, not cells: the head
+                // grid's cells are off the base's
+                BoundingBoxD Box(MyCubeGrid g, Vector3I cell) => new BoundingBoxD(g.GridIntegerToWorld(cell) - 1.1, g.GridIntegerToWorld(cell) + 1.1);
+                BoundingBoxD Shrunk(MySlimBlock b) => b.FatBlock != null ? b.FatBlock.PositionComp.WorldAABB.Inflate(-0.15) : Box(b.CubeGrid, b.Position);
+                var headSide = new List<Vector3I> { head.WorldToGridInteger(top.PositionComp.WorldAABB.Center + mechanism.WorldMatrix.Up * head.GridSize) };
+                if (top is Sandbox.Game.GameSystems.Conveyors.IMyConveyorEndpointBlock headPorts && headPorts.ConveyorEndpoint != null)
+                    for (var k = 0; k < headPorts.ConveyorEndpoint.GetLineCount(); k++)
+                        headSide.Add(headPorts.ConveyorEndpoint.GetPosition(k).NeighbourGridPosition);
+                var headBoxes = headSide.Select(c => Box(head, c)).Append(top.PositionComp.WorldAABB.Inflate(-0.15)).ToList();
+                var free = Wave31.Around(mechanism.SlimBlock).Where(c => !headBoxes.Any(h => h.Intersects(Box(grid, c)))).ToList();
+                Check(free.Count >= 1, id + ": no side of the base clear of the head");
+                Check(Wave31.Add(grid, "BatteryBlock/LargeBlockBatteryBlock", free[0] * 2 - Vector3I.Max(mechanism.SlimBlock.Min, Vector3I.Min(mechanism.SlimBlock.Max, free[0])), Base6Directions.Direction.Forward,
+                    Base6Directions.Direction.Up, Identity, b => Motion.Charged(b)) != null, id + ": the battery was not added");
                 var cargos = new List<MyCargoContainer>();
-                foreach (var cell in free.Skip(1))
+                foreach (var cell in free)
                 {
                     var slim = Wave31.Add(grid, "CargoContainer/LargeBlockSmallContainer", cell, Base6Directions.Direction.Forward, Base6Directions.Direction.Up, Identity);
                     if (slim?.FatBlock is MyCargoContainer cargo)
@@ -170,7 +180,8 @@ namespace SentisTests.Regression.Checks
                 // the head: an empty reactor where its conveyor port meets the head's - the ports are in the models, so each
                 // side of the head block away from the base and each way the reactor faces is tried, the first on the head's
                 // conveyors kept; on a head with no conveyor, a reactor on every side
-                bool NearBase(Vector3D at) => Vector3D.Distance(mechanism.PositionComp.GetPosition(), at) < 2;
+                // a head reactor where it is clear of the base's blocks
+                bool NearBase(Vector3I cell) => grid.GetBlocks().Any(b => Shrunk(b).Intersects(Box(head, cell)));
                 var baseEnd = (mechanism as Sandbox.Game.GameSystems.Conveyors.IMyConveyorEndpointBlock)?.ConveyorEndpoint;
                 var topEnd = (top as Sandbox.Game.GameSystems.Conveyors.IMyConveyorEndpointBlock)?.ConveyorEndpoint;
                 var reactors = new List<MyReactor>();
@@ -179,7 +190,7 @@ namespace SentisTests.Regression.Checks
                     Base6Directions.Direction.Forward, Base6Directions.Direction.Backward, Base6Directions.Direction.Left,
                     Base6Directions.Direction.Right, Base6Directions.Direction.Up, Base6Directions.Direction.Down,
                 };
-                foreach (var cell in Wave31.Around(top.SlimBlock).Where(c => !NearBase(head.GridIntegerToWorld(c))).ToList())
+                foreach (var cell in Wave31.Around(top.SlimBlock).Where(c => !NearBase(c)).ToList())
                 {
                     if (topEnd != null && reactors.Count > 0) break;
                     foreach (var face in topEnd == null ? faces.Take(1) : faces)
@@ -200,7 +211,9 @@ namespace SentisTests.Regression.Checks
                         yield return WaitForTicks(1);
                     }
                 }
-                Check(reactors.Count > 0, id + ": no reactor on the head's conveyors");
+                Check(reactors.Count > 0, id + ": no reactor on the head's conveyors; head cells " + string.Join(" ", Wave31.Around(top.SlimBlock).Select(c => c + (NearBase(c) ? " taken" : "")))
+                    + "; base sides " + string.Join(" ", free) + "; head side " + string.Join(" ", headSide) + "; head " + top.PositionComp.WorldAABB.Min + "-" + top.PositionComp.WorldAABB.Max
+                    + "; base blocks " + string.Join(" ", grid.GetBlocks().Select(b => b.BlockDefinition.Id.SubtypeName + "@" + b.Min)));
 
                 double Pulled() => reactors.Sum(r => r.GetInventory(0) is Sandbox.Game.MyInventory inventory ? Amount(inventory, "Ingot/Uranium") : 0);
                 string Reactors() => string.Join(", ", reactors.Select(r => "reactor " + r.EntityId + (r.Closed ? " closed" : r.MarkedForClose ? " closing" : "") +

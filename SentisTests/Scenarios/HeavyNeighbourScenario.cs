@@ -46,6 +46,35 @@ namespace SentisTests.Scenarios
         private float _initialWelderMultiplier;
         private bool _initialOwnAllDlcs;
 
+        /// <summary>
+        /// How far to move the points so that every one is out of every planet near them (past its highest ground, with
+        /// 2 km over it), straight up from the planet that holds the deepest one; zero if none is in.
+        /// </summary>
+        private static Vector3D OutOfPlanets(List<Vector3D> points)
+        {
+            var total = Vector3D.Zero;
+            for (var round = 0; round < 8; round++)
+            {
+                Sandbox.Game.Entities.MyPlanet deepest = null;
+                var need = 0.0;
+                var from = Vector3D.Zero;
+                foreach (var point in points)
+                {
+                    var at = point + total;
+                    var planet = MyGamePruningStructure.GetClosestPlanet(at);
+                    if (planet == null) continue;
+                    var clear = planet.MaximumRadius + 2000 - Vector3D.Distance(at, planet.PositionComp.GetPosition());
+                    if (clear <= need) continue;
+                    need = clear;
+                    deepest = planet;
+                    from = at;
+                }
+                if (deepest == null) break;
+                total += Vector3D.Normalize(from - deepest.PositionComp.GetPosition()) * need;
+            }
+            return total;
+        }
+
         public override string Name => ScenarioName;
         public override int TimeoutSeconds => 900;
 
@@ -86,11 +115,20 @@ namespace SentisTests.Scenarios
                 Index = i,
                 Origin = origin + new Vector3D(i % HeavyPerRow * HeavyStep, 0, i / HeavyPerRow * HeavyStep)
             }).ToList();
+            // out of any planet: 12 km off the welders' blueprint along the world's axis put a part of the heap into the
+            // stand planet's ground (27.10.2026) - voxel bodies in the heavy cluster's world, not what is measured here
+            var shift = OutOfPlanets(sites.Select(s => s.Origin).ToList());
+            if (shift != Vector3D.Zero)
+            {
+                foreach (var site in sites) site.Origin += shift;
+                Note("the heap moved " + shift.Length().ToString("F0") + " m out of a planet");
+            }
             var heapCentre = sites.Aggregate(Vector3D.Zero, (s, x) => s + x.Origin) / sites.Count;
             var lights = Enumerable.Range(0, LightSites).Select(i =>
             {
                 var angle = Math.PI * 2 * i / LightSites;
-                return heapCentre + new Vector3D(Math.Cos(angle), 0, Math.Sin(angle)) * LightAway;
+                var light = heapCentre + new Vector3D(Math.Cos(angle), 0, Math.Sin(angle)) * LightAway;
+                return light + OutOfPlanets(new List<Vector3D> { light });
             }).ToList();
 
             // the players first, invulnerable: the freezer would take a spot nobody is at

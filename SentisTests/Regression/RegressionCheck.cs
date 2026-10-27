@@ -585,8 +585,21 @@ namespace SentisTests.Regression
                 typeof(MyMechanicalConnectionBlockBase).GetMethod("DoRecreateTop", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
                     .Invoke(block, new object[] { Identity, MyMechanicalConnectionBlockBase.MyTopBlockSize.Normal, true });
             yield return Until(() => block.TopGrid != null && ((Sandbox.ModAPI.Ingame.IMyMechanicalConnectionBlock)block).IsAttached ? 1 : 0, v => v > 0,
-                "the head on " + block.BlockDefinition.Id.SubtypeName, 20);
+                "the head on " + block.BlockDefinition.Id.SubtypeName, 20, () => HeadSpot(block));
             Track(block.TopGrid);
+        }
+
+        /// <summary>What is where a mechanism's head goes (it is not placed into anything but its own grid).</summary>
+        private static string HeadSpot(MyMechanicalConnectionBlockBase block)
+        {
+            var spot = block.WorldMatrix.Translation + block.WorldMatrix.Up * block.CubeGrid.GridSize;
+            if (block is Sandbox.Game.Entities.Blocks.MyPistonBase piston && piston.Subpart3 != null)
+                spot = piston.Subpart3.WorldMatrix.Translation + block.WorldMatrix.Up * piston.Subpart3.Model.BoundingBoxSize.Y;
+            var sphere = new BoundingSphereD(spot, block.CubeGrid.GridSize);
+            var near = new List<VRage.Game.Entity.MyEntity>();
+            Sandbox.Game.Entities.MyGamePruningStructure.GetAllTopMostEntitiesInSphere(ref sphere, near);
+            return "head spot " + F(Vector3D.Distance(spot, block.WorldMatrix.Translation)) + " m from the block; there: " +
+                   string.Join(", ", near.Where(e => e != block.CubeGrid).Select(e => e.GetType().Name + " " + e.EntityId + (e.Physics == null ? " no physics" : e.Physics.IsPhantom ? " phantom" : "")));
         }
 
         /// <summary>The size of a block in grid cells, turned the way the part faces.</summary>

@@ -110,6 +110,27 @@ namespace SentisTests.Regression.Checks
             return lines.Count + (lines.Count > 0 ? ": " + string.Join("; ", lines) : "");
         }
 
+        /// <summary>The generator's installations within the distance of the point marked for removal; how many.</summary>
+        private static int StaleAt(object generator, Type type, Vector3D point, double distance)
+        {
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public;
+            var registry = type.GetField("m_installationsRegistry", flags)?.GetValue(generator);
+            var list = registry?.GetType().GetField("m_installations", flags)?.GetValue(registry) as IEnumerable;
+            var remove = registry?.GetType().GetMethod("MarkForRemoval", flags);
+            if (list == null || remove == null) return 0;
+            var count = 0;
+            foreach (var installation in list.Cast<object>().ToList())
+            {
+                var data = installation.GetType().GetField("Data", flags)?.GetValue(installation) ?? installation.GetType().GetProperty("Data", flags)?.GetValue(installation);
+                if (data == null) continue;
+                var position = (Vector3D)data.GetType().GetField("Position").GetValue(data);
+                if (Vector3D.Distance(position, point) > distance) continue;
+                remove.Invoke(registry, new[] { installation });
+                count++;
+            }
+            return count;
+        }
+
         protected override IEnumerator Check()
         {
             SkipUnless(Sandbox.Game.World.MySession.Static.Settings.EnablePlanetaryEncounters, "planetary encounters are off in this world");
@@ -126,6 +147,15 @@ namespace SentisTests.Regression.Checks
             var far = 2 * Site.Planet.PositionComp.GetPosition() - Site.Origin;
             var spot = Site.Planet.GetClosestSurfacePointGlobal(ref far);
             spot += Vector3D.Normalize(spot - Site.Planet.PositionComp.GetPosition()) * 3;
+            // the installations an earlier run left at the spot (one that did not end; their grids gone, the records kept for
+            // the game to set them down again when a player comes): the game keeps a new one off them, and none came in
+            // six tries (27.10.2026). Taken out of the generator's registry, the next frame does it
+            var stale = StaleAt(generator, type, spot, 20000);
+            if (stale > 0)
+            {
+                yield return WaitForTicks(2);
+                Note(stale + " installations of earlier runs taken away from the spot");
+            }
             Sandbox.Definitions.MySpawnGroupDefinition.OnSpawnGroupGridsCreated += created;
             try
             {
