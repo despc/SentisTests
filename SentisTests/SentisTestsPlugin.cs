@@ -220,6 +220,8 @@ namespace SentisTests
                 ScenarioRegistry.Register(AsteroidDrillScenario.ScenarioName, () => new AsteroidDrillScenario());
                 ScenarioRegistry.Register(VoxelStreamOrderScenario.ScenarioName, () => new VoxelStreamOrderScenario());
                 ScenarioRegistry.Register(HeavyNeighbourScenario.ScenarioName, () => new HeavyNeighbourScenario());
+                ScenarioRegistry.Register(HeavyNeighbourScenario.MediumName, HeavyNeighbourScenario.Medium);
+                ScenarioRegistry.Register(ParallelGainScenario.ScenarioName, () => new ParallelGainScenario());
                 ScenarioRegistry.Register(DetachChurnScenario.ScenarioName, () => new DetachChurnScenario());
                 ScenarioRegistry.Register(PurgeUndergroundScenario.ScenarioName, () => new PurgeUndergroundScenario());
                 ScenarioRegistry.Register(ProceduralJumpScenario.ScenarioName, () => new ProceduralJumpScenario());

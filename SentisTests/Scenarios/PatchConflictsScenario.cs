@@ -26,6 +26,16 @@ namespace SentisTests.Scenarios
             var torch = TorchPatched();
             var harmony = HarmonyPatched();
             Note("Torch patches " + torch.Count + " methods, Harmony " + harmony.Count);
+            // focus who=Name,Name: whose patches are on the methods of these names
+            var who = System.Text.RegularExpressions.Regex.Match(Core.TestRunner.Focus ?? "", @"\bwho=([\w,]+)");
+            if (who.Success)
+            {
+                var names = new HashSet<string>(who.Groups[1].Value.Split(','));
+                foreach (var pair in torch.Where(p => names.Contains(p.Key.Name)))
+                    Note("WHO: " + Describe(pair.Key) + " | Torch: " + string.Join(", ", pair.Value));
+                foreach (var pair in harmony.Where(p => names.Contains(p.Key.Name)))
+                    Note("WHO: " + Describe(pair.Key) + " | Harmony: " + string.Join(", ", pair.Value));
+            }
             var both = torch.Keys.Where(harmony.ContainsKey).ToList();
             foreach (var method in both)
                 Note("BOTH: " + Describe(method) + " | runs: " + Runs(method) + " | Torch: " + string.Join(", ", torch[method]) +

@@ -211,13 +211,13 @@ namespace SentisTests.Scenarios
         /// evenly in time across the ore types. Rates come from the live blueprints and world speed
         /// multiplier, so the load tracks the server's settings instead of hard-coded kilograms.
         /// </summary>
-        private static Dictionary<string, double> OreLoad(int refineriesPerGrid)
+        internal static Dictionary<string, double> OreLoad(int refineriesPerGrid, double seconds = ProcessingSeconds)
         {
             var refinery = MyDefinitionManager.Static.GetCubeBlockDefinition(
                 new MyDefinitionId(typeof(Sandbox.Common.ObjectBuilders.MyObjectBuilder_Refinery), "LargeRefinery")) as MyRefineryDefinition;
             Check(refinery != null, "LargeRefinery definition not found");
             var load = new Dictionary<string, double>();
-            var secondsPerOre = ProcessingSeconds / Ores.Length;
+            var secondsPerOre = seconds / Ores.Length;
             foreach (var ore in Ores)
             {
                 var oreId = new MyDefinitionId(typeof(MyObjectBuilder_Ore), ore);
@@ -232,7 +232,7 @@ namespace SentisTests.Scenarios
             return load;
         }
 
-        private static void StockOre(List<MyInventory> containers, Dictionary<string, double> ore)
+        internal static void StockOre(List<MyInventory> containers, Dictionary<string, double> ore)
         {
             foreach (var entry in ore)
             {
@@ -249,7 +249,7 @@ namespace SentisTests.Scenarios
             }
         }
 
-        private static List<MyInventory> InventoriesOf(MyCubeGrid grid)
+        internal static List<MyInventory> InventoriesOf(MyCubeGrid grid)
         {
             var result = new List<MyInventory>();
             foreach (var block in grid.GetFatBlocks())
@@ -264,7 +264,7 @@ namespace SentisTests.Scenarios
             return result;
         }
 
-        private static double CountOre(List<MyInventory> inventories) => CountItems(inventories, "MyObjectBuilder_Ore", Ores);
+        internal static double CountOre(List<MyInventory> inventories) => CountItems(inventories, "MyObjectBuilder_Ore", Ores);
 
         private static double CountItems(List<MyInventory> inventories, string typeId, string[] subtypes)
         {

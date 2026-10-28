@@ -278,7 +278,7 @@ namespace SentisTests.Regression.Checks
     public sealed class ForageCheck : RegressionCheck
     {
         public override string Name => Prefix + "forage";
-        public override int TimeoutSeconds => 120;
+        public override int TimeoutSeconds => 300;
 
         private static List<MyForageableEntity> Plants(Vector3D near, double radius) =>
             MyEntities.GetEntities().OfType<MyForageableEntity>().Where(f => !f.MarkedForClose && !f.WasForaged && Vector3D.Distance(f.PositionComp.GetPosition(), near) < radius).ToList();
@@ -302,17 +302,55 @@ namespace SentisTests.Regression.Checks
             else
             {
                 var planets = MyEntities.GetEntities().OfType<MyPlanet>().ToList();
-                planet = new[] { "Pertam", "Earth", "Alien" }.Select(n => planets.FirstOrDefault(p => p.StorageName.StartsWith(n))).FirstOrDefault(p => p != null);
-                SkipUnless(planet != null, "no planet with forageables in this world (" + string.Join(", ", planets.Select(p => p.StorageName)) + ")");
-                var centre = planet.PositionComp.GetPosition();
-                var guess = centre + Vector3D.Normalize(Site.Origin - centre) * planet.MaximumRadius * 1.1;
-                ground = planet.GetClosestSurfacePointGlobal(ref guess);
-                up = Vector3D.Normalize(ground - centre);
-                yield return Arrive(ground + up * 3);
-                yield return Until(() => (plants = Plants(ground, 600)).Count, v => v > 0, "forageable plants loaded around the player on " + planet.StorageName, 60);
+                // Earth and Alien first: the spot below the site on Pertam grew nothing in 60 s, the check failed whenever no
+                // plant was loaded elsewhere (28.10.2026). A few spots of each, the player moved on from one with none
+                var candidates = new[] { "Earth", "Alien", "Pertam" }.Select(n => planets.FirstOrDefault(p => p.StorageName.StartsWith(n))).Where(p => p != null).ToList();
+                SkipUnless(candidates.Count > 0, "no planet with forageables in this world (" + string.Join(", ", planets.Select(p => p.StorageName)) + ")");
+                var tried = new List<string>();
+                planet = null;
+                ground = up = Vector3D.Zero;
+                var arrived = false;
+                foreach (var candidate in candidates)
+                {
+                    var centre = candidate.PositionComp.GetPosition();
+                    var toward = Vector3D.Normalize(Site.Origin - centre);
+                    var across = Vector3D.CalculatePerpendicularVector(toward);
+                    foreach (var direction in new[] { toward, Vector3D.Normalize(toward + across * 0.3), Vector3D.Normalize(toward - across * 0.3) })
+                    {
+                        var guess = centre + direction * candidate.MaximumRadius * 1.1;
+                        var spot = candidate.GetClosestSurfacePointGlobal(ref guess);
+                        var spotUp = Vector3D.Normalize(spot - centre);
+                        // a body moved from spot to spot dies now and then on the way (full regressions, 28.10.2026): a new player
+                        if (!arrived || !FakeClients.HasLiveCharacter(Me))
+                        {
+                            if (arrived) Note("the player's body died after " + string.Join(", ", tried) + ": another player at the next spot");
+                            yield return Arrive(spot + spotUp * 3);
+                            arrived = true;
+                        }
+                        else Body.PositionComp.SetPosition(spot + spotUp * 3);
+                        // the first spot longer: under a full run's load the planets' sectors come in slowly (28.10.2026: nine
+                        // spots of 20 s with none)
+                        for (var f = Frames(tried.Count == 0 ? 60 : 20); f > 0 && (plants = Plants(spot, 600)).Count == 0; f--) yield return null;
+                        tried.Add(candidate.StorageName + " " + plants.Count);
+                        if (plants.Count == 0) continue;
+                        planet = candidate;
+                        ground = spot;
+                        up = spotUp;
+                        break;
+                    }
+                    if (planet != null) break;
+                }
+                Check(planet != null, "no forageable plants loaded around the player in 20 s at any of the spots tried: " + string.Join(", ", tried));
             }
             var plant = plants.OrderBy(p => Vector3D.Distance(p.PositionComp.GetPosition(), ground)).First();
             up = Vector3D.Normalize(plant.PositionComp.GetPosition() - planet.PositionComp.GetPosition());
+            // the body moved from spot to spot can die on the way (a full regression, 28.10.2026: the anticheat refused
+            // the request, "no live character"): a player of its own then, by the plant
+            if (!FakeClients.HasLiveCharacter(Me))
+            {
+                Note("the player's body died while plants were looked for: another player by the plant");
+                yield return Arrive(plant.PositionComp.GetPosition() + up * 3);
+            }
             StandAt(plant.PositionComp.GetPosition() + up * 1.5 + Vector3D.CalculatePerpendicularVector(up) * 1.5, plant.PositionComp.GetPosition());
             yield return Seconds(1);
             var suit = Inventory(Body);

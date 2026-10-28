@@ -214,7 +214,17 @@ namespace SentisTests.Regression.Checks
                 Note(pairing);
                 SkipUnless(false, pairing);
             }
-            yield return Until(() => radiation.Value, v => v > whole + 1, "the player taking radiation by the damaged reactor", 90,
+            // the players online change all along a full run, and with them the pairing: the frames it could pair them are
+            // counted, and a wait with next to none of them says so instead of failing (28.10.2026: three runs of four)
+            var paired = 0;
+            for (var f = Frames(90); f > 0 && radiation.Value <= whole + 1; f--)
+            {
+                if (Pairing() == null) paired++;
+                yield return null;
+            }
+            SkipUnless(radiation.Value > whole + 1 || paired >= 600, "the game paired the player with the blocks' radiation on " + paired +
+                       " frames of the wait only: the players online kept changing (" + (Pairing() ?? "now they meet") + ")");
+            yield return Until(() => radiation.Value, v => v > whole + 1, "the player taking radiation by the damaged reactor", 1,
                 () => "reactor at " + F(reactor.Integrity / reactor.MaxIntegrity * 100) + " %, the player " + F(Vector3D.Distance(Body.PositionComp.GetPosition(), grid.PositionComp.WorldAABB.Center)) + " m off");
             var took = radiation.Value;
             radiation.Value = 0;

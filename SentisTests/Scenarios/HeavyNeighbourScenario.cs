@@ -31,6 +31,30 @@ namespace SentisTests.Scenarios
     public sealed class HeavyNeighbourScenario : TestScenario
     {
         public const string ScenarioName = "heavy_neighbour";
+
+        /// <summary>
+        /// The same work spread: <see cref="MediumGroups"/> groups of <see cref="MediumPerGroup"/> welding sites on a ring
+        /// <see cref="MediumRing"/> from its middle, a cluster each, a probe in each - the load SentisClusters' parallel
+        /// updates are for (the clusters run side by side), against the one heavy heap that only detaching helps.
+        /// </summary>
+        public const string MediumName = "medium_clusters";
+        private const int MediumGroups = 8;
+        private const int MediumPerGroup = 5;
+        private const double MediumRing = 30000;
+
+        private readonly string _name;
+        private readonly int _groups, _perGroup;
+
+        public HeavyNeighbourScenario() : this(ScenarioName, 1, HeavySites) { }
+
+        private HeavyNeighbourScenario(string name, int groups, int perGroup)
+        {
+            _name = name;
+            _groups = groups;
+            _perGroup = perGroup;
+        }
+
+        public static HeavyNeighbourScenario Medium() => new HeavyNeighbourScenario(MediumName, MediumGroups, MediumPerGroup);
         private const int HeavySites = 36;
         private const int HeavyPerRow = 6;
         private const double HeavyStep = 450;
@@ -48,9 +72,9 @@ namespace SentisTests.Scenarios
 
         /// <summary>
         /// How far to move the points so that every one is out of every planet near them (past its highest ground, with
-        /// 2 km over it), straight up from the planet that holds the deepest one; zero if none is in.
+        /// 2 km over it) and out of their gravity, straight up from the planet that holds the deepest one; zero if none is in.
         /// </summary>
-        private static Vector3D OutOfPlanets(List<Vector3D> points)
+        internal static Vector3D OutOfPlanets(List<Vector3D> points)
         {
             var total = Vector3D.Zero;
             for (var round = 0; round < 8; round++)
@@ -72,10 +96,20 @@ namespace SentisTests.Scenarios
                 if (deepest == null) break;
                 total += Vector3D.Normalize(from - deepest.PositionComp.GetPosition()) * need;
             }
+            // and out of the planets' gravity: a probe in it falls, gathers speed and its path says more than the
+            // simulation's speed (1.4, 9.1 for clusters at full speed, 27.10.2026)
+            for (var round = 0; round < 100; round++)
+            {
+                var pulled = points.Select(p => p + total).FirstOrDefault(p => Sandbox.Game.GameSystems.MyGravityProviderSystem.CalculateNaturalGravityInPoint(p).LengthSquared() > 0);
+                if (pulled == default(Vector3D)) break;
+                var planet = MyGamePruningStructure.GetClosestPlanet(pulled);
+                if (planet == null) break;
+                total += Vector3D.Normalize(pulled - planet.PositionComp.GetPosition()) * 5000;
+            }
             return total;
         }
 
-        public override string Name => ScenarioName;
+        public override string Name => _name;
         public override int TimeoutSeconds => 900;
 
         private sealed class Site
@@ -103,33 +137,40 @@ namespace SentisTests.Scenarios
             _captured = true;
             Sandbox.Engine.Utils.MyFakes.OWN_ALL_DLCS = true;
             RuntimePluginControls.SetWelderRadiusMultiplier(WelderPerfScenario.RadiusMultiplier);
-            _soConfig.Set("ProjectionBuildsPerFrame", HeavySites * WelderPerfScenario.WelderCount);
+            _soConfig.Set("ProjectionBuildsPerFrame", _groups * _perGroup * WelderPerfScenario.WelderCount);
             FakeClients.RemoveAll();
 
             var authored = WorldApi.LoadAuthoredGrid(WelderPerfScenario.ProjectionResource, WorldApi.EntityPrefix + "perf-projection");
             var pose = authored.PositionAndOrientation.Value;
             var origin = TestRunner.RunOrigin ?? new Vector3D(pose.Position.X + 12000.0, pose.Position.Y, pose.Position.Z);
             var up = (Vector3D)(Vector3)pose.Up;
-            var sites = Enumerable.Range(0, HeavySites).Select(i => new Site
+            // one heap (heavy_neighbour) or a ring of groups (medium_clusters), each group its sites in rows
+            var perRow = _groups == 1 ? HeavyPerRow : 3;
+            var groupCentres = Enumerable.Range(0, _groups).Select(g => _groups == 1 ? origin
+                : origin + new Vector3D(Math.Cos(Math.PI * 2 * g / _groups), 0, Math.Sin(Math.PI * 2 * g / _groups)) * MediumRing).ToList();
+            var sites = Enumerable.Range(0, _groups * _perGroup).Select(i => new Site
             {
                 Index = i,
-                Origin = origin + new Vector3D(i % HeavyPerRow * HeavyStep, 0, i / HeavyPerRow * HeavyStep)
+                Origin = groupCentres[i / _perGroup] + new Vector3D(i % _perGroup % perRow * HeavyStep, 0, i % _perGroup / perRow * HeavyStep)
             }).ToList();
             // out of any planet: 12 km off the welders' blueprint along the world's axis put a part of the heap into the
             // stand planet's ground (27.10.2026) - voxel bodies in the heavy cluster's world, not what is measured here
-            var shift = OutOfPlanets(sites.Select(s => s.Origin).ToList());
+            // the heap and the light spots moved together, one shift for all: each light spot moved on its own was
+            // pulled back by the planet's gravity onto the heap and landed in its cluster (light-2, 28.10.2026)
+            var heapCentre = sites.Aggregate(Vector3D.Zero, (s, x) => s + x.Origin) / sites.Count;
+            var lights = Enumerable.Range(0, _groups == 1 ? LightSites : 0).Select(i =>
+            {
+                var angle = Math.PI * 2 * i / LightSites;
+                return heapCentre + new Vector3D(Math.Cos(angle), 0, Math.Sin(angle)) * LightAway;
+            }).ToList();
+            var shift = OutOfPlanets(sites.Select(s => s.Origin).Concat(lights).ToList());
             if (shift != Vector3D.Zero)
             {
                 foreach (var site in sites) site.Origin += shift;
-                Note("the heap moved " + shift.Length().ToString("F0") + " m out of a planet");
+                heapCentre += shift;
+                lights = lights.Select(l => l + shift).ToList();
+                Note("the heap and the light spots moved " + shift.Length().ToString("F0") + " m out of a planet and its gravity");
             }
-            var heapCentre = sites.Aggregate(Vector3D.Zero, (s, x) => s + x.Origin) / sites.Count;
-            var lights = Enumerable.Range(0, LightSites).Select(i =>
-            {
-                var angle = Math.PI * 2 * i / LightSites;
-                var light = heapCentre + new Vector3D(Math.Cos(angle), 0, Math.Sin(angle)) * LightAway;
-                return light + OutOfPlanets(new List<Vector3D> { light });
-            }).ToList();
 
             // the players first, invulnerable: the freezer would take a spot nobody is at
             var spots = sites.Select(s => s.Origin + up * 150).Concat(lights).ToList();
@@ -211,8 +252,11 @@ namespace SentisTests.Scenarios
                 yield return null;
             }
 
-            // the probes: one in the heap, one at every light spot, drifting
-            var probes = new List<Probe> { SpawnProbe("heavy", heapCentre + up * 400) };
+            // the probes: one in the heap (or in each group), one at every light spot, drifting
+            var probes = _groups == 1
+                ? new List<Probe> { SpawnProbe("heavy", heapCentre + up * 400) }
+                : Enumerable.Range(0, _groups).Select(g => SpawnProbe("group-" + g,
+                    sites.Where(s => s.Index / _perGroup == g).Aggregate(Vector3D.Zero, (a, s) => a + s.Origin) / _perGroup + up * 400)).ToList();
             for (var i = 0; i < lights.Count; i++) probes.Add(SpawnProbe("light-" + i, lights[i] + up * 40));
             yield return WaitForTicks(10);
             foreach (var p in probes) Push(p);
@@ -233,7 +277,7 @@ namespace SentisTests.Scenarios
             while (waitWorking.MoveNext()) yield return waitWorking.Current;
             foreach (var welder in welders)
                 if (!WorldApi.ToolIsActivated(welder)) WorldApi.ToolStartShooting(welder);
-            Note("HEAVY NEIGHBOUR | " + HeavySites + " welding sites in a heap " + HeavyStep + " m apart, " + welders.Count + " welders, " +
+            Note("HEAVY NEIGHBOUR | " + sites.Count + " welding sites in " + (_groups == 1 ? "a heap" : _groups + " groups " + MediumRing / 1000 + " km from the middle") + ", " + HeavyStep + " m apart, " + welders.Count + " welders, " +
                  LightSites + " light spots " + LightAway / 1000 + " km off, " + FakeClients.Count + " players");
 
             // a few seconds for the welding to get going, then the measured stretch
@@ -258,7 +302,9 @@ namespace SentisTests.Scenarios
             }
             var seconds = watch.Elapsed.TotalSeconds;
             var metrics = TickMetrics.Take();
-            var speeds = probes.Select(p => p.Name + " " + SimSpeed(p, seconds).ToString("F2")).ToList();
+            // the natural gravity where each probe is (0 for a path that measures the simulation alone)
+            var speeds = probes.Select(p => p.Name + " " + SimSpeed(p, seconds).ToString("F2") +
+                                            (Sandbox.Game.GameSystems.MyGravityProviderSystem.CalculateNaturalGravityInPoint(p.Grid.PositionComp.GetPosition()).LengthSquared() > 0 ? " (in gravity)" : "")).ToList();
             var remainingAfter = sites.Sum(s => s.Projector.ProjectedGrid != null ? ((Sandbox.ModAPI.Ingame.IMyProjector)s.Projector).RemainingBlocks : 0);
             Note("HEAVY NEIGHBOUR RESULT | sim speed by probe: " + string.Join(", ", speeds) + " | welded " + (remainingBefore - remainingAfter) +
                  " blocks in " + seconds.ToString("F0") + " s (" + remainingAfter + " left), platforms grew by " + (sites.Sum(s => s.Platform.BlocksCount) - platformBlocksBefore) + " blocks | welders: " + WelderDelta(welderBefore, WelderCounters()) + " | " + metrics.Format() +

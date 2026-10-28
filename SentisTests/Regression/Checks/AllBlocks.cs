@@ -113,6 +113,11 @@ namespace SentisTests.Regression.Checks
                     if (p.Block is MyFunctionalBlock) Switch(p.Block, true);
                 }
                 yield return Seconds(2);
+                // a block's power check (MyBlockPowerCheckComponent: a contract block, a services terminal) sees the power in
+                // its 100-frame update, spread over 100 frames: one that came into the list past its turn waits a round more,
+                // close to 200 frames - one block of 288 now and then under load (28.10.2026). Up to 5 s more for those
+                for (var f = Frames(5); f > 0 && placed.Any(p => p.Block.IsFunctional && !p.Block.IsWorking && !(p.Block is MyFunctionalBlock fb && !fb.Enabled)); f--)
+                    yield return null;
                 foreach (var p in placed)
                 {
                     if (!p.Block.IsFunctional)
