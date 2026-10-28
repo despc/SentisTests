@@ -115,6 +115,14 @@ namespace SentisTests.Regression
         /// </summary>
         protected virtual bool NeedsBags => false;
 
+        /// <summary>
+        /// Essentials' limit of bags out of reach for a run. Not int.MaxValue: Essentials makes each owner's list of bags
+        /// with the limit for its capacity, and that threw OutOfMemoryException as each bag came into the world - from the
+        /// game's pass of entity updates, which it stopped: every entity after it missed its update, a ship's thrust never
+        /// got one (reg_dampeners_off in the full regression, 28.10.2026).
+        /// </summary>
+        internal const int BagLimitOff = 100000;
+
         private Scenarios.ConfigOverride _essentials;
 
         /// <summary>The cap of loose items while a check that needs them runs: out of reach.</summary>
@@ -201,7 +209,7 @@ namespace SentisTests.Regression
             if (!InSuite && NeedsBags && Integrations.IsLoaded(Scenarios.ConfigOverride.Essentials))
             {
                 _essentials = new Scenarios.ConfigOverride(Scenarios.ConfigOverride.Essentials);
-                _essentials.Set("BackpackLimit", int.MaxValue);
+                _essentials.Set("BackpackLimit", BagLimitOff);
             }
             Note(Site.ToString());
             yield return Check();
@@ -803,6 +811,45 @@ namespace SentisTests.Regression
         }
 
         /// <summary>The grid's body as the physics sees it, for a failure line.</summary>
+        /// <summary>
+        /// Waits for the ship to be one the game flies: a fake player within 100 m of it (in it counts), its physics
+        /// cluster stepped (MyPhysics.IsClusterActive: with selective physics a world nobody is in stands still) and the
+        /// ship not frozen by SentisOptimisations' freezer (logic or physics). Fails with what is missing.
+        /// </summary>
+        protected IEnumerator ReadyToFly(MyCubeGrid grid, int seconds = 10)
+        {
+            yield return Until(() => FlyBlocker(grid) == null ? 1 : 0, v => v > 0, "the ship ready to fly (a player near, its cluster stepped, not frozen)", seconds,
+                () => FlyBlocker(grid) ?? "ready");
+        }
+
+        /// <summary>What keeps the game from flying the ship now; null if nothing.</summary>
+        protected static string FlyBlocker(MyCubeGrid grid)
+        {
+            var at = grid.PositionComp.GetPosition();
+            var near = Sandbox.Game.World.MySession.Static.Players.GetOnlinePlayers()
+                .Any(p => p.Character != null && !p.Character.IsDead && Vector3D.Distance(p.Character.PositionComp.GetPosition(), at) < 100);
+            if (!near) return "no player within 100 m";
+            var world = grid.Physics?.HavokWorld;
+            if (world == null) return "no physics world";
+            var physics = Sandbox.Game.World.MySession.Static.GetComponent<Sandbox.Engine.Physics.MyPhysics>();
+            var active = typeof(Sandbox.Engine.Physics.MyPhysics).GetMethod("IsClusterActive", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null,
+                new[] { typeof(int), typeof(int) }, null);
+            foreach (var cluster in Sandbox.Engine.Physics.MyPhysics.Clusters.GetClusters())
+                if (ReferenceEquals(cluster.UserData, world) && physics != null && active != null &&
+                    !(bool)active.Invoke(physics, new object[] { cluster.ClusterId, world.CharacterRigidBodies.Count }))
+                    return "its cluster " + cluster.ClusterId + " not stepped";
+            try
+            {
+                if (Scenarios.FreezerState.IsFrozen(grid)) return "frozen by the freezer";
+                if (Scenarios.FreezerState.IsPhysicsFrozen(grid)) return "its physics frozen by the freezer";
+            }
+            catch (Core.ScenarioSkippedException)
+            {
+                // no SentisOptimisations: nothing freezes it
+            }
+            return null;
+        }
+
         protected static string PhysicsState(MyCubeGrid grid)
         {
             var physics = grid.Physics;

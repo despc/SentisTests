@@ -26,6 +26,10 @@ namespace SentisTests.Regression.Checks
         {
             SkipUnless(System.AppDomain.CurrentDomain.GetAssemblies().Any(a => a.GetName().Name == "SentisClusters"),
                 "the vanilla game finds the world's entities by id on the game thread only (its store is the game thread's own after the load)");
+            // SentisClusters shares the store only with its clusters' updates on (Enabled and Parallel): off, the game runs as it does
+            var config = Core.Integrations.TypeOf("SentisClusters", "SentisClusters.SentisClustersPlugin")?.GetProperty("Config")?.GetValue(null);
+            bool On(string name) => config?.GetType().GetProperty(name)?.GetValue(config) as bool? == true;
+            SkipUnless(On("Enabled") && On("Parallel"), "SentisClusters' parallel updates are off: the game finds the world's entities by id on the game thread only");
             yield return null;
             const BindingFlags st = BindingFlags.Static | BindingFlags.NonPublic;
             var type = typeof(MyEntityIdentifier);

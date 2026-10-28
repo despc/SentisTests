@@ -212,6 +212,40 @@ namespace SentisTests.Regression.Checks
     /// </summary>
     public sealed class DampenersOffCheck : RegressionCheck
     {
+        // what the ship's thrust component knows of its thrusters
+        private static string ThrustState(Sandbox.Game.GameSystems.MyEntityThrustComponent thrust)
+        {
+            const System.Reflection.BindingFlags any = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public;
+            object F(string name) => thrust.GetType().BaseType?.GetField(name, any)?.GetValue(thrust) ?? thrust.GetType().GetField(name, any)?.GetValue(thrust);
+            return "thrusters " + thrust.ThrustCount + ", max forward " + thrust.GetMaxThrustInDirection(Base6Directions.Direction.Forward).ToString("F0") +
+                   " backward " + thrust.GetMaxThrustInDirection(Base6Directions.Direction.Backward).ToString("F0") +
+                   ", fuel types " + ((F("m_dataByFuelType") as System.Collections.ICollection)?.Count.ToString() ?? "?") +
+                   ", conveyor groups " + ((F("m_connectedGroups") as System.Collections.ICollection)?.Count.ToString() ?? "?") +
+                   ", thrusts changed " + F("m_thrustsChanged") + ", strengths " +
+                   string.Join("/", thrust.Entity is MyCubeGrid g ? g.GetFatBlocks().OfType<Sandbox.Game.Entities.MyThrust>().Select(t => t.CurrentStrength.ToString("F2")) : new string[0]);
+        }
+
+        // the grid's queue of updates before the step (MyCubeGrid.Schedule: the ship controller's UpdateControls is there)
+        // and the game's sets of parallel updates it is in
+        private static string QueueState(MyCubeGrid grid)
+        {
+            const System.Reflection.BindingFlags any = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public;
+            var queues = typeof(MyCubeGrid).GetField("m_updateQueues", any)?.GetValue(grid) as System.Collections.IList;
+            var before = queues?[0] as System.Collections.IList;
+            var names = new List<string>();
+            if (before != null)
+                foreach (var update in before)
+                {
+                    var callback = update.GetType().GetField("Callback").GetValue(update) as Delegate;
+                    var parallel = (bool)update.GetType().GetField("Parallel").GetValue(update);
+                    names.Add((callback?.Target?.GetType().Name ?? "static") + "." + (callback?.Method.Name ?? "?") + (parallel ? "/p" : ""));
+                }
+            var orchestrator = MyEntities.Orchestrator;
+            string In(string field) => (orchestrator.GetType().GetField(field, any)?.GetValue(orchestrator) as HashSet<Sandbox.Game.Entities.IMyParallelUpdateable>)?.Contains(grid).ToString() ?? "?";
+            return "queue before [" + string.Join(" ", names) + "], parallel queued " + typeof(MyCubeGrid).GetField("m_totalQueuedParallelUpdates", any)?.GetValue(grid) +
+                   ", in the game's parallel sets " + In("m_entitiesForUpdateParallel") + "/" + In("m_entitiesForUpdateParallelFirst") + "/" + In("m_entitiesForUpdateParallelLast");
+        }
+
         public override string Name => Prefix + "dampeners_off";
 
         protected override IEnumerator Check()
@@ -225,16 +259,30 @@ namespace SentisTests.Regression.Checks
                 new Part("Thrust/LargeBlockSmallThrust", -1, 0, 0).Facing(Base6Directions.Direction.Forward));
             var seat = Block<MyCockpit>(ship);
             yield return Sit(seat);
+            yield return ReadyToFly(ship);
             var thrust = ship.Components.Get<Sandbox.Game.GameSystems.MyEntityThrustComponent>();
             Check(thrust != null && thrust.DampenersEnabled, "the ship's dampeners are not on from the start");
             seat.SwitchDamping();
             yield return WaitForTicks(2);
             Check(!thrust.DampenersEnabled, "the dampeners did not switch off");
             Check(!((MyObjectBuilder_CubeGrid)ship.GetObjectBuilder()).DampenersEnabled, "the grid's save has the dampeners on");
-            yield return HoldShip(2, seat, new Vector3(0, 0, -1));
+            // the keys held for 2 s, what the thrust made of them each frame kept (the first frames and the most)
+            var trace = new List<string>();
+            var most = 0f;
+            for (var i = Frames(2); i > 0; i--)
+            {
+                ShipKeys(seat, new Vector3(0, 0, -1));
+                yield return null;
+                most = Math.Max(most, thrust.FinalThrust.Length());
+                if (trace.Count < 6) trace.Add("ctl " + thrust.ControlThrust.Length().ToString("F2") + " fin " + thrust.FinalThrust.Length().ToString("F0") + " last " + seat.LastMotionIndicator.Length().ToString("F0"));
+            }
             var speed = Motion.Speed(ship);
             Check(speed > 1, "2 s of forward thrust gave the ship " + F(speed) + " m/s (" + PhysicsState(ship) + ", control thrust " + thrust.ControlThrust + ", final thrust " + thrust.FinalThrust +
-                             ", thrust enabled " + thrust.Enabled + ", seat move " + typeof(MyShipController).GetProperty("MoveIndicator", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic)?.GetValue(seat) + ", last motion " + seat.LastMotionIndicator +
+                             ", thrust enabled " + thrust.Enabled + ", frames: " + string.Join("; ", trace) + ", most final thrust " + most.ToString("F0") + ", " + ThrustState(thrust) + ", " + QueueState(ship) + ", seat controls thrusters " + seat.ControlThrusters + ", ship control " + typeof(MyShipController).GetField("m_enableShipControl", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)?.GetValue(seat) +
+                             ", extended control " + Sandbox.Game.World.MySession.Static.Players.HasExtendedControl(seat, ship) + ", controlling player " + (Sandbox.Game.World.MySession.Static.Players.GetControllingPlayer(ship)?.DisplayName ?? "none") +
+                             ", the thrust component the grid's now " + ReferenceEquals(thrust, ship.Components.Get<Sandbox.Game.GameSystems.MyEntityThrustComponent>()) +
+                             ", the seat's " + ReferenceEquals(thrust, typeof(MyShipController).GetProperty("EntityThrustComponent", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public)?.GetValue(seat)) +
+                             ", main cockpit " + seat.IsMainCockpit + "/" + ship.HasMainCockpit() + ", resource state " + ship.GridSystems.ResourceDistributor.ResourceState + ", autopilot " + thrust.AutopilotEnabled + ", seat updates " + seat.NeedsUpdate + ", grid updates " + ship.NeedsUpdate + ", grid parallel updates " + ship.UpdateFlags + ", grid presence tier " + ship.PlayerPresenceTier + ", seat in scene " + seat.InScene + ", seat move " + typeof(MyShipController).GetProperty("MoveIndicator", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic)?.GetValue(seat) + ", last motion " + seat.LastMotionIndicator +
                              ", the control system's controller " + (ship.GridSystems.ControlSystem?.GetShipController() == null ? "none" : ReferenceEquals(ship.GridSystems.ControlSystem.GetShipController().ControllableEntity, seat) ? "this seat" : "another") +
                              ", pilot " + (seat.Pilot?.DisplayName ?? "none") + ", controlled by " + (seat.ControllerInfo.Controller?.Player?.DisplayName ?? "nobody") +
                              "; " + string.Join("; ", ship.GetFatBlocks().OfType<Sandbox.Game.Entities.MyThrust>().Select(t => State(t))) + ")");

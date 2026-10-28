@@ -209,6 +209,24 @@ namespace SentisTests.Regression.Checks
     /// </summary>
     public sealed class ReputationDamageCheck : RegressionCheck
     {
+        private static MySlimBlock Watched;
+        private static float SeenFirst, SeenLast;
+        private static bool _hooked;
+
+        private static void Hook()
+        {
+            if (_hooked) return;
+            _hooked = true;
+            Sandbox.Game.GameSystems.MyDamageSystem.Static.RegisterBeforeDamageHandler(int.MinValue, (object target, ref VRage.Game.ModAPI.MyDamageInformation info) =>
+            {
+                if (Watched != null && ReferenceEquals(target, Watched)) SeenFirst = info.Amount;
+            });
+            Sandbox.Game.GameSystems.MyDamageSystem.Static.RegisterBeforeDamageHandler(int.MaxValue, (object target, ref VRage.Game.ModAPI.MyDamageInformation info) =>
+            {
+                if (Watched != null && ReferenceEquals(target, Watched)) SeenLast = info.Amount;
+            });
+        }
+
         public override string Name => Prefix + "reputation_damage";
         protected override bool NeedsDamage => true;
 
@@ -240,16 +258,32 @@ namespace SentisTests.Regression.Checks
             factions.SetReputationBetweenPlayerAndFaction(Identity, _faction.FactionId, 0, ReputationChangeReason.Admin);
             yield return null;
             var integrity0 = block.Integrity;
+            // what the damage handlers saw of it, first and last (did it reach them, who took it down)
+            Watched = block;
+            SeenFirst = SeenLast = -1;
+            Hook();
             for (var i = 0; i < 5; i++) block.DoDamage(perPoint * 1.01f, MyDamageType.Bullet, true, null, Body.EntityId);
-            yield return null;
+            Watched = null;
+            // the damage is the block's accumulated damage first (MySlimBlock.AccumulatedDamage), its grid takes it off
+            // the integrity in its own update after: a frame later as a rule, in the loaded suite later (frames counted)
+            var frames = 0;
+            do
+            {
+                yield return null;
+                frames++;
+            } while (integrity0 - block.Integrity <= 0 && frames < Frames(5));
             var lost = integrity0 - block.Integrity;
             var rep = factions.GetRelationBetweenPlayerAndFaction(Identity, _faction.FactionId).Item2;
-            Check(lost > 0, "the block took no damage");
+            Check(lost > 0, "the block took no damage in " + frames + " frames (accumulated " + block.AccumulatedDamage + "; the damage handlers saw " + SeenFirst + " first, " + SeenLast + " last; safe zones allow it " +
+                            Sandbox.Game.Entities.MySessionComponentSafeZones.IsActionAllowed(grid, VRage.Game.ObjectBuilders.Components.MySafeZoneAction.Damage, 0L, 0uL) +
+                            ", with the attacker " + Sandbox.Game.Entities.MySessionComponentSafeZones.IsActionAllowed(grid, VRage.Game.ObjectBuilders.Components.MySafeZoneAction.Damage, Body.EntityId, 0uL) +
+                            ", the attacker's place " + Sandbox.Game.Entities.MySessionComponentSafeZones.IsActionAllowed(Body, VRage.Game.ObjectBuilders.Components.MySafeZoneAction.Damage, 0L, 0uL) +
+                            ", grid destructible " + grid.DestructibleBlocks + ", block destruction " + MySession.Static.Settings.DestructibleBlocks + ")");
             Check(rep < 0, "the player's reputation with " + _faction.Tag + " is " + rep + " after " + lost + " damage to its grid (" + perPoint + " a point)");
             // the game's own count of these 5 hits is 2 points apiece, 10; in the suite it came to 11 once (22.10.2026,
             // where the extra point came from is not known): a margin of two points
             Check(rep >= -5 * step * 2 - 2 * step, "the player's reputation with " + _faction.Tag + " fell to " + rep + " for 5 points of damage");
-            Result(lost + " damage to a grid of " + _faction.Tag + " (" + perPoint + " a point, step " + step + "): reputation 0 -> " + rep);
+            Result(lost + " damage to a grid of " + _faction.Tag + " (" + perPoint + " a point, step " + step + ", on the integrity in " + frames + " frames): reputation 0 -> " + rep);
         }
 
         public override void Cleanup()
