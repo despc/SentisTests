@@ -33,7 +33,7 @@ namespace SentisTests.Regression.Checks
         {
             yield return Arrive(Site.At(-20, 20, -20));
             var definitions = MyDefinitionManager.Static.GetAllDefinitions().OfType<MyCubeBlockDefinition>()
-                .Where(d => d.Public && d.CubeSize == _size && d.Components != null && d.Components.Length > 0)
+                .Where(d => d.Public && d.CubeSize == _size && d.Components != null && d.Components.Length > 0 && !Game.Mods.AdminBlock(d))
                 .OrderBy(d => d.Id.TypeId.ToString()).ThenBy(d => d.Id.SubtypeName).ToList();
             // what is ground off goes into a large container of the check's (an inventory needs an owner to take items)
             var stock = Build("build-stock", Site.Origin - Site.Forward * 40, true, new[] { new Part("CargoContainer/LargeBlockLargeContainer", 0, 0, 0) });

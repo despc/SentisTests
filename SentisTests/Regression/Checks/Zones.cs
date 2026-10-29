@@ -95,7 +95,7 @@ namespace SentisTests.Regression.Checks
 
             var frame = Build("zone-frame", Site.At(0, 0, 10), true, new Part("CubeBlock/LargeBlockArmorBlock", 0, 0, 0).At(0.05f));
             var frameBlock = frame.GetCubeBlock(Vector3I.Zero);
-            Put(Inventory(Body), "Component/SteelPlate", 30);
+            Put(Inventory(Body), "Component/SteelPlate", ArmorPlates);
             yield return Equip("WelderItem");
             yield return AimAt(frameBlock);
             var built = frameBlock.Integrity;
@@ -122,7 +122,7 @@ namespace SentisTests.Regression.Checks
             done.Add("ship grinder");
             var weldRig = ToolRig("zone-welder", "ShipWelder/LargeShipWelder", Site.At(0, 0, 10) - Site.Right * 1.5, Site.Right);
             var shipWelder = Block<SpaceEngineers.Game.Entities.Blocks.MyShipWelder>(weldRig);
-            Put(Inventory(shipWelder), "Component/SteelPlate", 30);
+            Put(Inventory(shipWelder), "Component/SteelPlate", ArmorPlates);
             Switch(shipWelder, true);
             built = frameBlock.Integrity;
             yield return Seconds(4);
@@ -130,7 +130,7 @@ namespace SentisTests.Regression.Checks
             done.Add("ship welder");
 
             // building
-            Put(Inventory(Body), "Component/SteelPlate", 30);
+            Put(Inventory(Body), "Component/SteelPlate", ArmorPlates);
             var definition = Definition("CubeBlock/LargeBlockArmorBlock");
             var cell = new Vector3I(0, 1, 0);
             var location = new MyCubeGrid.MyBlockLocation(definition.Id, cell, cell, cell, Quaternion.Identity, 0, Identity);
@@ -211,7 +211,7 @@ namespace SentisTests.Regression.Checks
             Release();
             done.Add("hand grinder");
 
-            Put(Inventory(Body), "Component/SteelPlate", 30);
+            Put(Inventory(Body), "Component/SteelPlate", ArmorPlates);
             yield return Equip("WelderItem");
             yield return AimAt(block);
             var ground = block.Integrity;

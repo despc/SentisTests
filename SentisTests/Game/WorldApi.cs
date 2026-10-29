@@ -627,12 +627,19 @@ namespace SentisTests.Game
         public static MatrixD PlanetAnchor(string name)
         {
             var anchor = LoadAuthoredGroup(SentisTests.Scenarios.WheelPerfScenario.ResourceName, name)[0].PositionAndOrientation.Value.GetMatrix();
-            if (MyGamePruningStructure.GetClosestPlanet(anchor.Translation) != null) return anchor;
-            var planet = MyEntities.GetEntities().OfType<MyPlanet>().OrderByDescending(p => p.MaximumRadius).FirstOrDefault();
+            // a planet of about the Earth's gravity: the modded V5 has one of 10 g (SentisHercules) by the anchor, where an
+            // astronaut dies of a fall, a jetpack does not lift and a rover does not stop
+            bool Earthly(MyPlanet p) => p?.Generator != null && p.Generator.SurfaceGravity >= 0.5f && p.Generator.SurfaceGravity <= 1.5f;
+            var near = MyGamePruningStructure.GetClosestPlanet(anchor.Translation);
+            if (near != null && Earthly(near)) return anchor;
+            var planets = MyEntities.GetEntities().OfType<MyPlanet>().ToList();
+            var planet = planets.Where(Earthly).OrderBy(p => Math.Abs(p.Generator.SurfaceGravity - 1)).ThenByDescending(p => p.MaximumRadius).FirstOrDefault()
+                         ?? (near != null ? null : planets.OrderByDescending(p => p.MaximumRadius).FirstOrDefault());
             if (planet == null) return anchor;
             var probe = planet.PositionComp.GetPosition() + Vector3D.Normalize(new Vector3D(-0.52, 0.71, 0.47)) * planet.MaximumRadius;
             var surface = planet.GetClosestSurfacePointGlobal(ref probe);
-            Log.Info("the wheel_perf anchor is near no planet in this world: placed on the surface of {0} instead", planet.StorageName);
+            Log.Info("the wheel_perf anchor is near no planet of about the Earth's gravity in this world ({0}): placed on the surface of {1} ({2} g) instead",
+                near == null ? "none" : near.StorageName + " " + near.Generator?.SurfaceGravity + " g", planet.StorageName, planet.Generator?.SurfaceGravity);
             return MatrixD.CreateTranslation(surface);
         }
 

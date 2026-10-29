@@ -45,7 +45,7 @@ namespace SentisTests.Regression.Checks
                 new Part("CubeBlock/LargeBlockArmorBlock", 0, 0, 0), new Part("CargoContainer/LargeBlockSmallContainer", 1, 0, 0));
             var mine = Build("npc-build-mine", Site.At(0, 0, 10), true,
                 new Part("CubeBlock/LargeBlockArmorBlock", 0, 0, 0), new Part("CargoContainer/LargeBlockSmallContainer", 1, 0, 0));
-            Put(Inventory(Body), "Component/SteelPlate", 30);
+            Put(Inventory(Body), "Component/SteelPlate", ArmorPlates);
             _gameplay = new Scenarios.ConfigOverride(Scenarios.ConfigOverride.Gameplay);
             _gameplay.Set("DisableBuildBlockOnNPC", true);
 
@@ -298,7 +298,7 @@ namespace SentisTests.Regression.Checks
             var lit = Build("beacon-lit", Site.At(0, 0, 12), true,
                 new Part("CubeBlock/LargeBlockArmorBlock", 0, 0, 0), new Part("Beacon/LargeBlockBeacon", 1, 0, 0),
                 new Part("BatteryBlock/LargeBlockBatteryBlock", 3, 0, 0).With(b => Motion.Charged(b)));
-            Put(Inventory(Body), "Component/SteelPlate", 30);
+            Put(Inventory(Body), "Component/SteelPlate", ArmorPlates);
             _gameplay = new Scenarios.ConfigOverride(Scenarios.ConfigOverride.Gameplay);
             _gameplay.Set("EnableCheckBeacon", true);
             var definition = Definition("CubeBlock/LargeBlockArmorBlock");

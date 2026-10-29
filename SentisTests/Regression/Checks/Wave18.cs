@@ -43,7 +43,14 @@ namespace SentisTests.Regression.Checks
             }
             // until each has taken some 100 kg of its ore
             Func<(MyBlueprintDefinitionBase Blueprint, MyRefinery Refinery), double> taken = l => 500 - (double)l.Refinery.InputInventory.GetItemAmount(l.Blueprint.Prerequisites[0].Id);
-            yield return Until(() => lines.Min(taken), v => v >= 100, "every refinery through 100 kg of its ore, the slowest", 150,
+            // 100 kg, or what the blueprint's time lets the refinery take in a minute (a mod's concentrates go slow)
+            Func<(MyBlueprintDefinitionBase Blueprint, MyRefinery Refinery), double> goal = l =>
+            {
+                var perSecond = (double)l.Blueprint.Prerequisites[0].Amount / Math.Max(0.001, l.Blueprint.BaseProductionTimeInSeconds) *
+                                definition.RefineSpeed * MySession.Static.RefinerySpeedMultiplier * l.Refinery.UpgradeValues["Productivity"];
+                return Math.Min(100, perSecond * 60);
+            };
+            yield return Until(() => lines.Min(l => taken(l) - goal(l)), v => v >= 0, "every refinery through 100 kg of its ore or a minute of it, the furthest off, kg", 150,
                 () => string.Join(", ", lines.Select(l => l.Blueprint.Prerequisites[0].Id.SubtypeName + " " + F(taken(l)))));
             foreach (var l in lines) l.Refinery.Enabled = false;
             yield return Seconds(1);

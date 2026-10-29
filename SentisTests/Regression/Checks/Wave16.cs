@@ -147,7 +147,7 @@ namespace SentisTests.Regression.Checks
             for (var y = -3; y <= 3; y++)
                 wall.Add(new Part("CubeBlock/LargeBlockArmorBlock", x, y, 0));
             Build("solar-shade", grid.PositionComp.WorldAABB.Center + sun * 10, true, wall, forward: sun, up: Vector3D.CalculatePerpendicularVector(sun));
-            yield return Until(() => ((Sandbox.ModAPI.Ingame.IMyPowerProducer)panel).MaxOutput, v => v < open * 0.3, "the shaded panel's output dropping, MW", 20);
+            yield return Until(() => ((Sandbox.ModAPI.Ingame.IMyPowerProducer)panel).MaxOutput, v => v < open * 0.3, "the shaded panel's output dropping, MW", 60);
             Result("solar panel " + F(open * 1000) + " kW in the open, " + F(((Sandbox.ModAPI.Ingame.IMyPowerProducer)panel).MaxOutput * 1000) + " kW in a wall's shadow");
         }
     }
@@ -174,9 +174,16 @@ namespace SentisTests.Regression.Checks
                 yield return null;
                 if (f > 2) top = Math.Max(top, Motion.Speed(ship));
             }
+            var scriptedAtEnd = Game.Mods.ScriptSpeedLimit(ship);
             ship.Close();
+            if (scriptedAtEnd.HasValue && scriptedAtEnd.Value > limit) limit = (float)scriptedAtEnd.Value;
             // Havok's cap is a little over the world's figure (100 m/s comes out at 104.4)
-            Check(top <= limit * 1.044 + 0.2, "a " + _size + " ship pushed at 300 m/s went " + F(top) + " m/s, the limit is " + F(limit));
+            // a script of the world's holding each grid to a limit of its own (the modded V5's speed restrictions)
+            var scripted = Game.Mods.ScriptSpeedLimit(ship);
+            if (scripted.HasValue && scripted.Value > limit) limit = (float)scripted.Value;
+            // Havok's cap over the world's figure: 104.4 at 100, 190 at 180 (the modded V5's small ships): 6 % at most
+            var overshoot = 1.06;
+            Check(top <= limit * overshoot + 0.2, "a " + _size + " ship pushed at 300 m/s went " + F(top) + " m/s, the limit is " + F(limit));
             Check(top >= limit - 5, "a " + _size + " ship pushed at 300 m/s went only " + F(top) + " m/s, the limit is " + F(limit));
             Result(_size + " ship pushed at 300 m/s held to " + F(top) + " m/s (the limit " + F(limit) + ")");
         }

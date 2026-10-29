@@ -95,6 +95,7 @@ namespace SentisTests.Regression.Checks
 
         protected override IEnumerator Check()
         {
+            SkipUnless(!Game.Mods.WeaponCore, "WeaponCore runs the weapons in this world: the custom turret's launcher is not the game's");
             // at the game's low quality (its own under load) bullets check what they hit a third as often and fly through walls
             HoldHighQuality();
             yield return Arrive(Site.At(-15, 10, -15));

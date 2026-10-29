@@ -156,7 +156,12 @@ namespace SentisTests.Regression.Checks
             Check(Math.Abs(drop) < 1.5, "on the jetpack with the dampeners the player drifted " + F(drop) + " m down in 2 s (" + Body.GetCurrentMovementState() + ")");
             yield return Hold(3, new Vector3(0, 1, 0), jetpack: true, dampeners: true);
             var lift = height() - held;
-            Check(lift > 3, "3 s of up on the jetpack lifted the player " + F(lift) + " m in the planet's gravity");
+            // a mod's jetpack may only hold its astronaut up (the modded V5's: 3200 N a direction): lifting looked at only
+            // when the jetpack's up thrust is over the astronaut's weight by a tenth
+            var thrust = Body.Definition?.Jetpack?.ThrustProperties?.ForceMagnitude ?? float.MaxValue;
+            var weight = (Body.Physics?.Mass ?? 100) * Body.Physics.Gravity.Length();
+            if (thrust > weight * 1.1) Check(lift > 3, "3 s of up on the jetpack lifted the player " + F(lift) + " m in the planet's gravity");
+            else Note("the jetpack's " + F(thrust) + " N against the astronaut's " + F(weight) + " N: it holds, it does not lift (lifted " + F(lift) + " m)");
             Result("in " + F(Body.Physics.Gravity.Length()) + " m/s2 the jetpack held the player (" + F(drop) + " m in 2 s) and lifted them " + F(lift) + " m in 3 s");
         }
     }

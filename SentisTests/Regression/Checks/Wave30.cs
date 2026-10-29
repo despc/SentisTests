@@ -34,6 +34,8 @@ namespace SentisTests.Regression.Checks
         {
             yield return Arrive(Site.At(0, 0, -3));
             var body = Body;
+            // the cold's damage is what is looked at: this player is not kept from it as the others are
+            FeelTemperature.Add(Player.Id.SteamId);
             Check(Sandbox.Game.SessionComponents.MySectorWeatherComponent.TemperatureToLevel(Sandbox.Game.SessionComponents.MySectorWeatherComponent.GetTemperatureInPoint(body.PositionComp.GetPosition())) == MyTemperatureLevel.ExtremeFreeze,
                 "open space here is not of the extreme cold (temperature " + F(Sandbox.Game.SessionComponents.MySectorWeatherComponent.GetTemperatureInPoint(body.PositionComp.GetPosition())) + ")");
             if (!_registered)
@@ -84,7 +86,12 @@ namespace SentisTests.Regression.Checks
         {
             yield return Arrive(Site.At(0, 3, -6));
             var parts = new List<Part> { new Part("BatteryBlock/LargeBlockBatteryBlock", 0, 0, 0).With(b => Motion.Charged(b)) };
-            for (var i = 0; i < 21; i++) parts.Add(new Part("VirtualMass/VirtualMassLarge", 1 + i % 7, 0, i / 7));
+            // masses enough to ask a little more than the battery gives: 21 of 0.6 MW over the game's 12 MW (a mod's battery
+            // gives 72: 121 of them)
+            var batteryMax = ((Sandbox.Definitions.MyBatteryBlockDefinition)Definition("BatteryBlock/LargeBlockBatteryBlock")).MaxPowerOutput;
+            var massNeeds = ((Sandbox.Definitions.MyVirtualMassDefinition)Definition("VirtualMass/VirtualMassLarge")).RequiredPowerInput;
+            var count = (int)Math.Floor(batteryMax / massNeeds + 1e-3) + 1;   // 72 / 0.6 in floats is 119.99999
+            for (var i = 0; i < count; i++) parts.Add(new Part("VirtualMass/VirtualMassLarge", 1 + i % 7, 0, i / 7));
             parts.Add(new Part("Gyro/LargeBlockGyro", 0, 0, 1));
             parts.Add(new Part("JumpDrive/LargeJumpDrive", -3, 0, 1));
             // a ship: a station's gyroscopes ask for nothing
@@ -93,7 +100,7 @@ namespace SentisTests.Regression.Checks
             var masses = Blocks<SpaceEngineers.Game.Entities.Blocks.MyVirtualMass>(grid);
             var gyro = Block<Sandbox.Game.Entities.MyGyro>(grid);
             var jump = Block<Sandbox.Game.Entities.MyJumpDrive>(grid);
-            Check(battery != null && masses.Count == 21 && gyro != null && jump != null, "the grid did not come up whole: " + masses.Count + " masses");
+            Check(battery != null && masses.Count == count && gyro != null && jump != null, "the grid did not come up whole: " + masses.Count + " masses");
             var power = MyResourceDistributorComponent.ElectricityId;
             // the gyroscopes of a grid draw through one sink, the grid's gyroscope system's
             MyResourceSinkComponent Sink(MyCubeBlock b) => b is Sandbox.Game.Entities.MyGyro ? grid.GridSystems.GyroSystem.ResourceSink

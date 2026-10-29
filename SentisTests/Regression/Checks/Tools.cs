@@ -138,7 +138,7 @@ namespace SentisTests.Regression.Checks
             yield return Arrive(Site.At(0, 0, -4));
             var grid = Build("hand-weld", Site.Origin, true, new Part("CubeBlock/LargeBlockArmorBlock", 0, 0, 0).At(0.05f));
             var block = grid.GetCubeBlock(Vector3I.Zero);
-            Put(Inventory(Body), "Component/SteelPlate", 30);
+            Put(Inventory(Body), "Component/SteelPlate", ArmorPlates);
             yield return Equip("WelderItem");
             yield return AimAt(block);
             var plates = Amount(Inventory(Body), "Component/SteelPlate");

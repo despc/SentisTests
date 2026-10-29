@@ -66,6 +66,7 @@ namespace SentisTests.Regression.Checks
 
         protected override IEnumerator Check()
         {
+            SkipUnless(!Game.Mods.WeaponCoreManages(Definition("Searchlight/LargeSearchlight").Id), "WeaponCore runs the searchlights in this world");
             yield return Arrive(Site.At(0, 10, 20));
             var station = BuildFor(WorldApi.TestIdentityId(), "searchlight-target", Site.At(60, 0, 80),
                 new Part("BatteryBlock/LargeBlockBatteryBlock", 0, 0, 0).With(b => Motion.Charged(b)),

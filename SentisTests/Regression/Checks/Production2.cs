@@ -72,7 +72,10 @@ namespace SentisTests.Regression.Checks
                 refineries[Modules[i].Upgrade] = refinery;
                 yield return Until(() => refinery.UpgradeValues[Modules[i].Upgrade] - bareValues[Modules[i].Upgrade], v => v > 0.001,
                     Modules[i].Upgrade + " of the refinery over a bare one's " + F(bareValues[Modules[i].Upgrade]), 15);
-                foreach (var other in Modules.Where(m => m.Upgrade != Modules[i].Upgrade))
+                // the module changes what its definition lists (a mod's productivity module changes the power efficiency too)
+                var listed = (Sandbox.Definitions.MyDefinitionManager.Static.GetCubeBlockDefinition(VRage.Game.MyDefinitionId.Parse("MyObjectBuilder_" + Modules[i].Module))
+                    as Sandbox.Definitions.MyUpgradeModuleDefinition)?.Upgrades?.Select(u => u.UpgradeType).ToList() ?? new List<string> { Modules[i].Upgrade };
+                foreach (var other in Modules.Where(m => m.Upgrade != Modules[i].Upgrade && !listed.Contains(m.Upgrade)))
                     Check(Math.Abs(refinery.UpgradeValues[other.Upgrade] - bareValues[other.Upgrade]) < 0.001,
                         Modules[i].Module + " changed the refinery's " + other.Upgrade + " to " + F(refinery.UpgradeValues[other.Upgrade]));
                 notes.Add(Modules[i].Upgrade + " " + F(bareValues[Modules[i].Upgrade]) + " -> " + F(refinery.UpgradeValues[Modules[i].Upgrade]));

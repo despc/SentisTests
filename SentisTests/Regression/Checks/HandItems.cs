@@ -39,7 +39,7 @@ namespace SentisTests.Regression.Checks
                     // each tool's block a place of its own along the line: the last one's grid may not be gone yet
                     var grid = Build("tier", Site.Origin + Site.Right * (5 * times.Count), true, new Part("CubeBlock/LargeBlockArmorBlock", 0, 0, 0).At(weld ? 0.05f : 1f));
                     var block = grid.GetCubeBlock(Vector3I.Zero);
-                    if (weld) Put(Inventory(Body), "Component/SteelPlate", 30);
+                    if (weld) Put(Inventory(Body), "Component/SteelPlate", ArmorPlates);
                     yield return Equip(item);
                     yield return AimAt(block);
                     var started = MySandboxGameTime();

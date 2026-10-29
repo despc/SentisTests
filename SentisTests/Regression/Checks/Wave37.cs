@@ -107,8 +107,18 @@ namespace SentisTests.Regression.Checks
             yield return Join(Site.At(-4, 4, -6), i => stranger = i);
             var faction = Found(Me);
             Enter(member, faction, Me);
+            // a block one of the player's researches unlocks: sharing passes on researches (m_unlockedResearch), not blocks
+            // unlocked one by one - the test identity has every block unlocked at once (DebugUnlockAllResearchSync), and a
+            // block outside its researches is not shared (the modded V5's research tree, 29.10.2026)
+            const System.Reflection.BindingFlags any = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            var researched = (typeof(MySessionComponentResearch).GetField("m_unlockedResearch", any)?.GetValue(research)
+                as System.Collections.Generic.Dictionary<long, System.Collections.Generic.HashSet<VRage.Game.MyDefinitionId>>)?.TryGetValue(Identity, out var keys) == true ? keys : null;
+            var unlocks = typeof(MySessionComponentResearch).GetField("m_unlocks", any)?.GetValue(research)
+                as System.Collections.Generic.Dictionary<VRage.Game.MyDefinitionId, System.Collections.Generic.List<VRage.Game.MyDefinitionId>>;
+            var shareable = new System.Collections.Generic.HashSet<VRage.Game.MyDefinitionId>(researched == null || unlocks == null ? Enumerable.Empty<VRage.Game.MyDefinitionId>()
+                : researched.Where(unlocks.ContainsKey).SelectMany(k => unlocks[k]));
             var block = Sandbox.Definitions.MyDefinitionManager.Static.GetAllDefinitions().OfType<Sandbox.Definitions.MyCubeBlockDefinition>()
-                .FirstOrDefault(d => d.Public && research.RequiresResearch(d.Id) && research.CanUse(Identity, d.Id));
+                .FirstOrDefault(d => d.Public && research.RequiresResearch(d.Id) && research.CanUse(Identity, d.Id) && shareable.Contains(d.Id));
             SkipUnless(block != null, "the player has no researched block to share");
             foreach (var other in new[] { IdentityOf(member), IdentityOf(stranger) })
             {
@@ -117,8 +127,18 @@ namespace SentisTests.Regression.Checks
             }
             Check(!research.CanUse(IdentityOf(member), block.Id), "after the reset the member can still use " + block.Id.SubtypeName);
             Request(typeof(MySessionComponentResearch), "CallShareResearch", IdentityOf(stranger));
-            Request(typeof(MySessionComponentResearch), "CallShareResearch", IdentityOf(member));
-            yield return Until(() => research.CanUse(IdentityOf(member), block.Id) ? 1 : 0, v => v > 0, block.Id.SubtypeName + " shared with the faction's member", 5);
+            // the game shares one layer of a deep tree at a time: a block whose own unlocker the member cannot use yet is
+            // skipped (UnlockResearch), and the next share takes it (a mod's tiers on the modded V5): shared again a while
+            for (var share = 0; share < 10 && !research.CanUse(IdentityOf(member), block.Id); share++)
+            {
+                Request(typeof(MySessionComponentResearch), "CallShareResearch", IdentityOf(member));
+                yield return Seconds(1);
+            }
+            yield return Until(() => research.CanUse(IdentityOf(member), block.Id) ? 1 : 0, v => v > 0, block.Id.SubtypeName + " shared with the faction's member", 5,
+                () => "the player's faction " + (MySession.Static.Factions.GetPlayerFaction(Identity)?.Tag ?? "none") + ", the member's " +
+                      (MySession.Static.Factions.GetPlayerFaction(IdentityOf(member))?.Tag ?? "none") + "; the player's research " +
+                      ((typeof(MySessionComponentResearch).GetField("m_unlockedResearch", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)?.GetValue(research)
+                          as System.Collections.Generic.Dictionary<long, System.Collections.Generic.HashSet<VRage.Game.MyDefinitionId>>)?.TryGetValue(Identity, out var mine) == true ? mine.Count + " unlocked" : "none"));
             Check(!research.CanUse(IdentityOf(stranger), block.Id), "the research was shared with a player out of the faction");
             Result("research (" + block.Id.SubtypeName + " among it) shared with the faction's member; not with a stranger");
         }

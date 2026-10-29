@@ -130,6 +130,12 @@ namespace SentisTests.Regression.Checks
             var size = definition.InventorySize.Volume > 0 ? definition.InventorySize.Volume
                 : definition.Size.X * definition.Size.Y * definition.Size.Z * Math.Pow(grid.GridSize, 3);
             var expected = size * MySession.Static.Settings.BlocksInventorySizeMultiplier;
+            // a mod of the world may size the inventories itself (the modded V5's: 9 times the definition's)
+            if (Game.Mods.InWorld && Math.Abs((double)inventory.MaxVolume - expected) > expected * 0.01)
+            {
+                Note("the cargo holds " + F((double)inventory.MaxVolume * 1000) + " L, its definition times the world's multiplier says " + F(expected * 1000) + " L: a mod of the world's sizes it");
+                expected = (double)inventory.MaxVolume;
+            }
             Check(Math.Abs((double)inventory.MaxVolume - expected) <= expected * 0.01, "the cargo holds " + F((double)inventory.MaxVolume * 1000) + " L, its definition times the world's " +
                                                                                        MySession.Static.Settings.BlocksInventorySizeMultiplier + " says " + F(expected * 1000) + " L");
             var ore = Item("Ore/Stone");

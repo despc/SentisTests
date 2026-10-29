@@ -37,11 +37,16 @@ namespace SentisTests.Regression.Checks
             { "MyObjectBuilder_OffensiveCombatBlock", "its AI behaviour switched on" },
         };
 
+        /// <summary>A thruster burning a gas (its definition's fuel: a mod's hydrogen thrusters not named so).</summary>
+        private static bool Fuelled(MyCubeBlockDefinition definition) =>
+            definition is MyThrustDefinition thrust && thrust.FuelConverter?.FuelId != null && !thrust.FuelConverter.FuelId.IsNull() &&
+            thrust.FuelConverter.FuelId.SubtypeId != "Electricity";
+
         protected override IEnumerator Check()
         {
             yield return Arrive(Site.At(-20, 20, -20));
             var definitions = MyDefinitionManager.Static.GetAllDefinitions().OfType<MyCubeBlockDefinition>()
-                .Where(d => d.Public && d.CubeSize == _size && typeof(MyObjectBuilder_FunctionalBlock).IsAssignableFrom(d.Id.TypeId))
+                .Where(d => d.Public && d.CubeSize == _size && typeof(MyObjectBuilder_FunctionalBlock).IsAssignableFrom(d.Id.TypeId) && !Game.Mods.AdminBlock(d))
                 .OrderBy(d => d.Id.TypeId.ToString()).ThenBy(d => d.Id.SubtypeName).ToList();
             // focus from=N count=M: a part of the list (to find which block a fault comes with)
             int Arg(string name, int otherwise) => System.Text.RegularExpressions.Regex.Match(Core.TestRunner.Focus ?? "", name + @"=(\d+)") is var m && m.Success ? int.Parse(m.Groups[1].Value) : otherwise;
@@ -105,7 +110,7 @@ namespace SentisTests.Regression.Checks
                         typeof(Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase).GetMethod("DoRecreateTop", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
                             .Invoke(mechanical, new object[] { Identity, Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase.MyTopBlockSize.Normal, true });
                 // the heads are made as grids of their own a while later (longer under load): waited for, each
-                for (var f = Frames(15); f > 0 && placed.Any(p => p.Block is Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase m && m.TopGrid == null); f--)
+                for (var f = Frames(40); f > 0 && placed.Any(p => p.Block is Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase m && m.TopGrid == null); f--)
                     yield return null;
                 foreach (var p in placed)
                 {
@@ -126,7 +131,7 @@ namespace SentisTests.Regression.Checks
                     else if (!p.Block.IsWorking)
                     {
                         var what = NeedMore.TryGetValue(p.Definition.Id.TypeId.ToString(), out var need) ? need
-                            : p.Block is MyThrust && p.Definition.Id.SubtypeName.Contains("Hydrogen") ? "hydrogen (reg_hydrogen_thrust flies on it)" : null;
+                            : p.Block is MyThrust && (p.Definition.Id.SubtypeName.Contains("Hydrogen") || Fuelled(p.Definition)) ? "hydrogen (reg_hydrogen_thrust flies on it)" : null;
                         if (what != null) needing.Add(Short(p.Definition) + " (" + what + ")");
                         else broken.Add(Short(p.Definition) + ": on and powered and not working (" + State(p.Block) + Around(p.Block) + ")");
                     }

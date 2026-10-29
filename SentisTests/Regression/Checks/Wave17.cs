@@ -43,13 +43,27 @@ namespace SentisTests.Regression.Checks
             // each filled to 80 %
             Func<Sandbox.Game.MyInventory, string, double> eighty = (inventory, item) =>
                 (double)inventory.MaxVolume * 0.8 / Sandbox.Definitions.MyDefinitionManager.Static.GetPhysicalItemDefinition(Item(item)).Volume;
-            var ingots = Math.Floor(eighty(refinery.OutputInventory, "Ingot/Iron"));
+            // what the refinery makes and its output takes: iron ingots, or what a mod's refinery makes (concentrates)
+            var product = Sandbox.Definitions.MyDefinitionManager.Static.GetCubeBlockDefinition(refinery.BlockDefinition.Id) is Sandbox.Definitions.MyRefineryDefinition rd
+                ? rd.BlueprintClasses.SelectMany(c => c).SelectMany(b => b.Results).Select(r => r.Id)
+                    .FirstOrDefault(id => id.TypeId.ToString() == "MyObjectBuilder_Ingot" && refinery.OutputInventory.CanItemsBeAdded(1, id))
+                : default(VRage.Game.MyDefinitionId);
+            var ingot = product.TypeId.IsNull ? "Ingot/Iron" : product.TypeId.ToString().Replace("MyObjectBuilder_", "") + "/" + product.SubtypeName;
+            var ingots = Math.Floor(eighty(refinery.OutputInventory, ingot));
             var plates = Math.Floor(eighty(assembler.OutputInventory, "Component/SteelPlate"));
-            Put(refinery.OutputInventory, "Ingot/Iron", ingots);
+            Put(refinery.OutputInventory, ingot, ingots);
+            Note("put " + F(ingots) + " " + ingot + " into the refinery's output (max " + F((double)refinery.OutputInventory.MaxVolume * 1000) + " L): it holds " + F(Amount(refinery.OutputInventory, ingot)));
+            // where the ingots are, every inventory of the grid's, when they are not in the container
+            Func<string> where = () => string.Join(", ", grid.GetFatBlocks().Where(b => b.HasInventory).SelectMany(b => Enumerable.Range(0, b.InventoryCount).Select(i => (b, i)))
+                .Select(x => x.b.BlockDefinition.Id.SubtypeName + "#" + x.i + " " + F((double)((Sandbox.Game.MyInventory)x.b.GetInventory(x.i)).GetItemAmount(Item(ingot)))));
             Put(assembler.OutputInventory, "Component/SteelPlate", plates);
-            yield return Until(() => Amount(cargo, "Ingot/Iron"), v => v > 0, "the refinery's ingots sent into the container", 30, () => State(refinery) + ", ingots kept " + F(Amount(refinery.OutputInventory, "Ingot/Iron")));
+            // sent down the conveyors: into the container, or into another machine that takes them first (the assembler
+            // took a mod's cobalt on V5)
+            Func<double> sent = () => grid.GetFatBlocks().Where(b => b.HasInventory && b != refinery)
+                .SelectMany(b => Enumerable.Range(0, b.InventoryCount).Select(i => (double)((Sandbox.Game.MyInventory)b.GetInventory(i)).GetItemAmount(Item(ingot)))).Sum();
+            yield return Until(sent, v => v > 0, "the refinery's ingots sent down the conveyors", 30, () => State(refinery) + ", " + ingot + " kept " + F(Amount(refinery.OutputInventory, ingot)) + "; " + where());
             yield return Until(() => Amount(cargo, "Component/SteelPlate"), v => v > 0, "the assembler's plates sent into the container", 30, () => State(assembler) + ", plates kept " + F(Amount(assembler.OutputInventory, "Component/SteelPlate")));
-            Result("outputs at 80 %: into the container " + F(Amount(cargo, "Ingot/Iron")) + " kg of iron from the refinery, " + Amount(cargo, "Component/SteelPlate") + " plates from the assembler");
+            Result("outputs at 80 %: into the container " + F(Amount(cargo, ingot)) + " kg of " + ingot + " from the refinery, " + Amount(cargo, "Component/SteelPlate") + " plates from the assembler");
         }
     }
 
@@ -138,8 +152,16 @@ namespace SentisTests.Regression.Checks
             var get = typeof(Sandbox.Game.World.MySession).GetMethods().FirstOrDefault(m => m.Name == "GetComponent" && m.IsGenericMethodDefinition && m.GetParameters().Length == 0);
             var generator = type == null || get == null ? null : get.MakeGenericMethod(type).Invoke(Sandbox.Game.World.MySession.Static, null);
             SkipUnless(generator != null, "no planetary encounters in this game");
+            // the game's choice of a spawn group for a planet (MyPlanetaryEncountersGenerator.GetSamplerForPlanet): those whose
+            // list of planets names one the planet's name holds, else those with no list - a mod's planet none lists
+            // (Satreus on the modded V5) gets only the latter, and there may be none
+            var planetName = Site.Planet.Name ?? "";
+            var encounters = Sandbox.Definitions.MyDefinitionManager.Static.GetSpawnGroupDefinitions().Where(g => g.IsPlanetaryEncounter).ToList();
+            var listed = encounters.Where(g => g.PlanetaryInstallationSettings.Planets != null && g.PlanetaryInstallationSettings.Planets.Any(p => planetName.Contains(p))).ToList();
+            var forIt = listed.Count > 0 ? listed : encounters.Where(g => g.PlanetaryInstallationSettings.Planets == null || g.PlanetaryInstallationSettings.Planets.Count == 0).ToList();
+            SkipUnless(forIt.Count > 0, "no planetary encounter of this game may come on " + planetName + " (the sites' planet)");
             yield return Arrive(Site.Origin + Site.Up * 3);
-            Note("installations the generator knows: " + Installations(generator, type));
+            Note("installations the generator knows: " + Installations(generator, type) + "; spawn groups for " + planetName + ": " + forIt.Count);
             var grids = new System.Collections.Generic.List<MyCubeGrid>();
             Action<System.Collections.Generic.List<MyCubeGrid>, Sandbox.Definitions.MySpawnGroupDefinition, Sandbox.Definitions.MySpawnGroupDefinition.SpawnGroupPrefab, long> created =
                 (list, group, prefab, owner) => { if (group.IsPlanetaryEncounter) grids.AddRange(list); };

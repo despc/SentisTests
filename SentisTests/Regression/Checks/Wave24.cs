@@ -75,9 +75,12 @@ namespace SentisTests.Regression.Checks
             Check(back.BlocksCount == blocks, "the ship came back with " + back.BlocksCount + " blocks, not " + blocks);
             Check(back.BigOwners.Contains(Identity), "the ship came back not the player's");
             var plates = Total(back, "Component/SteelPlate");
-            Check(Math.Abs(plates - 10) < 0.01, "the ship came back with " + F(plates) + " plates, not 10");
+            // the world's GridStorageAllowsInventory: off (the modded V5), a stored grid comes back empty
+            var keeps = MySession.Static.Settings.GetType().GetField("GridStorageAllowsInventory")?.GetValue(MySession.Static.Settings) as bool? ?? true;
+            var expectedPlates = keeps ? 10 : 0;
+            Check(Math.Abs(plates - expectedPlates) < 0.01, "the ship came back with " + F(plates) + " plates, not " + expectedPlates + " (the world " + (keeps ? "lets" : "does not let") + " stored grids keep their inventory)");
             var away = Vector3D.Distance(back.PositionComp.GetPosition(), terminal.PositionComp.GetPosition());
-            Result("stored and fetched back: " + blocks + " blocks, the player's, 10 plates, " + F(away) + " m from the terminal; the record gone");
+            Result("stored and fetched back: " + blocks + " blocks, the player's, " + expectedPlates + " plates, " + F(away) + " m from the terminal; the record gone");
         }
 
         private static T Block<T>(MyCubeGrid grid, Func<T, bool> which) where T : class =>

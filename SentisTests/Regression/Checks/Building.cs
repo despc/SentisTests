@@ -262,7 +262,9 @@ namespace SentisTests.Regression.Checks
             var middle = (grid.GridIntegerToWorld(cells[0]) + grid.GridIntegerToWorld(cells[cells.Count - 1])) / 2;
             var rig = ToolRig("projector-welder", "ShipWelder/LargeShipWelder", middle + Site.Up * 1.5, -Site.Up);
             var welder = Block<SpaceEngineers.Game.Entities.Blocks.MyShipWelder>(rig);
-            Put(Inventory(welder), "Component/SteelPlate", 80);
+            // every component the hologram's blocks ask for (a mod's armor asks twice the game's plates)
+            foreach (var need in hologram.CubeBlocks.SelectMany(b => b.BlockDefinition.Components).GroupBy(c => c.Definition.Id))
+                Inventory(welder).AddItems(need.Sum(c => c.Count) + 10, (MyObjectBuilder_PhysicalObject)VRage.ObjectBuilders.MyObjectBuilderSerializer.CreateNewObject(need.Key));
             Switch(welder, true);
             yield return Until(() => cells.Count(c => grid.GetCubeBlock(c)?.IsFullIntegrity == true), v => v >= cells.Count,
                 "projected blocks built and finished", 120, () => State(welder));

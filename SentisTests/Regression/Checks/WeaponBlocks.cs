@@ -69,11 +69,17 @@ namespace SentisTests.Regression.Checks
                     var fits = Math.Min(10, Math.Floor((double)ammoBox.ComputeAmountThatFits(magazine)));
                     if (fits > 0) ammoBox.AddItems((VRage.MyFixedPoint)fits, (MyObjectBuilder_PhysicalObject)VRage.ObjectBuilders.MyObjectBuilderSerializer.CreateNewObject(magazine));
                 }
-                var wall = BuildFor(WorldApi.TestIdentityId(), "weapon-wall", at + Site.Forward * 150,
-                    Bodies.Wall("CubeBlock/LargeHeavyBlockArmorBlock", 2, 1).Concat(new[]
-                    {
-                        new Part("BatteryBlock/LargeBlockBatteryBlock", 0, 0, -1).With(b => ((Sandbox.Common.ObjectBuilders.MyObjectBuilder_BatteryBlock)b).CurrentStoredPower = 3f),
-                    }).ToArray());
+                // a weapon WeaponCore runs fires at a threat only (TargetInfo.OffenseRating: a grid armed itself) and leaves a
+                // neutral alone: its wall the pirates', with a copy of the weapon on it, no ammunition
+                var wc = Game.Mods.WeaponCoreManages(definition.Id);
+                var wallParts = Bodies.Wall("CubeBlock/LargeHeavyBlockArmorBlock", 2, 1).Concat(new[]
+                {
+                    new Part("BatteryBlock/LargeBlockBatteryBlock", 0, 0, -1).With(b => ((Sandbox.Common.ObjectBuilders.MyObjectBuilder_BatteryBlock)b).CurrentStoredPower = 3f),
+                }).ToList();
+                // the wall is a large grid: a small weapon's lane gets a large weapon of WeaponCore's as the threat
+                var threat = definition.CubeSize == MyCubeSize.Large ? definition : weapons.FirstOrDefault(d => d.CubeSize == MyCubeSize.Large && Game.Mods.WeaponCoreManages(d.Id));
+                if (wc && threat != null) wallParts.Add(new Part(threat.Id.TypeId.ToString() + "/" + threat.Id.SubtypeName, 0, 0, -8));
+                var wall = BuildFor(wc ? Sandbox.Game.World.MyPirateAntennas.GetPiratesId() : WorldApi.TestIdentityId(), "weapon-wall", at + Site.Forward * 150, wallParts.ToArray());
                 lanes.Add(new Lane
                 {
                     Definition = definition,
@@ -86,6 +92,24 @@ namespace SentisTests.Regression.Checks
                 });
             }
             yield return Seconds(1);
+            // WeaponCore's weapons load its own magazines, not the game's definition's: those, once its AI has the grid
+            foreach (var lane in lanes.Where(l => Game.Mods.WeaponCoreManages(l.Definition.Id)))
+            {
+                var magazines = Game.Mods.WeaponCoreMagazines(lane.Gun);
+                if (magazines.Count == 0 || !(lane.Gun.GetInventory(0) is Sandbox.Game.MyInventory box)) continue;
+                lane.Magazine = magazines[0];
+                var fits = Math.Min(10, Math.Floor((double)box.ComputeAmountThatFits(lane.Magazine)));
+                // a mod's turret whose WeaponCore magazine its own inventory does not take (the reskinned missile turrets on
+                // V5: Missile200mm) fires for nobody: noted, not a fault of the game's
+                if (fits <= 0)
+                {
+                    Note(lane.Definition.Id.SubtypeName + ": its WeaponCore magazine " + lane.Magazine.SubtypeName + " does not go into its inventory - it fires for nobody (the mod's set-up)");
+                    lane.Done = lane.Definition.Id.SubtypeName + " (its magazine does not fit)";
+                    continue;
+                }
+                if (fits > 0) box.AddItems((VRage.MyFixedPoint)fits, (MyObjectBuilder_PhysicalObject)VRage.ObjectBuilders.MyObjectBuilderSerializer.CreateNewObject(lane.Magazine));
+                lane.Ammo = (double)box.GetItemAmount(lane.Magazine);
+            }
             foreach (var lane in lanes)
             {
                 Switch(lane.Gun, true);

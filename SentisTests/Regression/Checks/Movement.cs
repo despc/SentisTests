@@ -62,7 +62,11 @@ namespace SentisTests.Regression.Checks
             Check(Motion.Speed(body) <= 0.3, "the dampeners did not stop the astronaut: " + F(Motion.Speed(body)) + " m/s after 10 s");
             // the suit's gas is counted now and then, not every frame: looked at once the flight is over
             yield return Hold(2, Vector3.Zero, jetpack: true, dampeners: true, face: Site.Forward);
-            Check(Motion.Hydrogen(body) < hydrogen, "the jetpack flew on no hydrogen (" + hydrogen.ToString("F6") + " in the suit before and after)");
+            // a jetpack that burns next to nothing (the modded V5's: 0.00001 of the game's at most, a tank of 125) shows no
+            // change in the suit's share of hydrogen over a few seconds
+            var burns = body.Definition?.Jetpack?.ThrustProperties?.MaxPowerConsumption ?? 1f;
+            if (burns >= 1e-4f) Check(Motion.Hydrogen(body) < hydrogen, "the jetpack flew on no hydrogen (" + hydrogen.ToString("F6") + " in the suit before and after)");
+            else Note("the jetpack burns at most " + burns + " (its definition): the suit's hydrogen not looked at");
             Result("jetpack: " + F(gone) + " m forward in 3 s at " + F(speed) + " m/s, hydrogen " + hydrogen.ToString("F4") + " -> " +
                    Motion.Hydrogen(body).ToString("F4") + ", stopped by the dampeners");
         }

@@ -95,6 +95,17 @@ namespace SentisTests.Regression
         public virtual bool NeedsOwnCluster => false;
 
         /// <summary>
+        /// Steel plates enough to weld a light armor block whole by hand, with some over: what its definition asks (25 in
+        /// the game, 50 on the modded V5), 30 at least.
+        /// </summary>
+        /// <summary>SentisGameplayImprovements destroys what a connector throws out instead of throwing it (ConnectorDestroyInsteadThrow).</summary>
+        protected static bool DestroyInsteadOfThrow =>
+            Integrations.IsLoaded(Scenarios.ConfigOverride.Gameplay) && Scenarios.ConfigOverride.Get(Scenarios.ConfigOverride.Gameplay, "ConnectorDestroyInsteadThrow") is bool b && b;
+
+        protected static int ArmorPlates => Math.Max(30, (int)Definition("CubeBlock/LargeBlockArmorBlock").Components
+            .Where(c => c.Definition.Id.SubtypeName == "SteelPlate").Sum(c => c.Count) + 10);
+
+        /// <summary>
         /// Skips the check when the clusters of the physics are too big for its distances: a check that crosses a cluster
         /// border <paramref name="apartM"/> m away needs clusters smaller than that - SentisClusters' 5 km ones; the game's
         /// own are 20 km, and both ends stay in one (a stand without SentisClusters, 29.10.2026).
@@ -237,8 +248,32 @@ namespace SentisTests.Regression
         /// The check's fake player joins with a character at the point (an astronaut held there; in gravity too), and owns
         /// what the check builds from then on.
         /// </summary>
+        /// <summary>
+        /// The checks' fake players take no damage from the planets' temperature: a planet site of the modded V5 burns 5 of
+        /// their health a while, and a check of an astronaut's fall or flight there lost its player half way (29.10.2026).
+        /// Registered once, for the session.
+        /// </summary>
+        private static void GuardTemperature()
+        {
+            if (_temperatureGuarded || Sandbox.Game.GameSystems.MyDamageSystem.Static == null) return;
+            _temperatureGuarded = true;
+            var temperature = VRage.Utils.MyStringHash.GetOrCompute("Temperature");
+            Sandbox.Game.GameSystems.MyDamageSystem.Static.RegisterBeforeDamageHandler(0, (object target, ref VRage.Game.ModAPI.MyDamageInformation info) =>
+            {
+                if (info.Type == temperature && target is MyCharacter character && character.ControlSteamId != 0 && FakeClients.IsFake(character.ControlSteamId) &&
+                    !FeelTemperature.Contains(character.ControlSteamId))
+                    info.Amount = 0;
+            });
+        }
+
+        private static bool _temperatureGuarded;
+
+        /// <summary>The fake players a check of the temperature's own damage leaves to it (steam ids).</summary>
+        protected static readonly HashSet<ulong> FeelTemperature = new HashSet<ulong>();
+
         protected IEnumerator Arrive(Vector3D at)
         {
+            GuardTemperature();
             var index = FakeClients.Count;
             FakeClients.Add(1, Network, i => (at, 0, 0), withCharacters: true);
             Me = index;

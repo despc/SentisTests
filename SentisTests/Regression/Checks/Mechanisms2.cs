@@ -98,6 +98,14 @@ namespace SentisTests.Regression.Checks
             Func<double> thrown = () => MyEntities.GetEntities().OfType<MyFloatingObject>()
                 .Where(o => !o.MarkedForClose && Vector3D.Distance(o.PositionComp.GetPosition(), near) < 30 && o.Item.Content.SubtypeName == "Stone")
                 .Sum(o => (double)o.Item.Amount);
+            if (DestroyInsteadOfThrow)
+            {
+                // SentisGameplayImprovements' ConnectorDestroyInsteadThrow (the modded V5): what is thrown out is gone, not loose
+                yield return Until(() => Amount(cargo, "Ore/Stone") + Amount(Inventory(connector), "Ore/Stone"), v => v < 200, "stone thrown out and done away with, kg left", 30, () => State(connector));
+                Check(thrown() == 0, "the connector threw " + F(thrown()) + " kg of stone loose though the server destroys what is thrown out");
+                Result("the connector collected the cargo's stone and did away with " + F(200 - Amount(cargo, "Ore/Stone") - Amount(Inventory(connector), "Ore/Stone")) + " kg (ConnectorDestroyInsteadThrow)");
+                yield break;
+            }
             yield return Until(thrown, v => v > 0, "stone thrown out of the connector, kg", 30, () => State(connector));
             foreach (var floating in MyEntities.GetEntities().OfType<MyFloatingObject>().Where(o => Vector3D.Distance(o.PositionComp.GetPosition(), near) < 30).ToList())
                 Track(floating);
@@ -129,6 +137,13 @@ namespace SentisTests.Regression.Checks
             Func<double> thrown = () => MyEntities.GetEntities().OfType<MyFloatingObject>()
                 .Where(o => !o.MarkedForClose && Vector3D.Distance(o.PositionComp.GetPosition(), near) < 20 && o.Item.Content.SubtypeName == "Stone")
                 .Sum(o => (double)o.Item.Amount);
+            if (DestroyInsteadOfThrow)
+            {
+                yield return Until(() => Amount(Inventory(connector), "Ore/Stone"), v => v < 20, "stone thrown out of the small connector and done away with, kg left", 30, () => State(connector));
+                Check(thrown() == 0, "the small connector threw " + F(thrown()) + " kg of stone loose though the server destroys what is thrown out");
+                Result("the small connector did away with " + F(20 - Amount(Inventory(connector), "Ore/Stone")) + " kg of stone (ConnectorDestroyInsteadThrow)");
+                yield break;
+            }
             yield return Until(thrown, v => v > 0, "stone thrown out of the small connector, kg", 30, () => State(connector));
             foreach (var floating in MyEntities.GetEntities().OfType<MyFloatingObject>().Where(o => Vector3D.Distance(o.PositionComp.GetPosition(), near) < 20).ToList())
                 Track(floating);
