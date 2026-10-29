@@ -32,7 +32,8 @@ namespace SentisTests.Scenarios
     /// - a player of B comes in: the zone is contested;
     /// - B goes, A captures again: the first structure is gone and its contents are in the new one;
     /// - the new structure emptied: it goes away;
-    /// - A's player dies inside: A loses a point;
+    /// - B's player killed inside by A's: B's points (up to 5, down to zero) go to A;
+    /// - A's player dies inside with no killer: A loses a point;
     /// - the weekly rewards given by hand: a structure for the week's winner with the zone's own weekly reward.
     /// The plugin is driven through SentisAnomalyZone.AnomalyZoneApi by reflection; its settings come back as they were.
     /// </summary>
@@ -177,9 +178,23 @@ namespace SentisTests.Scenarios
             var gone = Wait(() => RewardGrid == 0 && Grid(secondGrid.EntityId) == null, "the emptied structure goes away", 10);
             while (gone.MoveNext()) yield return gone.Current;
 
-            // a death inside costs a point
+            // a kill inside: B killed by A, B's points (up to 5, not below zero) go to A's faction
+            Setting("PointsLostOnDeath", 5);
+            Call("AddPoints", ZoneId, fb, 2);
             FakeClients.MoveTo(0, site);
+            FakeClients.MoveTo(1, site + new Vector3D(0, 5, 0));
             yield return WaitForTicks(30);
+            var aBefore = Points(fa);
+            var bBefore = Points(fb);
+            var moved = Math.Min(5, bBefore);
+            FakeClients.Character(1).DoDamage(100000, MyDamageType.Bullet, true, FakeClients.Character(0).EntityId);
+            var killed = Wait(() => Points(fb) == bBefore - moved && Points(fa) == aBefore + moved,
+                $"B's {moved} points go to A for a kill inside (A {aBefore}, B {bBefore} before)", 10);
+            while (killed.MoveNext()) yield return killed.Current;
+            Note($"kill: A {aBefore} -> {Points(fa)}, B {bBefore} -> {Points(fb)}");
+            Setting("PointsLostOnDeath", 1);
+
+            // a death inside with no killer costs a point
             var pointsBefore = Points(fa);
             FakeClients.Character(0).DoDamage(100000, MyDamageType.Bullet, true);
             var died = Wait(() => Points(fa) == pointsBefore - 1, $"A loses a point for a death inside ({pointsBefore} before)", 10);
@@ -223,7 +238,7 @@ namespace SentisTests.Scenarios
             Note($"a jump to the center from 5.2 km off ends {Vector3D.Distance(toCenter.Value, site):0} m off the center, " +
                  $"{Vector3D.Distance(toCenter.Value, edgeShip.PositionComp.GetPosition()):0} m from the ship");
             Check(Vector3D.Distance(toCenter.Value, site) >= 1000, "a jump to the center ended inside the jump-in radius");
-            Note("PASS: center cube, capture, the zone's own rewards, reward structure, contest, carry-over, emptied structure, death, weekly, jumps near the zone");
+            Note("PASS: center cube, capture, the zone's own rewards, reward structure, contest, carry-over, emptied structure, death, kill, weekly, jumps near the zone");
         }
 
         /// <summary>A ship of the player: a charged large jump drive and a battery.</summary>

@@ -24,7 +24,9 @@ namespace SentisTests.Scenarios
     /// - every item of the settings is an item of the game;
     /// - a zone without lines of its own captured by a player on foot (multiplier 1): the reward structure holds every
     ///   sure line (chance 1) of the common capture rewards, the others at most, nothing else; the faction got its credits;
-    /// - three factions with points of the week: the weekly rewards give each place a structure with exactly its lines.
+    /// - three factions with points of the week: the weekly rewards give each place a structure with exactly its lines;
+    /// - who may take: the capture's structure (0 minutes) is open to everyone at once; the weekly ones are the places'
+    ///   factions' only, then open to everyone (their owners kept) once their minutes are up (6 s here).
     /// The plugin is driven through SentisAnomalyZone.AnomalyZoneApi by reflection; its settings come back as they were.
     /// </summary>
     public class AnomalyRewardsScenario : TestScenario
@@ -71,6 +73,8 @@ namespace SentisTests.Scenarios
             Setting("SpawnRewards", true);
             Setting("K1", 0.0); // the multiplier at its least, 1: the amounts as set
             Setting("PointsPerCapture", 0);
+            Setting("CaptureRewardOpenMinutes", 0.0);
+            Setting("WeeklyRewardOpenMinutes", 0.1);
             var config = Integrations.TypeOf(Integrations.AnomalyZone, "SentisAnomalyZone.SentisAnomalyZonePlugin").GetProperty("Config").GetValue(null);
             var credits = Convert.ToInt64(config.GetType().GetProperty("CreditsPerPoint").GetValue(config));
             Call("Forget", ZoneId);
@@ -134,6 +138,7 @@ namespace SentisTests.Scenarios
             while (paid.MoveNext()) yield return paid.Current;
             Note($"{points} points, the faction's balance {balanceBefore} -> {balance} ({credits} a point)");
             Check(balance - balanceBefore == points * credits, $"the faction got {balance - balanceBefore} credits, not {points * credits}");
+            Check(Open(Grid(RewardGrid)), "the capture's structure (0 minutes) is not open to everyone");
             FakeClients.MoveTo(0, away);
 
             // the week: three places
@@ -162,10 +167,22 @@ namespace SentisTests.Scenarios
                     $"place {place}: {Describe(set)} set, {Describe(got)} given");
             }
 
-            Note($"PASS: {capture.Count} capture and {week.Count} weekly lines are items of the game; a capture gave the sure ones and credits; places {string.Join(", ", places.Where(p => p <= 3))} got theirs");
+            // the weekly structures: the places' only, open to everyone after their minutes
+            Check(weekly.Count > 0 && weekly.All(g => !Open(g)), "a weekly structure is open to everyone at once");
+            var owners = weekly.ToDictionary(g => g.EntityId, g => g.GetFatBlocks<MyCargoContainer>().First().OwnerId);
+            var opened = Wait(() => weekly.All(Open), "the weekly structures open to everyone after 6 s", 30);
+            while (opened.MoveNext()) yield return opened.Current;
+            Check(weekly.All(g => g.GetFatBlocks<MyCargoContainer>().First().OwnerId == owners[g.EntityId]), "a weekly structure's owner changed when it opened");
+
+            Note($"PASS: {capture.Count} capture and {week.Count} weekly lines are items of the game; a capture gave the sure ones and credits, open to everyone; " +
+                 $"places {string.Join(", ", places.Where(p => p <= 3))} got theirs, open to everyone after their minutes");
         }
 
         private long RewardGrid => (long)Call("RewardGrid", ZoneId);
+
+        /// <summary>Every block of the structure shared with everyone.</summary>
+        private static bool Open(MyCubeGrid grid) =>
+            grid != null && grid.GetFatBlocks().All(b => b.IDModule == null || b.IDModule.ShareMode == MyOwnershipShareModeEnum.All);
 
         private static double Number(string text) => double.Parse(text, CultureInfo.InvariantCulture);
 
