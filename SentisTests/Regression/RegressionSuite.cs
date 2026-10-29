@@ -213,6 +213,7 @@ namespace SentisTests.Regression
             var frame = 0;
             while (_runs.Any(r => r.Verdict == null))
             {
+                Unfinished = _runs.Count(r => r.Verdict == null);
                 if (_detachAll && frame++ % 30 == 0)
                     foreach (var run in _runs)
                     {
@@ -260,6 +261,7 @@ namespace SentisTests.Regression
                 yield return null;
             }
 
+            Unfinished = 0;
             DispatchWatch.Stop();
             var thrown = DispatchWatch.Report();
             foreach (var line in thrown) Log.Error("[TEST] REGRESSION | the entities' update pass threw (it stops there for the frame): " + line);
@@ -282,6 +284,9 @@ namespace SentisTests.Regression
             commands?.HandleCommandFromServer(text, message => answers.Add(message.Message));
             return answers;
         }
+
+        /// <summary>The checks of the running suite not done yet (0 with no suite running). Game thread.</summary>
+        internal static int Unfinished;
 
         private List<Running> Bad() => _runs.Where(r => r.Verdict != null && r.Verdict != TestVerdict.Passed && r.Verdict != TestVerdict.Skipped).ToList();
 

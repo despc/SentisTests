@@ -308,17 +308,20 @@ namespace SentisTests.Regression.Checks
     /// <summary>
     /// SentisGameplayImprovements' reward for time online (<c>OnlineRewardEnabled</c>, looked at every 30 s): a player online
     /// longer than <c>OnlineRewardEachMinutes</c> since they logged in gets <c>OnlineReward</c> in their inventory, once
-    /// in that time. With 1 minute (in memory) and the player's login 2 minutes back: the reward once.
+    /// in that time. With 1 minute (in memory) and the player's login 2 minutes back: the reward once. In the suite it waits
+    /// for every other check to finish first: the reward goes to every player online, and keeping the others' logins fresh
+    /// missed the players who came in meanwhile - 7 plates more in 14 checks' suits and containers (29.10.2026).
     /// </summary>
     public sealed class OnlineRewardCheck : RegressionCheck
     {
         public override string Name => Prefix + "online_reward";
-        public override int TimeoutSeconds => 120;
+        public override int TimeoutSeconds => 900;
         private Scenarios.ConfigOverride _gameplay;
 
         protected override IEnumerator Check()
         {
             SkipUnless(SentisTests.Core.Integrations.TypeOf(Scenarios.ConfigOverride.Gameplay, "SentisGameplayImprovements.BackgroundActions.OnlineReward") != null, "SentisGameplayImprovements has no OnlineReward");
+            if (InSuite) yield return Until(() => RegressionSuite.Unfinished <= 1 ? 1 : 0, v => v > 0, "every other check done", 780, () => RegressionSuite.Unfinished + " checks running");
             yield return Arrive(Site.At(0, 0, -6));
             _gameplay = new Scenarios.ConfigOverride(Scenarios.ConfigOverride.Gameplay);
             _gameplay.Set("OnlineRewardEnabled", true);

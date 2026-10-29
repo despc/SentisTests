@@ -95,6 +95,19 @@ namespace SentisTests.Regression
         public virtual bool NeedsOwnCluster => false;
 
         /// <summary>
+        /// Skips the check when the clusters of the physics are too big for its distances: a check that crosses a cluster
+        /// border <paramref name="apartM"/> m away needs clusters smaller than that - SentisClusters' 5 km ones; the game's
+        /// own are 20 km, and both ends stay in one (a stand without SentisClusters, 29.10.2026).
+        /// </summary>
+        protected static void SmallClusters(double apartM)
+        {
+            var size = VRageMath.Spatial.MyClusterTree.IdealClusterSize.X;
+            if (size >= apartM)
+                throw new ScenarioSkippedException("the clusters of the physics are " + (size / 1000).ToString("F0") + " km: " + (apartM / 1000).ToString("F0") +
+                                                   " km apart is one cluster (the check's distances are for SentisClusters' 5 km clusters)");
+        }
+
+        /// <summary>
         /// The check throws grids into a planet fast: where the planet has no physics yet one may go through the ground
         /// (the game itself does it on the first fast fall on a place), and SentisGameplayImprovements' bringing back of
         /// such grids (<c>AutoRestoreFromVoxel</c>) is on while the check runs (the suite does it once for all).

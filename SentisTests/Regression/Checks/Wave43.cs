@@ -114,6 +114,7 @@ namespace SentisTests.Regression.Checks
 
         protected override IEnumerator Check()
         {
+            SmallClusters(7000);
             yield return Arrive(Site.At(0, 6, -10));
             var here = Build("respawn-here", Site.Origin, true,
                 new Part("MedicalRoom/LargeMedicalRoom", 0, 0, 0),
@@ -201,6 +202,7 @@ namespace SentisTests.Regression.Checks
 
         protected override IEnumerator Check()
         {
+            SmallClusters(7000);
             yield return Arrive(Site.At(0, 0, 4));
             var station = Build("border-station", Site.At(40, 0, 0), true,
                 new Part("BatteryBlock/LargeBlockBatteryBlock", 0, 0, 0).With(b => Motion.Charged(b)));
