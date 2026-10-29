@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections;
+using System.Reflection;
 using System.Collections.Generic;
 using System.Linq;
 using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
+using Sandbox.Game.World;
 using SentisTests.Core;
 using SentisTests.Game;
 using VRage;
@@ -53,6 +55,15 @@ namespace SentisTests.Scenarios
         public const string RestoreSmallScenarioName = "wheel_restore_small";
         // Cost of the checks alone: 100 vehicles drive with AutoRestoreFromVoxel on, none sinks.
         public const string RestoreCostScenarioName = "wheel_restore_cost";
+        /// <summary>
+        /// One vehicle driving straight on over the planet on its own wheels, as fast as they go (onto ground whose voxels'
+        /// bodies are made as it comes; not pushed - wheel_fall's push had it flying 5 m over the ground), its cluster attached for <see cref="DetachPhaseSeconds"/>, then
+        /// detached by SentisClusters (as !clusters detach does) for as long: what the detached cluster's ticks and step
+        /// take, how long the game thread and the frame's physics wait for them, how fast the vehicle and the server go.
+        /// A player found a car on the planet in a detached cluster odd to drive, its tick at 16 ms (28.10.2026).
+        /// </summary>
+        public const string DetachScenarioName = "wheel_detach";
+        private const double DetachPhaseSeconds = 20;
         private const double SinkAtSeconds = 10;
         private const double RestoreWindowSeconds = 40;
         private const double SinkDepthLargeM = 12;
@@ -91,6 +102,8 @@ namespace SentisTests.Scenarios
         private const double FastSpacingM = 100.0;
         // Circles drift; past this distance from its spawn point a vehicle steers back toward it.
         private const double HomeRadiusM = 40.0;
+        // the chassis over the ground when the vehicle is put onto another planet than the authored one (lifted more if a wheel needs it)
+        private const double AuthoredHeightM = 2.0;
         private const double SettleSeconds = 10;
         private const double ApproachSeconds = 10;
         private const double WindowSeconds = 120;
@@ -123,10 +136,12 @@ namespace SentisTests.Scenarios
         private readonly bool _ab;
         private bool? _initialAutoRestore;
         private readonly bool _sink = true;
+        private readonly bool _detach;
 
         public WheelPerfScenario(int count = 32, bool fast = false, bool lag = false, string rover = null, bool restore = false,
-            bool parked = false, bool ab = false, bool sink = true)
+            bool parked = false, bool ab = false, bool sink = true, bool detach = false)
         {
+            _detach = detach;
             _sink = sink;
             _parked = parked;
             _ab = ab;
@@ -137,7 +152,7 @@ namespace SentisTests.Scenarios
             _restore = restore;
         }
 
-        public override string Name => _restore && !_sink ? RestoreCostScenarioName : _ab ? PhysicsAbScenarioName : _parked ? ParkedScenarioName : _restore
+        public override string Name => _detach ? DetachScenarioName : _restore && !_sink ? RestoreCostScenarioName : _ab ? PhysicsAbScenarioName : _parked ? ParkedScenarioName : _restore
             ? (_rover != null ? RestoreSmallScenarioName : RestoreScenarioName)
             : _rover != null
             ? (_rover.EndsWith("3x3") ? (_lag ? Small3LagScenarioName : Small3ScenarioName) : (_lag ? SmallLagScenarioName : SmallScenarioName))
@@ -162,10 +177,20 @@ namespace SentisTests.Scenarios
             var chassis0 = template[0].PositionAndOrientation.Value.GetMatrix();
             var authored = chassis0.Translation;
             _planet = MyGamePruningStructure.GetClosestPlanet(authored);
-            Check(_planet != null, "no planet near the authored vehicle");
+            // the world's planets are elsewhere now than where the vehicle was authored (the stand, 28.10.2026: "no planet
+            // near the authored vehicle"): it goes onto an Earth-like planet, where the vertical is the authored chassis' up
+            var moved = _planet == null || Vector3D.Distance(authored, _planet.PositionComp.GetPosition()) > _planet.MaximumRadius + 1000;
+            if (moved)
+            {
+                var planets = MyEntities.GetEntities().OfType<MyPlanet>().ToList();
+                _planet = planets.FirstOrDefault(p => p.StorageName.StartsWith("EarthLike")) ?? planets.FirstOrDefault();
+                Check(_planet != null, "no planet in the world");
+                var guess = _planet.PositionComp.GetPosition() + Vector3D.Normalize(chassis0.Up) * _planet.MaximumRadius * 1.1;
+                authored = Ground(_planet.GetClosestSurfacePointGlobal(ref guess)) + Vector3D.Normalize(chassis0.Up) * AuthoredHeightM;
+            }
             var planetCenter = _planet.PositionComp.GetPosition();
-            var up0 = Vector3D.Normalize(authored - planetCenter);
-            var height0 = HeightOverGround(authored);
+            var up0 = moved ? Vector3D.Normalize(chassis0.Up) : Vector3D.Normalize(authored - planetCenter);
+            var height0 = moved ? AuthoredHeightM : HeightOverGround(authored);
             var east = Vector3D.Normalize(chassis0.Forward - up0 * Vector3D.Dot(chassis0.Forward, up0));
             var north = Vector3D.Cross(up0, east);
             var rows = (_count + GridsPerRow - 1) / GridsPerRow;
@@ -228,7 +253,7 @@ namespace SentisTests.Scenarios
                     ob.IsStatic = false;
                     foreach (var suspension in ob.CubeBlocks.OfType<Sandbox.Common.ObjectBuilders.MyObjectBuilder_MotorSuspension>())
                     {
-                        suspension.SpeedLimit = _fast ? FastSpeedLimitKmh : SpeedLimitKmh;
+                        suspension.SpeedLimit = _fast || _detach ? FastSpeedLimitKmh : SpeedLimitKmh;
                         suspension.PropulsionOverride = 0;
                         suspension.SteeringOverride = 0;
                     }
@@ -270,7 +295,7 @@ namespace SentisTests.Scenarios
             foreach (var suspension in _suspensions)
             {
                 suspension.PropulsionOverride = _parked ? 0f : 1f;
-                suspension.SteeringOverride = _fast || _parked ? 0f : Steering;
+                suspension.SteeringOverride = _fast || _parked || _detach ? 0f : Steering;
             }
             var starts = _vehicles.Select(v => v[0].PositionComp.GetPosition()).ToArray();
             var started = DateTime.UtcNow;
@@ -322,7 +347,7 @@ namespace SentisTests.Scenarios
                 if (++frame % CheckEveryFrames == 0)
                 {
                     CheckFallThrough();
-                    if (!_fast && !_parked) SteerHome(starts);
+                    if (!_fast && !_parked && !_detach) SteerHome(starts);
                 }
                 if (_fast && windowStarted != DateTime.MinValue) Push();
                 if (_fast) Stabilize();
@@ -348,6 +373,18 @@ namespace SentisTests.Scenarios
                         ApplyAbPhase(abPhase);
                     }
                 }
+                if (_detach && windowStarted != DateTime.MinValue)
+                {
+                    var phase = (int)((DateTime.UtcNow - windowStarted).TotalSeconds / DetachPhaseSeconds);
+                    if (phase != _detachPhase)
+                    {
+                        if (_detachPhase >= 0) _detachResults.Add(DetachPhaseEnd(_detachPhase == 0 ? "attached" : "detached"));
+                        if (phase >= 2) break;
+                        _detachPhase = phase;
+                        if (phase == 1) DetachVehicle();
+                        DetachPhaseStart();
+                    }
+                }
                 if (windowStarted != DateTime.MinValue)
                 {
                     var inWindow = (DateTime.UtcNow - windowStarted).TotalSeconds;
@@ -361,6 +398,12 @@ namespace SentisTests.Scenarios
                 yield return null;
             }
 
+            if (_detach)
+            {
+                AttachVehicle();
+                Note("WHEEL DETACH RESULT | " + string.Join(" || ", _detachResults));
+                Check(_detachResults.Count == 2, "the phases did not both run");
+            }
             var metrics = TickMetrics.Take();
             var simWork = FrameProbe.Take();
             CheckFallThrough();
@@ -811,6 +854,93 @@ namespace SentisTests.Scenarios
             }
         }
 
+        // ------------------------------------------------------------------ wheel_detach
+
+        private int _detachPhase = -1;
+        private readonly List<string> _detachResults = new List<string>();
+        private int _detachedCluster = -1;
+        private object _clustersConfig;
+        private bool? _initialDetach;
+        private Vector3D _phaseFrom;
+        private DateTime _phaseAt;
+        private long _phaseFrame, _havokWaits, _havokWaitTicks, _stepWaits, _stepWaitTicks;
+
+        private static Type Clusters(string name) => Integrations.TypeOf("SentisClusters", name);
+
+        private static long Counter(string type, string field) => Convert.ToInt64(Clusters(type)?.GetField(field, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)?.GetValue(null) ?? 0L);
+
+        private void DetachPhaseStart()
+        {
+            _phaseFrom = _vehicles[0][0].PositionComp.GetPosition();
+            _phaseAt = DateTime.UtcNow;
+            _phaseFrame = MySession.Static.GameplayFrameCounter;
+            _havokWaits = Counter("SentisClusters.Run.HavokGate", "Waits");
+            _havokWaitTicks = Counter("SentisClusters.Run.HavokGate", "WaitTicks");
+            _stepWaits = Counter("SentisClusters.Run.StepGate", "Waits");
+            _stepWaitTicks = Counter("SentisClusters.Run.StepGate", "WaitTicks");
+            TickMetrics.Take();
+            if (_detachedCluster >= 0) Sample(_detachedCluster, out _, out _, out _);
+        }
+
+        private string DetachPhaseEnd(string what)
+        {
+            var seconds = (DateTime.UtcNow - _phaseAt).TotalSeconds;
+            var chassis = _vehicles[0][0];
+            var driven = (chassis.PositionComp.GetPosition() - _phaseFrom).Length();
+            var serverSpeed = (MySession.Static.GameplayFrameCounter - _phaseFrame) / seconds / 60.0;
+            var metrics = TickMetrics.Take();
+            double Ms(long ticks) => ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            var havokWaits = Counter("SentisClusters.Run.HavokGate", "Waits") - _havokWaits;
+            var stepWaits = Counter("SentisClusters.Run.StepGate", "Waits") - _stepWaits;
+            var text = what + ": server " + serverSpeed.ToString("F2") + ", frame avg " + metrics.AvgFrameMs.ToString("F2") + " ms, p99 " + metrics.P99FrameMs.ToString("F1") +
+                       ", vehicle " + (driven / seconds).ToString("F1") + " m/s from its place (speed now " + (chassis.Physics?.LinearVelocity.Length() ?? 0).ToString("F1") + ")";
+            if (_detachedCluster >= 0 && Sample(_detachedCluster, out var speed, out var tickMs, out var stepMs))
+                text += "; cluster " + _detachedCluster + " detached: sim " + speed.ToString("F2") + ", tick " + tickMs.ToString("F1") + " ms, of it the step " + stepMs.ToString("F1") + " ms";
+            text += "; the frame's physics waited for detached pieces " + havokWaits + " times, " + (havokWaits > 0 ? Ms(Counter("SentisClusters.Run.HavokGate", "WaitTicks") - _havokWaitTicks) / havokWaits : 0).ToString("F2") +
+                    " ms each; the game's updates waited for detached steps " + stepWaits + " times, " + (stepWaits > 0 ? Ms(Counter("SentisClusters.Run.StepGate", "WaitTicks") - _stepWaitTicks) / stepWaits : 0).ToString("F2") + " ms each";
+            Note("PHASE " + text);
+            return text;
+        }
+
+        private static bool Sample(int cluster, out double speed, out double tickMs, out double stepMs)
+        {
+            speed = tickMs = stepMs = 0;
+            var method = Clusters("SentisClusters.Run.Detacher")?.GetMethod("Sample", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            if (method == null) return false;
+            var args = new object[] { cluster, 0.0, 0.0, 0.0 };
+            var ok = (bool)method.Invoke(null, args);
+            speed = (double)args[1];
+            tickMs = (double)args[2];
+            stepMs = (double)args[3];
+            return ok;
+        }
+
+        private void DetachVehicle()
+        {
+            _clustersConfig = Clusters("SentisClusters.SentisClustersPlugin")?.GetProperty("Config")?.GetValue(null);
+            Check(_clustersConfig != null, "SentisClusters is not loaded");
+            var detach = _clustersConfig.GetType().GetProperty("Detach");
+            _initialDetach = (bool)detach.GetValue(_clustersConfig);
+            detach.SetValue(_clustersConfig, true);
+            var force = Clusters("SentisClusters.Run.Detacher").GetMethod("ForceDetach", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            _detachedCluster = (int)force.Invoke(null, new object[] { _vehicles[0][0].PositionComp.GetPosition() });
+            Check(_detachedCluster >= 0, "the vehicle's cluster was not detached (" + _detachedCluster + ")");
+        }
+
+        private void AttachVehicle()
+        {
+            if (_detachedCluster < 0 || _vehicles.Count == 0) return;
+            try
+            {
+                Clusters("SentisClusters.Run.Detacher")?.GetMethod("ForceAttach", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)
+                    ?.Invoke(null, new object[] { _vehicles[0][0].PositionComp.GetPosition() });
+            }
+            catch (Exception e) { Log.Warn(e, "wheel_detach: attaching the vehicle's cluster"); }
+            _detachedCluster = -1;
+            if (_initialDetach.HasValue) _clustersConfig?.GetType().GetProperty("Detach")?.SetValue(_clustersConfig, _initialDetach.Value);
+            _initialDetach = null;
+        }
+
         private string Motion(Vector3D[] starts)
         {
             var speeds = new List<double>();
@@ -900,6 +1030,7 @@ namespace SentisTests.Scenarios
 
         private void RestoreRuntimeConfig()
         {
+            AttachVehicle();
             if (!_captured) return;
             if (_initialAutoRestore.HasValue) AutoRestore = _initialAutoRestore.Value;
             _initialAutoRestore = null;

@@ -390,6 +390,7 @@ namespace SentisTests.Regression
             // with SentisClusters: scripts against detached clusters; it switches detaching, so not in the suite
             ScenarioRegistry.Register(PbDetachCheck.ScenarioName, () => new PbDetachCheck());
             ScenarioRegistry.Register(JetpackDetachCheck.ScenarioName, () => new JetpackDetachCheck());
+            ScenarioRegistry.Register(RoverDetachCheck.ScenarioName, () => new RoverDetachCheck());
             ScenarioRegistry.Register(JumpDetachCheck.ScenarioName, () => new JumpDetachCheck());
             ScenarioRegistry.Register(RaycastDetachCheck.ScenarioName, () => new RaycastDetachCheck());
             ScenarioRegistry.Register(ProjectileDetachCheck.ScenarioName, () => new ProjectileDetachCheck());

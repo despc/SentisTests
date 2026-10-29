@@ -168,6 +168,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(WheelPerfScenario.Small3LagScenarioName, () => new WheelPerfScenario(32, lag: true, rover: "SmallSuspension3x3"));
                 ScenarioRegistry.Register(WheelPerfScenario.RestoreScenarioName, () => new WheelPerfScenario(16, restore: true));
                 ScenarioRegistry.Register(WheelPerfScenario.ParkedScenarioName, () => new WheelPerfScenario(64, parked: true));
+                ScenarioRegistry.Register(WheelPerfScenario.DetachScenarioName, () => new WheelPerfScenario(1, detach: true));
                 ScenarioRegistry.Register(GearProbeScenario.ScenarioName, () => new GearProbeScenario());
                 ScenarioRegistry.Register(FreezerPhysicsScenario.ScenarioName, () => new FreezerPhysicsScenario());
                 ScenarioRegistry.Register(RoverThawScenario.ScenarioName, () => new RoverThawScenario());
@@ -222,6 +223,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(HeavyNeighbourScenario.ScenarioName, () => new HeavyNeighbourScenario());
                 ScenarioRegistry.Register(HeavyNeighbourScenario.MediumName, HeavyNeighbourScenario.Medium);
                 ScenarioRegistry.Register(ParallelGainScenario.ScenarioName, () => new ParallelGainScenario());
+                ScenarioRegistry.Register(PlayerAtScenario.ScenarioName, () => new PlayerAtScenario());
                 ScenarioRegistry.Register(DetachChurnScenario.ScenarioName, () => new DetachChurnScenario());
                 ScenarioRegistry.Register(PurgeUndergroundScenario.ScenarioName, () => new PurgeUndergroundScenario());
                 ScenarioRegistry.Register(ProceduralJumpScenario.ScenarioName, () => new ProceduralJumpScenario());
@@ -255,6 +257,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(WorldSweepsScenario.ScenarioName, () => new WorldSweepsScenario());
                 ScenarioRegistry.Register("load_test_40", () => new LoadTestScenario("load_test_40", 40));
                 ScenarioRegistry.Register(TurretDetachScenario.ScenarioName, () => new TurretDetachScenario());
+                ScenarioRegistry.Register(DetachTuneScenario.ScenarioName, () => new DetachTuneScenario());
                 ScenarioRegistry.Register("load_test_128", () => new LoadTestScenario("load_test_128", 128));
                 ScenarioRegistry.Register("load_test_300", () => new LoadTestScenario("load_test_300", 300));
                 ScenarioRegistry.Register("load_test_500", () => new LoadTestScenario("load_test_500", 500));

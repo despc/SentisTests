@@ -99,6 +99,8 @@ namespace SentisTests.Scenarios
             _soConfig.Set("ProjectionBuildsPerFrame", Sites * WelderPerfScenario.WelderCount);
             _clusters.Set("Detach", true);
             _clusters.Set("DetachMs", DetachMs);
+            // detached by its load whatever the server's frame (SentisClusters detaches otherwise only a busy server's clusters)
+            _clusters.Set("DetachFrameMs", 0f);
             FakeClients.RemoveAll();
 
             var authored = WorldApi.LoadAuthoredGrid(WelderPerfScenario.ProjectionResource, WorldApi.EntityPrefix + "perf-projection");
