@@ -150,6 +150,11 @@ namespace SentisTests.Scenarios
             if (Gone(claimedShip, station3)) failures.Add("merged before the claim button");
             var before = claimedShip.BlocksCount;
             var npcBuilt = claimedShip.GetBlocks().Count(b => b.BuiltBy == factorum.FounderId);
+            // by the ship, as a player with its terminal open is: SentisAnticheat refuses the claim to one who could not
+            // have it open ("no terminal ... open to them" from 40 m, 29.10.2026)
+            FakeClients.MoveTo(0, Origin(2) + _up * 3 - Vector3D.Cross(_up, _side) * 6);
+            var near = WaitForSeconds(2, "button: the player by the ship");
+            while (near.MoveNext()) yield return near.Current;
             FakeClients.AsClient(0, () => Sandbox.Game.World.MyBlockLimits.ClaimNPCGrid(claimedShip.EntityId));
             var claimedNow = Until(() => !claimedShip.IsNpcSpawnedGrid || Gone(claimedShip, station3), 5);
             while (claimedNow.MoveNext()) yield return claimedNow.Current;
