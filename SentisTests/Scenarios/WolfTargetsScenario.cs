@@ -125,6 +125,7 @@ namespace SentisTests.Scenarios
                 _ticks = 0;
                 var paths0 = Counter("Paths");
                 var skipped0 = Counter("Skipped");
+                var noWay0 = Counter("NoWayKept");
                 TickMetrics.Take();
                 var watch = Stopwatch.StartNew();
                 var nearSum = 0.0;
@@ -142,7 +143,7 @@ namespace SentisTests.Scenarios
                 var seconds = watch.Elapsed.TotalSeconds;
                 var metrics = TickMetrics.Take();
                 var line = mode + ": search " + (_ticks * 1000.0 / Stopwatch.Frequency / seconds).ToString("F1") + " ms/s in " + (_calls / seconds).ToString("F0") + " calls/s, paths " +
-                           ((Counter("Paths") - paths0) / seconds).ToString("F1") + "/s, skipped " + ((Counter("Skipped") - skipped0) / seconds).ToString("F1") + "/s, wolves by a player " +
+                           ((Counter("Paths") - paths0) / seconds).ToString("F1") + "/s, skipped " + ((Counter("Skipped") - skipped0) / seconds).ToString("F1") + "/s, no way kept " + ((Counter("NoWayKept") - noWay0) / seconds).ToString("F1") + "/s, wolves by a player " +
                            (nearSum / Math.Max(1, samples)).ToString("F1") + " of " + _wolves.Count(IsWolf) + ", frame avg " + metrics.AvgFrameMs.ToString("F2") + " ms, p99 " + metrics.P99FrameMs.ToString("F1");
                 Note(line);
                 results.Add(line);
@@ -150,7 +151,7 @@ namespace SentisTests.Scenarios
             Note("WOLF TARGETS RESULT | " + string.Join(" || ", results));
         }
 
-        private long Counter(string name) => (long)_patch.GetField(name, BindingFlags.Static | BindingFlags.Public).GetValue(null);
+        private long Counter(string name) => (long?)_patch.GetField(name, BindingFlags.Static | BindingFlags.Public)?.GetValue(null) ?? 0;
 
         private void SetPatch(bool on)
         {

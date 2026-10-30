@@ -138,6 +138,7 @@
 | Автопилот и блоки ИИ | `remote_autopilot`, `ai_flight`, `basic_follow_player`, `path_recorder`, `offensive_combat`, `defensive_combat`, `defensive_flee_damage` | Покрыто |
 | Автоматика: таймер, сенсор, событийный контроллер, кнопки | `timer`, `sensor`, `sensor_relations`, `event_controller`, `button_panel` | Покрыто |
 | Программируемый блок: запуск, лимит инструкций, самозапуск, редактор у одного игрока | `programmable_block`, `programmable_limits`, `programmable_self_run`, `programmable_editor` | Покрыто |
+| Поиск блоков по имени из скрипта (`SearchBlocksOfName`, `GetBlockWithName`): без учёта регистра, после переименования и снятия блока | `terminal_name_search` | Покрыто |
 | Камера (луч и его предел), прожектор, ЖК-панели | `camera_raycast`, `raycast_limit`, `searchlight`, `lcd_text` | Покрыто |
 | Двери и ангарные ворота | `door`, `hangar_door` | Покрыто |
 | Столкновения: стена, корабли, кубы, персонаж, земля, состыкованные | `collision_wall`, `collision_ships`, `collision_cubes`, `collision_character`, `collision_ground`, `collision_docked` | Покрыто |

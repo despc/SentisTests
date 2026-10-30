@@ -183,6 +183,12 @@ targets = [
     ("Sandbox.MySandboxGame", "ProcessRenderOutput", False),
     ("Sandbox.Engine.Multiplayer.MyMultiplayerBase", "ReportReplicatedObjects", False),
     ("VRage.Game.Components.MySessionComponentBase", "UpdateAfterSimulation", False),
+    # a rotor's or a piston's head made (a block placed, "Add Top") and a block welded by hand
+    ("Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase", "DoRecreateTop", True),
+    ("Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase", "CreateTopPartAndAttach", False),
+    ("Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase", "Attach", False),
+    ("Sandbox.Game.Weapons.MyWelder", "Weld", True),
+    ("Sandbox.Game.Entities.Cube.MySlimBlock", "IncreaseMountLevel", False),
 ]
 tl = '\n'.join('            ("%s", "%s", %s),' % (t, m, 'true' if r else 'false') for t, m, r in targets)
 code = open(os.path.join(HERE, 'eventtimer_template.cs'), encoding='utf-8').read()

@@ -198,6 +198,11 @@ namespace SentisTests.Core
             ("Sandbox.MySandboxGame", "ProcessRenderOutput", false),
             ("Sandbox.Engine.Multiplayer.MyMultiplayerBase", "ReportReplicatedObjects", false),
             ("VRage.Game.Components.MySessionComponentBase", "UpdateAfterSimulation", false),
+            ("Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase", "DoRecreateTop", true),
+            ("Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase", "CreateTopPartAndAttach", false),
+            ("Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase", "Attach", false),
+            ("Sandbox.Game.Weapons.MyWelder", "Weld", true),
+            ("Sandbox.Game.Entities.Cube.MySlimBlock", "IncreaseMountLevel", false),
         };
 
         private static readonly string[] Names = new string[Slots];

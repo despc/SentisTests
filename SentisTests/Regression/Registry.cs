@@ -372,6 +372,7 @@ namespace SentisTests.Regression
             Add(() => new ProgrammableEditorQuitCheck());
             Add(() => new JumpDriveDistanceCheck());
             Add(() => new JumpDriveFullReachCheck());
+            Add(() => new TerminalNameSearchCheck());
             Add(() => new JumpAcrossClustersCheck());
             Add(() => new RespawnAcrossClustersCheck());
             Add(() => new FlightClusterBorderCheck());
