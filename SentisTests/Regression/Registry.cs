@@ -395,6 +395,8 @@ namespace SentisTests.Regression
             ScenarioRegistry.Register(RaycastDetachCheck.ScenarioName, () => new RaycastDetachCheck());
             ScenarioRegistry.Register(ProjectileDetachCheck.ScenarioName, () => new ProjectileDetachCheck());
             ScenarioRegistry.Register(ClusterStressCheck.ScenarioName, () => new ClusterStressCheck());
+            ScenarioRegistry.Register(ClusterFlightCheck.ScenarioName, () => new ClusterFlightCheck());
+            ScenarioRegistry.Register(ClusterCrashCheck.ScenarioName, () => new ClusterCrashCheck());
         }
     }
 }

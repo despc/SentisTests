@@ -261,14 +261,14 @@ namespace SentisTests.Regression.Checks
         }
 
         // the Torch log: where it ends now, and its lines after that
-        private static (string File, long Length) LogMark()
+        internal static (string File, long Length) LogMark()
         {
             var dir = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(typeof(Torch.TorchBase).Assembly.Location) ?? ".", "Logs");
             var file = System.IO.Directory.GetFiles(dir, "Torch-*.log").OrderBy(p => p).LastOrDefault();
             return (file, file == null ? 0 : new System.IO.FileInfo(file).Length);
         }
 
-        private static List<string> LogSince((string File, long Length) mark)
+        internal static List<string> LogSince((string File, long Length) mark)
         {
             var lines = new List<string>();
             if (mark.File == null) return lines;
@@ -286,7 +286,7 @@ namespace SentisTests.Regression.Checks
             return lines;
         }
 
-        private static long Exceptions()
+        internal static long Exceptions()
         {
             var status = string.Join("\n", Command("!clusters status"));
             var m = Regex.Match(status, @"exceptions in the clusters' threads: (\d+)");
@@ -324,7 +324,7 @@ namespace SentisTests.Regression.Checks
             return (counted, inBlocks);
         }
 
-        private static List<string> Command(string text)
+        internal static List<string> Command(string text)
         {
             var answers = new List<string>();
             var commands = (Torch.Commands.CommandManager)Torch.TorchBase.Instance.CurrentSession.Managers.GetManager(typeof(Torch.Commands.CommandManager));
