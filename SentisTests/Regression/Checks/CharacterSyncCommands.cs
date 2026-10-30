@@ -38,10 +38,22 @@ namespace SentisTests.Regression.Checks
             var steam = player.Id.SteamId;
             var at = body.PositionComp.GetPosition();
 
+            // it walks before (forward and back: the floor is 12.5 m across)
+            var walked = new double[1];
+            yield return Walk(walked);
+            Check(walked[0] > 1, $"the character walks {walked[0]:0.00} m in 1.5 s before any reset");
+            var before = walked[0];
+            at = body.PositionComp.GetPosition();
+
             var answers = Command("!sync player " + steam + " reset");
             yield return WaitForTicks(10);
             Note("reset: " + string.Join(" | ", answers));
             Same(body, at, "after reset");
+            // and after it, as far
+            yield return Walk(walked);
+            Note($"walked {before:0.00} m before the reset, {walked[0]:0.00} m after it");
+            Check(walked[0] > before * 0.5, $"after the reset the character walks {walked[0]:0.00} m in 1.5 s, {before:0.00} m before it");
+            at = body.PositionComp.GetPosition();
 
             answers = Command("!sync player " + steam);
             yield return WaitForTicks(10);
@@ -49,8 +61,9 @@ namespace SentisTests.Regression.Checks
             var said = string.Join(" ", answers);
             var resent = System.Text.RegularExpressions.Regex.Match(said, @"отправлено заново: (\d+)");
             Check(resent.Success && int.Parse(resent.Groups[1].Value) >= 2, "the grids round it were not resent: " + said);
-            var kept = System.Text.RegularExpressions.Regex.Match(said, @"не трогали: (\d+)");
-            Check(kept.Success && int.Parse(kept.Groups[1].Value) >= 1, "the floor it stands on was resent too: " + said);
+            var sync = System.AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("SentisGameplayImprovements.CharacterSync", false)).FirstOrDefault(t => t != null);
+            var kept = sync == null ? -1 : (int)sync.GetField("LastKept").GetValue(null);
+            Check(kept >= 1, $"the floor it stands on was resent too (kept {kept}): " + said);
             Same(body, at, "after all");
             Check(!floor.MarkedForClose, "the floor is gone");
 
@@ -62,12 +75,25 @@ namespace SentisTests.Regression.Checks
             Result("reset, all (grids resent: " + resent.Groups[1].Value + ") and resend: the character where it was, alive, controlled, on its client");
         }
 
+        /// <summary>Forward 1.5 s (how far, into walked[0]), then back as long.</summary>
+        private IEnumerator Walk(double[] walked)
+        {
+            var from = Body.PositionComp.GetPosition();
+            yield return Hold(1.5, Vector3.Forward);
+            walked[0] = Vector3D.Distance(Body.PositionComp.GetPosition(), from);
+            yield return Hold(1.5, Vector3.Backward);
+            yield return Hold(0.5, Vector3.Zero);
+        }
+
         private void Same(Sandbox.Game.Entities.Character.MyCharacter body, Vector3D at, string when)
         {
             var player = FakeClients.PlayerOf(Me);
             Check(!body.MarkedForClose && !body.IsDead, when + ": the character is gone or dead");
             Check(player.Character == body, when + ": the player has another character");
             Check(player.Controller.ControlledEntity == body, when + ": the player does not control its character (" + player.Controller.ControlledEntity + ")");
+            // the server's table of control: a client's moves are taken only for an entity it has there (MyClientState.Read)
+            var table = Sandbox.Game.World.MySession.Static.Players.GetControllingPlayer(body);
+            Check(table?.Id == player.Id, when + ": the server's table of control has the character under " + (table?.DisplayName ?? "nobody") + ": the client's moves would be dropped");
             var moved = Vector3D.Distance(body.PositionComp.GetPosition(), at);
             Check(moved < 1.5, $"{when}: the character moved {moved:0.00} m");
         }
