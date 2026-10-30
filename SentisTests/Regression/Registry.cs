@@ -371,6 +371,7 @@ namespace SentisTests.Regression
             Add(() => new SharedAssemblerCheck());
             Add(() => new ProgrammableEditorQuitCheck());
             Add(() => new JumpDriveDistanceCheck());
+            Add(() => new JumpDriveFullReachCheck());
             Add(() => new JumpAcrossClustersCheck());
             Add(() => new RespawnAcrossClustersCheck());
             Add(() => new FlightClusterBorderCheck());
@@ -398,6 +399,7 @@ namespace SentisTests.Regression
             ScenarioRegistry.Register(ClusterStressCheck.ScenarioName, () => new ClusterStressCheck());
             ScenarioRegistry.Register(ClusterFlightCheck.ScenarioName, () => new ClusterFlightCheck());
             ScenarioRegistry.Register(ClusterCrashCheck.ScenarioName, () => new ClusterCrashCheck());
+            ScenarioRegistry.Register(JumpProbeCheck.ScenarioName, () => new JumpProbeCheck());
         }
     }
 }

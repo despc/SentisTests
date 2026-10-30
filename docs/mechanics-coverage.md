@@ -130,7 +130,7 @@
 | Предел скорости | `speed_limit_large`, `speed_limit_small` | Покрыто |
 | Переопределение тяги и гироскопов | `overrides` | Покрыто |
 | Масса: пилот с грузом, искусственная масса | `pilot_mass`, `artificial_mass` | Покрыто |
-| Прыжковый двигатель: прыжок, заряд, обрезка дальности по пределу двигателя | `jump_drive`, `jump_drive_charge`, `jump_drive_distance` | Покрыто |
+| Прыжковый двигатель: прыжок, заряд, обрезка дальности по пределу двигателя | `jump_drive`, `jump_drive_charge`, `jump_drive_distance`, `jump_drive_full_reach` (тяжёлый корабль на полной дальности, масса растёт за отсчёт) | Покрыто |
 | Шасси и парковка | `landing_gear`, `landing_gear_ship`, `parking` | Покрыто |
 | Роторы, шарниры, поршни, фиксация | `rotor`, `rotor_lock`, `hinge`, `hinge_lock`, `piston` | Покрыто |
 | Колёса | `wheels` | Покрыто |

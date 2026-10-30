@@ -159,4 +159,58 @@ namespace SentisTests.Regression.Checks
             Result("asked to jump " + F(max * 10 / 1000) + " km, the server capped it at the drive's reach: jumped " + F(jumped / 1000) + " km of " + F(max / 1000) + " km max");
         }
     }
+
+    /// <summary>
+    /// A ship heavier than its jump drive's MaxJumpMass jumps at the drive's full reach while its mass grows a little in
+    /// the countdown (cargo coming in), as a working ship's does (gas, ice): it jumps. The reach of such a ship is less
+    /// as it is heavier, and the game, asking for it again at the countdown's end, aborted the jump without a word when
+    /// it had shrunk by metres (the prod's "БурПрыг", 30.10.2026; SentisOptimisations' JumpReachDrift cuts it instead).
+    /// </summary>
+    public sealed class JumpDriveFullReachCheck : RegressionCheck
+    {
+        public override string Name => Prefix + "jump_drive_full_reach";
+
+        protected override IEnumerator Check()
+        {
+            yield return Arrive(Site.At(0, 0, 8));
+            var definition = (Sandbox.Definitions.MyJumpDriveDefinition)Definition("JumpDrive/LargeJumpDrive");
+            var ship = Build("jump-full", Site.Origin, false,
+                new Part("JumpDrive/LargeJumpDrive", 0, 0, 0).With(b => ((MyObjectBuilder_JumpDrive)b).StoredPower = definition.PowerNeededForJump),
+                new Part("BatteryBlock/LargeBlockBatteryBlock", 3, 0, 0).With(b => Motion.Charged(b)),
+                new Part("Cockpit/LargeBlockCockpitSeat", 3, 1, 0),
+                new Part("CargoContainer/LargeBlockLargeContainer", -3, 0, 0));
+            var drive = Block<MyJumpDrive>(ship);
+            var cargo = Inventory(Block<Sandbox.Game.Entities.MyCargoContainer>(ship));
+            // heavier than the drive takes at full reach: the reach is then less as the mass grows
+            var over = definition.MaxJumpMass * 1.5 - ship.GetCurrentMass();
+            Put(cargo, "Ingot/Gold", over);
+            yield return Until(() => drive.IsWorking ? 1 : 0, v => v > 0, "the jump drive working", 10, () => State(drive));
+            yield return Seconds(1);
+            var system = ship.GridSystems.JumpSystem;
+            var reach = system.GetMaxJumpDistance(Identity);
+            Check(reach < definition.MaxJumpDistance * 0.9, "the ship is not heavy enough to shorten the reach: " + F(reach / 1000) + " km of " + F(definition.MaxJumpDistance / 1000) + " km");
+            var from = ship.PositionComp.GetPosition();
+            Request(ship, "OnJumpRequested", from + Site.Up * reach, Identity, 10f, (long?)null);
+            yield return Until(() => system.IsJumping ? 1 : 0, v => v > 0, "the jump counting down", 5);
+            // a little cargo in every second of the countdown
+            var added = 0.0;
+            var within = Within(30);
+            var frame = 0;
+            while (within() && Vector3D.Distance(ship.PositionComp.GetPosition(), from) < reach * 0.5 && (system.IsJumping || frame < 30))
+            {
+                if (++frame % 60 == 0)
+                {
+                    Put(cargo, "Ingot/Gold", 20);
+                    added += 20;
+                }
+                yield return null;
+            }
+            yield return Seconds(1);
+            var jumped = Vector3D.Distance(ship.PositionComp.GetPosition(), from);
+            var reachAfter = system.GetMaxJumpDistance(Identity);
+            Check(jumped > reach * 0.9, "the ship at its full reach " + F(reach) + " m did not jump (moved " + F(jumped) + " m) after " + F(added) + " kg came into it in the countdown: the reach then " + F(reachAfter) + " m");
+            Result("a ship of " + F(ship.GetCurrentMass() / 1000) + " t (the drive takes " + F(definition.MaxJumpMass / 1000) + " t at full reach) jumped " + F(jumped) + " m of its reach " + F(reach) +
+                   " m, " + F(added) + " kg in in the countdown (the reach then " + F(reachAfter) + " m)");
+        }
+    }
 }
