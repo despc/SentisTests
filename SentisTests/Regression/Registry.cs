@@ -210,6 +210,7 @@ namespace SentisTests.Regression
             Add(() => new BasicFollowPlayerCheck());
             Add(() => new PathRecorderCheck());
             Add(() => new BlockLimitsCheck());
+            Add(() => new WelderLimitsCheck());
             Add(() => new ThrustEnvironmentCheck(SiteKind.Planet));
             Add(() => new ThrustEnvironmentCheck(SiteKind.Space));
             Add(() => new FlameHurtsPlayerCheck());
