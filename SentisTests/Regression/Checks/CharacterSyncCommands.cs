@@ -26,8 +26,8 @@ namespace SentisTests.Regression.Checks
         {
             var floor = Build("sync-floor", Site.At(0, 0, 0), true,
                 Enumerable.Range(-2, 5).SelectMany(x => Enumerable.Range(-2, 5).Select(z => new Part("CubeBlock/LargeBlockArmorBlock", x, 0, z))));
-            Build("sync-near-a", Site.At(20, 3, 0), true, new Part("CubeBlock/LargeBlockArmorBlock", 0, 0, 0));
-            Build("sync-near-b", Site.At(-20, 3, 0), true, new Part("CubeBlock/LargeBlockArmorBlock", 0, 0, 0));
+            var nearA = Build("sync-near-a", Site.At(20, 3, 0), true, new Part("CubeBlock/LargeBlockArmorBlock", 0, 0, 0));
+            var nearB = Build("sync-near-b", Site.At(-20, 3, 0), true, new Part("CubeBlock/LargeBlockArmorBlock", 0, 0, 0));
             yield return Arrive(Site.At(0, 2.5, 0));
             // let go: it stands on the floor, its support
             FakeClients.SetFree(Me, true);
@@ -55,6 +55,9 @@ namespace SentisTests.Regression.Checks
             Check(walked[0] > before * 0.5, $"after the reset the character walks {walked[0]:0.00} m in 1.5 s, {before:0.00} m before it");
             at = body.PositionComp.GetPosition();
 
+            // (the grids round it with its client first: on a busy server they come later, and what the client has not
+            // got is not resent)
+            yield return Until(() => FakeClients.ArrivedFor(Me, nearA) && FakeClients.ArrivedFor(Me, nearB) ? 1 : 0, v => v > 0, "the grids round it on its client", 30);
             answers = Command("!sync player " + steam);
             yield return WaitForTicks(10);
             Note("all: " + string.Join(" | ", answers));
@@ -71,7 +74,7 @@ namespace SentisTests.Regression.Checks
             Note("resend: " + string.Join(" | ", answers));
             yield return Seconds(5);
             Same(body, at, "after resend");
-            Check(FakeClients.ArrivedCount(new[] { (VRage.Game.Entity.MyEntity)body }) == 0, "the character is not on its client again in 5 s");
+            Check(FakeClients.ArrivedFor(Me, body), "the character is not on its client again in 5 s");
             Result("reset, all (grids resent: " + resent.Groups[1].Value + ") and resend: the character where it was, alive, controlled, on its client");
         }
 

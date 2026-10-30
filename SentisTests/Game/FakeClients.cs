@@ -1143,6 +1143,24 @@ namespace SentisTests.Game
         }
 
         /// <summary>How many (entity, client) pairs are still not fully replicated.</summary>
+        /// <summary>Whether the entity is with this one fake client and taken (not pending).</summary>
+        public static bool ArrivedFor(int index, VRage.Game.Entity.MyEntity entity)
+        {
+            if (entity == null || index < 0 || index >= _clientCount) return false;
+            var serverClient = ServerClient(_clients[index]);
+            if (serverClient == null || !(ClientReplicablesField.GetValue(serverClient) is IEnumerable rows)) return false;
+            foreach (var row in rows)
+            {
+                var pair = row.GetType();
+                if (EntityOf(pair.GetProperty("Key")?.GetValue(row)) != entity) continue;
+                var data = pair.GetProperty("Value")?.GetValue(row);
+                var flag = data?.GetType().GetField("IsPending") ?? (MemberInfo)data?.GetType().GetProperty("IsPending");
+                var value = (flag as FieldInfo)?.GetValue(data) ?? (flag as PropertyInfo)?.GetValue(data);
+                return !(value is bool b && b);
+            }
+            return false;
+        }
+
         public static int ArrivedCount(IEnumerable<VRage.Game.Entity.MyEntity> entities)
         {
             var outstanding = 0;
