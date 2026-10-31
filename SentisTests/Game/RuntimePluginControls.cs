@@ -334,6 +334,22 @@ namespace SentisTests.Game
         }
 
         /// <summary>The plugin's per-block detail: load, last run, worst run and the overrun window.</summary>
+        /// <summary>The SO welder counters, verbatim: activations, builds, idle skips and the rest.</summary>
+        public static string WelderSnapshot()
+        {
+            var type = RequiredPluginType("SentisOptimisations", "Optimizer.Optimizations.WelderDiagnostics");
+            return (string)type.GetMethod("Snapshot", BindingFlags.Public | BindingFlags.Static).Invoke(null, null);
+        }
+
+        /// <summary>One welder's activations or idle skips, or 0 when it has none yet.</summary>
+        public static long WelderCounter(long welderId, string dictionaryName)
+        {
+            var type = RequiredPluginType("SentisOptimisations", "Optimizer.Optimizations.WelderDiagnostics");
+            var dictionary = (System.Collections.Concurrent.ConcurrentDictionary<long, long>)type
+                .GetField(dictionaryName, BindingFlags.Public | BindingFlags.Static).GetValue(null);
+            return dictionary.TryGetValue(welderId, out var n) ? n : 0;
+        }
+
         public static string PbReport(int count)
         {
             var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.PbLoad");
