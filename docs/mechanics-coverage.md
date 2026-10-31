@@ -67,6 +67,7 @@
 | Разборка руками и кораблём, полный инвентарь, контейнер с грузом | `hand_grind`, `hand_grind_full`, `ship_grind`, `grind_container` | Покрыто |
 | Уровни инструментов | `hand_tool_tiers` | Покрыто |
 | Проектор, проекция с подгридом | `projector`, `projector_subgrid` | Покрыто |
+| Сварка многогридовой проекции MGP, две последовательные механические связи и работа построенных поршней без проекции | сценарий `multigrid_projector_weld` (нужен MGP) | Live PASS ×2, 31.10.2026; ограничения Torch-адаптера: `multigrid-projector-live.md` |
 | Порог работоспособности блока | `functional_threshold` | Покрыто |
 | Раскол и слияние гридов | `grid_split`, `merge` | Покрыто |
 | Станция в корабль и обратно | `convert_grid`, `grid_conversion` | Покрыто |

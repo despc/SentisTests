@@ -98,6 +98,7 @@ Harmony (`lib\0Harmony.dll`, 2.1.1) лежит в репозитории и ко
 | `SentisAdventures` | NPC и генераторы приключений: `npc_spawn`, проход поведенческих блоков в `world_sweeps` |
 | `VirtualGarage` | `garage_roundtrip` |
 | `SentisTranslator` | перевод чата моделью стенда: `translator_chat`, `translator_restart`; посмотреть самому: `translator_say`, `translator_say_inline`, `translator_say_discord` |
+| `MultigridProjector` | сварка цепочки из трёх гридов по проекции и работа построенных поршней: `multigrid_projector_weld` |
 | `Profiler` | профилирование внутри `load_test` и `freezer_stress_profile`; без него эти сценарии идут и пишут `PROFILE: the Profiler plugin is not loaded here` |
 
 Ещё три внешних условия:
@@ -865,6 +866,13 @@ REST:
 
 **Сварка и проекции**
 - `projector_weld` — строительный корабль ванильными сварщиками строит проекцию 10×10 целиком.
+- `multigrid_projector_weld` — Survival, нужен MGP: из двух блоков основания корабельный сварщик с обычным
+  радиусом строит 15 блоков на трёх гридах, соединённых двумя поршнями. Сабгриды не вставляются готовыми.
+  Проверяются клетки чертежа, типы, полная целостность, обе механические связи и точный расход каждого компонента;
+  затем проекция выключается, оба построенных поршня проходят ход туда и обратно. Чертёж встроен в DLL
+  (`MultigridProjection.xml`); инвентарь заполняется только при подготовке, сущности удаляются при любом исходе.
+  Запуск: `python C:/SE/tools/run_scenario.py multigrid_projector_weld 660`.
+  Live 31.10.2026: два PASS (28,0 / 18,4 с), 15/15 блоков; ограничения Torch-адаптера — в `docs/multigrid-projector-live.md`.
 - `mixed_weld` — то же с блоками всех типов; все функциональные блоки должны появиться.
 - `frozen_radius_weld` — `projector_weld` после заморозки корабля, смены радиуса во время заморозки и
   разморозки.

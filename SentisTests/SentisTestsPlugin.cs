@@ -107,6 +107,12 @@ namespace SentisTests
                 ScenarioRegistry.Register(GroundProbeScenario.ScenarioName, () => new GroundProbeScenario());
                 ScenarioRegistry.Register(TerrainRestoreScenario.ScenarioName, () => new TerrainRestoreScenario());
                 ScenarioRegistry.Register(ProjectorWeldScenario.ScenarioName, () => new ProjectorWeldScenario());
+                ScenarioRegistry.Register(MultigridProjectorWeldScenario.ScenarioName,
+                    () => new MultigridProjectorWeldScenario(), Integrations.MultigridProjector);
+                ScenarioRegistry.Register(MultigridProjectorTrustScenario.ScenarioName,
+                    () => new MultigridProjectorTrustScenario(), Integrations.MultigridProjector, Integrations.Anticheat);
+                ScenarioRegistry.Register(MultigridProjectorClustersScenario.ScenarioName,
+                    () => new MultigridProjectorClustersScenario(), Integrations.MultigridProjector);
                 ScenarioRegistry.Register(FrozenRadiusWeldScenario.ScenarioName, () => new FrozenRadiusWeldScenario());
                 ScenarioRegistry.Register(WelderPerfScenario.ScenarioName, () => new WelderPerfScenario());
                 ScenarioRegistry.Register(WelderPerfScenario.DetachScenarioName,

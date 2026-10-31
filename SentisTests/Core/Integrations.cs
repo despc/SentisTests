@@ -44,10 +44,16 @@ namespace SentisTests.Core
         /// <summary>SentisTranslator: RU/EN chat translation by a local model (llama-server).</summary>
         public const string Translator = "SentisTranslator";
 
+        /// <summary>SentisAnticheat: server-side request trust validation.</summary>
+        public const string Anticheat = "SentisAnticheat";
+
+        /// <summary>MultigridProjector: survival construction of mechanically connected subgrids.</summary>
+        public const string MultigridProjector = "MultigridProjector";
+
         /// <summary>Every optional plugin, in the order of the start-up log line.</summary>
         public static readonly IReadOnlyList<string> Known = new List<string>
         {
-            Optimisations, Gameplay, Ai, Watcher, Adventures, Garage, Profiler, AnomalyZone, Translator,
+            Optimisations, Gameplay, Ai, Watcher, Adventures, Garage, Profiler, AnomalyZone, Translator, MultigridProjector, Anticheat,
         };
 
         // Types are resolved once per session and kept; a plugin that is not loaded yet is looked
