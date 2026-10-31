@@ -74,6 +74,8 @@ namespace SentisTests
                 ResolveReportDirectory();
 
                 ScenarioRegistry.Register(SmokeScenario.ScenarioName, () => new SmokeScenario());
+                ScenarioRegistry.Register(TriadaPbScenario.ScenarioName, () => new TriadaPbScenario());
+                ScenarioRegistry.Register(TriadaMissileScenario.ScenarioName, () => new TriadaMissileScenario());
                 ScenarioRegistry.Register(PlayerStoreRaceScenario.ScenarioName, () => new PlayerStoreRaceScenario());
                 ScenarioRegistry.Register(FatalExceptionScenario.ScenarioName, () => new FatalExceptionScenario());
                 ScenarioRegistry.Register(BotRadiationScenario.ScenarioName, () => new BotRadiationScenario());

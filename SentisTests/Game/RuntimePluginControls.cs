@@ -333,6 +333,16 @@ namespace SentisTests.Game
             return Convert.ToDouble(method.Invoke(null, new[] { programmableBlock }));
         }
 
+        /// <summary>The plugin's per-block detail: load, last run, worst run and the overrun window.</summary>
+        public static string PbReport(int count)
+        {
+            var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.PbLoad");
+            if (type == null) return "plugin not loaded";
+            var method = type.GetMethod("Report", BindingFlags.Public | BindingFlags.Static);
+            if (method == null) throw new InvalidOperationException("PbLoad.Report is unavailable");
+            return (string)method.Invoke(null, new object[] { count });
+        }
+
         /// <summary>What every running script costs the server together, in ms of every frame.</summary>
         public static double PbTotalMsPerFrame()
         {
