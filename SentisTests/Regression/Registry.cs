@@ -140,6 +140,8 @@ namespace SentisTests.Regression
             Add(() => new DecoyCheck());
             Add(() => new SearchlightCheck());
             Add(() => new TurretControllerCheck());
+            Add(() => new RailTurretShipCheck());
+            Add(() => new TurretSearchCadenceCheck());
             Add(() => new FunctionalThresholdCheck());
             Add(() => new HackCheck());
             Add(() => new FallDamageCheck());

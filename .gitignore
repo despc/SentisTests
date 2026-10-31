@@ -3,3 +3,6 @@ obj/
 *.user
 __pycache__/
 *.pyc
+
+# Private local fixture; never publish the player's custom-turret ship.
+/SentisTests/Resources/RailTurretShip.xml

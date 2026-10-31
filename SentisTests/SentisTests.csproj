@@ -122,6 +122,8 @@
     <EmbeddedResource Include="Resources\PistonStack.xml" />
     <EmbeddedResource Include="Resources\RefineryTest.xml" />
     <EmbeddedResource Include="Resources\CustomTurret.xml" />
+    <!-- Optional private local fixture: not distributed in the public repository. -->
+    <EmbeddedResource Include="Resources\RailTurretShip.xml" Condition="Exists('Resources\RailTurretShip.xml')" />
   </ItemGroup>
 
 </Project>

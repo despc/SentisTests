@@ -161,7 +161,7 @@
 | Механика | Проверки | Покрытие |
 | --- | --- | --- |
 | Ручное оружие | `hand_weapons`, `rifle` | Покрыто |
-| Оружейные блоки (все), турели, их цели, контроллер турели | `weapon_blocks`, `turret`, `turret_relations`, `turret_character`, `turret_controller` | Покрыто |
+| Оружейные блоки (все), турели, их цели, контроллер турели | `weapon_blocks`, `turret`, `turret_relations`, `turret_character`, `turret_controller`, `rail_turret_ship`, `turret_search_cadence` | Покрыто |
 | Боеголовки: взрыв, отсчёт, цепная детонация | `warhead`, `warhead_countdown`, `warhead_chain` | Покрыто |
 | Взрыв боеприпасов и водородного бака | `ammo_explosion`, `hydrogen_tank_blast` | Покрыто |
 | Урон игроку: взрыв, пламя, другой игрок | `explosion_hurts_player`, `flame_hurts_player`, `player_damage` | Покрыто |

@@ -179,4 +179,212 @@ namespace SentisTests.Regression.Checks
             target.IsEmpty() ? "none" : target.Name + " " + target.EntityId + " at " + F(Vector3D.Distance(target.Position, launcher.PositionComp.GetPosition())) + " m, the launcher " +
                                         F(Motion.Angle(launcher.WorldMatrix.Forward, target.Position - launcher.PositionComp.GetPosition())) + " degrees off it";
     }
+
+    /// <summary>
+    /// A player's warship with custom turrets (a prod blueprint, 30.10.2026): a large ship of 437 blocks with 8 turrets
+    /// of its own make, each a hinge, a rotor and a small head of 6 railguns turned by a turret controller on the head
+    /// (one head has no guns). Enemy stations come round the ship, 360-450 m off: each controller with railguns takes
+    /// one for its target, turns its head on it, its railguns fire (their rounds go down) and the stations take damage;
+    /// in a fight of 45 s after that each fires again, at the next block once the one it aimed at is gone.
+    /// </summary>
+    public sealed class RailTurretShipCheck : RegressionCheck
+    {
+        public override string Name => Prefix + "rail_turret_ship";
+        public override int TimeoutSeconds => 300;
+        protected override bool NeedsDamage => true;
+
+        internal const string ResourceName = "SentisTests.Resources.RailTurretShip.xml";
+
+        protected override IEnumerator Check()
+        {
+            SkipUnless(typeof(RailTurretShipCheck).Assembly.GetManifestResourceInfo(ResourceName) != null,
+                "optional local RailTurretShip.xml fixture is not embedded");
+            SkipUnless(!Game.Mods.WeaponCore, "WeaponCore runs the weapons in this world: the railguns are not the game's");
+            HoldHighQuality();
+            yield return Arrive(Site.At(-60, 0, -60));
+            var enemy = -1;
+            yield return Join(Site.At(15, 10, 5000), i => enemy = i);
+            var group = WorldApi.LoadAuthoredGroup(ResourceName, WorldApi.EntityPrefix + "rail-turret-ship");
+            var hull = group.OrderByDescending(g => g.CubeBlocks.Count).First();
+            var move = MatrixD.Invert(hull.PositionAndOrientation.Value.GetMatrix()) * MatrixD.CreateWorld(Site.Origin, Site.Forward, Site.Up);
+            foreach (var ob in group)
+            {
+                ob.PositionAndOrientation = new VRage.MyPositionAndOrientation(ob.PositionAndOrientation.Value.GetMatrix() * move);
+                ob.LinearVelocity = default;
+                ob.AngularVelocity = default;
+                foreach (var block in ob.CubeBlocks)
+                {
+                    block.Owner = Identity;
+                    block.BuiltBy = Identity;
+                }
+            }
+            var grids = group.Select(WorldApi.SpawnGrid).ToList();
+            foreach (var grid in grids) Track(grid);
+            foreach (var grid in grids) WorldApi.ChargeBatteries(grid);
+            var blocks = grids.SelectMany(g => g.GetFatBlocks()).ToList();
+            var railguns = blocks.Where(b => b.BlockDefinition.Id.SubtypeName.EndsWith("Railgun")).ToList();
+            var ammo = railguns.ToDictionary(b => b, b => b.BlockDefinition.Id.SubtypeName == "LargeRailgun" ? "AmmoMagazine/LargeRailgunAmmo" : "AmmoMagazine/SmallRailgunAmmo");
+            foreach (var gun in railguns) Put(Inventory(gun), ammo[gun], 10);
+            // the blueprint's railguns hold rounds of their own: shots are counted from what each holds now
+            var loaded = railguns.ToDictionary(b => b, b => Amount(Inventory(b), ammo[b]));
+            var controllers = blocks.Where(b => b.BlockDefinition.Id.TypeId.ToString().EndsWith("TurretControlBlock"))
+                .Select(b => (SpaceEngineers.Game.ModAPI.Ingame.IMyTurretControlBlock)b).ToList();
+            Check(controllers.Count > 0, "the blueprint has no turret controllers");
+            // a controller finds its rotors and tools by their ids once the grids are all in the world, a frame or so later
+            yield return WaitForTicks(60);
+            var tools = controllers.ToDictionary(c => c, c =>
+            {
+                var list = new System.Collections.Generic.List<Sandbox.ModAPI.Ingame.IMyFunctionalBlock>();
+                c.GetTools(list);
+                return list;
+            });
+            // the controllers that turn railguns: the ones that should shoot
+            var armed = controllers.Where(c => c.AzimuthRotor != null && c.ElevationRotor != null && tools[c].Any(t => railguns.Contains((MyCubeBlock)t))).ToList();
+            string Who(SpaceEngineers.Game.ModAPI.Ingame.IMyTurretControlBlock c) => c.CustomName + " on " + ((MyCubeBlock)c).CubeGrid.DisplayName;
+            Note(grids.Count + " grids, " + blocks.Count + " functional blocks, " + railguns.Count + " railguns, " + controllers.Count + " turret controllers: " + string.Join("; ", controllers.Select(c =>
+                Who(c) + " (" + tools[c].Count + " tools, " + tools[c].Count(t => railguns.Contains((MyCubeBlock)t)) + " railguns, azimuth " + (c.AzimuthRotor != null) + ", elevation " + (c.ElevationRotor != null) + ")")));
+            Check(armed.Count > 0, "no turret controller with rotors turns a railgun");
+            foreach (var c in armed)
+            {
+                var az = (Sandbox.ModAPI.IMyMotorStator)c.AzimuthRotor;
+                var el = (Sandbox.ModAPI.IMyMotorStator)c.ElevationRotor;
+                // the elevation a direction asks: its angle over the plane square to the azimuth rotor's axis
+                Func<Vector3D, double> over = d => 90 - Motion.Angle(az.WorldMatrix.Up, d);
+                Note(Who(c) + ": azimuth rotor " + az.BlockDefinition.SubtypeName + " limits " + F(MathHelper.ToDegrees(az.LowerLimitRad)) + ".." + F(MathHelper.ToDegrees(az.UpperLimitRad)) +
+                     ", its axis " + F(Motion.Angle(az.WorldMatrix.Up, Site.Up)) + " degrees off the site's up; elevation " + el.BlockDefinition.SubtypeName + " limits " +
+                     F(MathHelper.ToDegrees(el.LowerLimitRad)) + ".." + F(MathHelper.ToDegrees(el.UpperLimitRad)) + "; the guns look " + F(over(((MyCubeBlock)tools[c][0]).WorldMatrix.Forward)) +
+                     " degrees over the azimuth plane; up ahead 40 degrees asks " + F(over(Site.At(0, 290, 345) - az.PositionComp.GetPosition())) + ", up to the right " + F(over(Site.At(345, 290, 0) - az.PositionComp.GetPosition())) +
+                     "; the head " + F(Vector3D.Dot(az.PositionComp.GetPosition() - Site.Origin, Site.Up)) + " m up, " + F(Vector3D.Dot(az.PositionComp.GetPosition() - Site.Origin, Site.Right)) + " m right, " +
+                     F(Vector3D.Dot(az.PositionComp.GetPosition() - Site.Origin, Site.Forward)) + " m ahead");
+            }
+            yield return Until(() => armed.Count(c => ((MyCubeBlock)c).IsWorking), v => v == armed.Count, "the armed turret controllers working", 20,
+                () => string.Join("; ", armed.Where(c => !((MyCubeBlock)c).IsWorking).Select(c => Who(c) + ": " + State((MyCubeBlock)c))));
+
+            // The turrets stand with their guns straight along the azimuth rotor's axis (their hinges at -90 degrees,
+            // a limit): the azimuth that brings them to a target is not defined there, and the controller left top
+            // ones so for 25-50 s with a target in reach, until a knock moved them (the game's own way with this
+            // blueprint, 31.10.2026). Their hinges are turned 5 degrees off first, as a player's turret is after its
+            // first fight.
+            var upright = armed.Where(c => Motion.Angle(((MyCubeBlock)tools[c][0]).WorldMatrix.Forward, c.AzimuthRotor.WorldMatrix.Up) < 2 ||
+                                           Motion.Angle(((MyCubeBlock)tools[c][0]).WorldMatrix.Forward, c.AzimuthRotor.WorldMatrix.Up) > 178).ToList();
+            // (the controllers hold their rotors even with no target: off meanwhile)
+            foreach (var c in upright) ((Sandbox.ModAPI.IMyFunctionalBlock)c).Enabled = false;
+            foreach (var c in upright)
+            {
+                var hinge = (Sandbox.ModAPI.IMyMotorStator)c.ElevationRotor;
+                var toward = Math.Abs(hinge.Angle - hinge.LowerLimitRad) < Math.Abs(hinge.Angle - hinge.UpperLimitRad) ? 1 : -1;
+                hinge.TargetVelocityRPM = toward * 2;
+            }
+            yield return Until(() => upright.Count(c => Math.Min(Motion.Angle(((MyCubeBlock)tools[c][0]).WorldMatrix.Forward, c.AzimuthRotor.WorldMatrix.Up),
+                                                                  180 - Motion.Angle(((MyCubeBlock)tools[c][0]).WorldMatrix.Forward, c.AzimuthRotor.WorldMatrix.Up)) >= 5),
+                v => v == upright.Count, "the upright turrets' hinges turned 5 degrees off", 15,
+                () => string.Join("; ", upright.Select(c => Who(c) + " hinge at " + F(MathHelper.ToDegrees(c.ElevationRotor.Angle)))));
+            foreach (var c in upright)
+            {
+                ((Sandbox.ModAPI.IMyMotorStator)c.ElevationRotor).TargetVelocityRPM = 0;
+                ((Sandbox.ModAPI.IMyFunctionalBlock)c).Enabled = true;
+            }
+            Note(upright.Count + " upright turrets turned off their axis: " + string.Join("; ", upright.Select(c => Who(c) + " hinge at " + F(MathHelper.ToDegrees(c.ElevationRotor.Angle)))));
+
+            // the enemy's stations round the ship, 40 degrees up ahead, behind and to the sides, each 450 m off, for the
+            // turrets on the ship's sides (their rotors' axes level, their hinges from -90 to 5 degrees); and one 80
+            // degrees up, 360 m off, for the 4 turrets on top: their hinges are held from -90 to -70 degrees, the guns
+            // look 70 to 90 degrees up and no more (one at 70 degrees was out of reach; straight up the azimuth means
+            // nothing). That one is straight over the ship's middle line, where the side turrets' azimuth axes (level,
+            // across the ship) reach it too: off to a side it was nearest to them and out of their hinges' reach, and
+            // one strained at it 50 s before it took another
+            // Each a wall of 9 x 9 heavy armor blocks before 25 batteries: the blueprint's controllers aim at power
+            // systems only and are left with no target once those are gone (one battery went with the first volley)
+            var wall = new System.Collections.Generic.List<Part>();
+            for (var x = -4; x <= 4; x++)
+            for (var y = -4; y <= 4; y++)
+            {
+                wall.Add(new Part("CubeBlock/LargeHeavyBlockArmorBlock", x, y, 0));
+                if (Math.Abs(x) <= 2 && Math.Abs(y) <= 2) wall.Add(new Part("BatteryBlock/LargeBlockBatteryBlock", x, y, 1).With(b => Motion.Charged(b)));
+            }
+            var places = new[] { Site.At(0, 290, 345), Site.At(0, 290, -345), Site.At(345, 290, 0), Site.At(-345, 290, 0), Site.At(0, 400, 70) };
+            var stations = places.Select((at, i) => BuildFacing("rail-turret-target-" + i, at, wall, enemy)).ToList();
+            var stationIds = new System.Collections.Generic.HashSet<long>(stations.Select(x => x.EntityId));
+            Func<double> integrity = () => stations.Sum(station => station.MarkedForClose ? 0 : station.GetBlocks().Sum(b => (double)b.Integrity));
+            var whole = integrity();
+            var targeted = new System.Collections.Generic.HashSet<object>();
+            var aimed = new System.Collections.Generic.HashSet<object>();
+            var fired = new System.Collections.Generic.HashSet<MyCubeBlock>();
+            var shots = 0.0;
+            var seen = new System.Collections.Generic.Dictionary<object, string>();
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            // which station a controller holds, and where it is from its head
+            string Target(SpaceEngineers.Game.ModAPI.Ingame.IMyTurretControlBlock c)
+            {
+                var t = c.GetTargetedEntity();
+                var i = stations.FindIndex(x => x.EntityId == t.EntityId);
+                var from = c.AzimuthRotor.GetPosition();
+                return (i < 0 ? t.Name : "station " + i) + " (" + Math.Round(Vector3D.Distance(t.Position, from) / 10) * 10 + " m, " + Math.Round(90 - Motion.Angle(c.AzimuthRotor.WorldMatrix.Up, t.Position - from)) + " degrees over the azimuth plane)";
+            }
+            Func<double> look = () =>
+            {
+                foreach (var c in armed)
+                {
+                    if (c.HasTarget && stationIds.Contains(c.GetTargetedEntity().EntityId)) targeted.Add(c);
+                    if (c.IsAimed) aimed.Add(c);
+                    var gunsShot = tools[c].Sum(t => railguns.Contains((MyCubeBlock)t) ? loaded[(MyCubeBlock)t] - Amount(Inventory((MyCubeBlock)t), ammo[(MyCubeBlock)t]) : 0);
+                    var now = (c.HasTarget ? "target " + Target(c) : "no target") + (c.IsAimed ? ", aimed" : "") + ", " + F(gunsShot) + " shots";
+                    if (!seen.TryGetValue(c, out var was) || was != now)
+                    {
+                        seen[c] = now;
+                        Note(F(clock.Elapsed.TotalSeconds) + " s: " + Who(c) + ": " + now + "; azimuth " + F(MathHelper.ToDegrees(c.AzimuthRotor.Angle)) + ", elevation " +
+                             F(MathHelper.ToDegrees(c.ElevationRotor.Angle)) + "; the stations " + F(integrity()) + " of " + F(whole) + " integrity, their batteries " +
+                             stations.Sum(x => x.GetFatBlocks().Count(b => b is Sandbox.Game.Entities.MyBatteryBlock)));
+                    }
+                }
+                shots = 0;
+                foreach (var gun in railguns)
+                {
+                    var used = loaded[gun] - Amount(Inventory(gun), ammo[gun]);
+                    if (used > 0) fired.Add(gun);
+                    shots += used;
+                }
+                return armed.Count(c => tools[c].Any(t => fired.Contains((MyCubeBlock)t)));
+            };
+            Func<string> state = () => "targeted " + targeted.Count + ", aimed " + aimed.Count + " of " + armed.Count + " armed controllers, " + fired.Count + " railguns fired (" + F(shots) + " shots), damage " +
+                                       F(whole - integrity()) + "; not firing: " + string.Join("; ", armed.Where(c => !tools[c].Any(t => fired.Contains((MyCubeBlock)t))).Select(c =>
+                                           Who(c) + " target " + (c.HasTarget ? c.GetTargetedEntity().Name : "none") + ", aimed " + c.IsAimed + ", azimuth " + F(MathHelper.ToDegrees(c.AzimuthRotor.Angle)) +
+                                           ", elevation " + F(MathHelper.ToDegrees(c.ElevationRotor.Angle)) + ", " + ((Sandbox.ModAPI.IMyTerminalBlock)c).DetailedInfo.Trim().Replace("\n", " ")));
+            yield return Until(look, v => v == armed.Count, "every armed turret controller's railguns firing at the enemy stations", 30, state);
+            var first = clock.Elapsed.TotalSeconds;
+            // then a fight of 45 s: the batteries a controller aims at go one by one, and it takes another and fires again
+            Func<SpaceEngineers.Game.ModAPI.Ingame.IMyTurretControlBlock, double> shotsOf = c =>
+                tools[c].Where(t => railguns.Contains((MyCubeBlock)t)).Sum(t => loaded[(MyCubeBlock)t] - Amount(Inventory((MyCubeBlock)t), ammo[(MyCubeBlock)t]));
+            // (45 s of the game's time, 2700 frames: a railgun charges in it, and the full regression slows the game down)
+            var fight = System.Diagnostics.Stopwatch.StartNew();
+            for (var frame = 0; frame < 2700 && fight.Elapsed.TotalSeconds < 150; frame++)
+            {
+                look();
+                yield return null;
+            }
+            var speed = 45 / fight.Elapsed.TotalSeconds;
+            var again = armed.Where(c => shotsOf(c) > tools[c].Count(t => railguns.Contains((MyCubeBlock)t))).ToList();
+            Check(again.Count == armed.Count, "turret controllers that fired one volley and no more in 45 s of the game (the game at " + F(speed * 100) + " % speed): " + string.Join("; ", armed.Except(again).Select(c => Who(c) + " " + F(shotsOf(c)) + " shots")) + "; " + state());
+            Check(whole - integrity() > 0, "the railguns fired but the enemy stations took no damage: " + state());
+            Result("all " + armed.Count + " armed turret controllers fired within " + F(first) + " s and kept firing: " + F(shots) + " shots in " + F(clock.Elapsed.TotalSeconds) + " s, the fight at " + F(Math.Min(1, speed) * 100) + " % of the game's speed (" +
+                   string.Join(", ", armed.Select(c => F(shotsOf(c)))) + " by controller), " + F(whole - integrity()) + " damage, the stations' batteries " +
+                   stations.Sum(x => x.GetFatBlocks().Count(b => b is Sandbox.Game.Entities.MyBatteryBlock)) + " of " + stations.Count * 25 + " left" + Searches());
+        }
+
+        /// <summary>SentisOptimisations' turret controllers' target searches (TurretControlTargetSelect), when it has them.</summary>
+        private static string Searches()
+        {
+            var type = AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("Optimizer.Optimizations.TurretControlTargetSelect", false)).FirstOrDefault(t => t != null);
+            if (type == null) return "; the controllers search for a target every frame (the game's way)";
+            return "; target searches since the start " + type.GetField("Started")?.GetValue(null) + ", skipped " + type.GetField("Skipped")?.GetValue(null) + " (SentisOptimisations: idle period " + type.GetField("Period")?.GetRawConstantValue() + " frames)";
+        }
+
+        /// <summary>The enemy's station built with its armor facing the ship (its battery behind, +Z being backward).</summary>
+        private MyCubeGrid BuildFacing(string name, Vector3D at, System.Collections.Generic.List<Part> parts, int enemy)
+        {
+            var toShip = Vector3D.Normalize(Site.Origin - at);
+            return Build(name, at, true, parts, forward: toShip, up: Vector3D.Normalize(Vector3D.Cross(Vector3D.Cross(toShip, Site.Up), toShip)),
+                ownedBy: FakeClients.PlayerOf(enemy).Identity.IdentityId);
+        }
+    }
 }
