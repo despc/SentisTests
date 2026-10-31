@@ -246,6 +246,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(WatcherRecordScenario.ScenarioName, () => new WatcherRecordScenario());
                 ScenarioRegistry.Register(WatcherLoadScenario.ScenarioName, () => new WatcherLoadScenario());
                 ScenarioRegistry.Register(WatcherLedgerScenario.ScenarioName, () => new WatcherLedgerScenario());
+                ScenarioRegistry.Register(WatcherNpcLedgerScenario.ScenarioName, () => new WatcherNpcLedgerScenario());
                 ScenarioRegistry.Register(ThrustFlameScenario.ScenarioName, () => new ThrustFlameScenario());
                 ScenarioRegistry.Register(TurretTargetScenario.ScenarioName, () => new TurretTargetScenario());
                 ScenarioRegistry.Register(ExplosionFriendlyFireScenario.ScenarioName, () => new ExplosionFriendlyFireScenario());
@@ -440,7 +441,8 @@ namespace SentisTests
 
             ScenarioRegistry.Needs(Integrations.Watcher,
                 WatcherRecordScenario.ScenarioName,
-                WatcherLoadScenario.ScenarioName);
+                WatcherLoadScenario.ScenarioName,
+                WatcherNpcLedgerScenario.ScenarioName);
 
             ScenarioRegistry.Needs(Integrations.Adventures, NpcSpawnScenario.ScenarioName);
             ScenarioRegistry.Needs(Integrations.Garage, GarageRoundtripScenario.ScenarioName);

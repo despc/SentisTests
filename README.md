@@ -94,7 +94,7 @@ Harmony (`lib\0Harmony.dll`, 2.1.1) лежит в репозитории и ко
 | `SentisOptimisations` (SO) | фризер гридов и физики, бюджет кадров производства, выборочная физика, наказание ПБ, параллельное сохранение, правка патчей Torch: `freeze_*`, `freezer_*`, `production_freezer_stress`, `refinery_perf_busy`, `physics_resume`, `unstepped_blocks`, `power_switch`, `panel_server`, `pb_*`, `frozen_radius_weld`, `piston_stack`, `laser_*`, `remote_control_anchors` |
 | `SentisGameplayImprovements` (SGI) | взрывы, лимит PCU, возврат провалившихся гридов, цены контрактов, PvE-зона, поле астероидов, застревание в вокселях, цена резака: `explosions`, `pcu_limit`, `pcu_limit_cost`, `pve_zone`, `wheel_*`, `fall_through_tunnel`, `wreck_restore`, `contract_prices`, `voxel_stuck`, `asteroid_field`, `world_sweeps` |
 | `SentisAi` | боты: `bot_*` и `ai_status_ui` |
-| `SentisWatcher` | записи и учёт: `watcher_record`, `watcher_load`, `watcher_ledger` |
+| `SentisWatcher` | записи и учёт: `watcher_record`, `watcher_load`, `watcher_ledger`, `watcher_npc_ledger` |
 | `SentisAdventures` | NPC и генераторы приключений: `npc_spawn`, проход поведенческих блоков в `world_sweeps` |
 | `VirtualGarage` | `garage_roundtrip` |
 | `SentisTranslator` | перевод чата моделью стенда: `translator_chat`, `translator_restart`; посмотреть самому: `translator_say`, `translator_say_inline`, `translator_say_discord` |
@@ -1205,6 +1205,7 @@ REST:
 - `watcher_record` — SentisWatcher: позиции игрока и грида, перенос предметов (запрос от клиента игрока), урон, содержимое инвентаря и «кто был рядом» записаны и читаются командами; честный перенос не даёт алерта о дюпе.
 - `watcher_load` — SentisWatcher под нагрузкой: 64 Spitfire с игроками в кокпитах летают туда-сюда, двое прыгают; окна с записью и без сравнивают цену кадра, потом проверяется, что позиции, инвентари, захват управления и прыжки записаны и ничего не потеряно.
 - `watcher_ledger` — учёт инвентарей SentisWatcher: честные перенос, сборка и переработка, разборка прототех-гироскопа в лом и починка корабля ALE ShipFixer с пилотом на прожекторе (блоки и пилот загружаются заново) не дают алертов; сборка и разборка без входа, переработка без руды и правка стака в обход игры дают свои алерты; учёт игрока раскладывает каждое изменение по источнику (в том числе «плагин SentisTests» и «необъяснено»).
+- `watcher_npc_ledger` — контролируемая identity-map fixture, не полноценный спавн NPC: у второй из двух тестовых личностей временно меняется только обратная привязка на SteamId первой с serial 17 (без NPC-флага). Реальные IsPlayer и Balance Watcher: прямые прибавки Medkit +1 и SpaceCredit +283 записываются в БД как «необъяснено», но не дают bypass/unknown_source; первичный клиент даёт bypass. Та же сущность после возврата serial 0 снова даёт bypass (подавление не навсегда). Привязка восстанавливается в finally и Cleanup; настройки и лимитер алертов не меняются. Только SentisWatcher, без SO.
 - `npc_spawn` — SentisAdventures:
   - NPC-корабль приходит целым и не пересоздаётся;
   - база на планете стоит вертикально, статично, низом на грунте, без блоков в скале.
