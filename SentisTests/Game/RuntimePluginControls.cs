@@ -350,6 +350,29 @@ namespace SentisTests.Game
             return dictionary.TryGetValue(welderId, out var n) ? n : 0;
         }
 
+        /// <summary>(welder id, gameplay frame) for the listed welders' activations since a frame, oldest first.</summary>
+        public static System.Collections.Generic.List<long[]> WelderActivationFrames(
+            System.Collections.Generic.HashSet<long> welderIds, long sinceFrame)
+        {
+            var type = RequiredPluginType("SentisOptimisations", "Optimizer.Optimizations.WelderDiagnostics");
+            var queue = (System.Collections.Concurrent.ConcurrentQueue<System.Collections.Generic.KeyValuePair<long, long>>)type
+                .GetField("RecentActivationFrames", BindingFlags.Public | BindingFlags.Static).GetValue(null);
+            var frames = new System.Collections.Generic.List<long[]>();
+            foreach (var entry in queue)
+                if (entry.Value >= sinceFrame && welderIds.Contains(entry.Key))
+                    frames.Add(new[] { entry.Key, entry.Value });
+            return frames;
+        }
+
+        /// <summary>Damaged targets found on this welder's latest activation, or -1 if none recorded.</summary>
+        public static int WelderTargetCount(long welderId)
+        {
+            var type = RequiredPluginType("SentisOptimisations", "Optimizer.Optimizations.WelderDiagnostics");
+            var dictionary = (System.Collections.Concurrent.ConcurrentDictionary<long, int>)type
+                .GetField("LastTargetsByWelder", BindingFlags.Public | BindingFlags.Static).GetValue(null);
+            return dictionary.TryGetValue(welderId, out var n) ? n : -1;
+        }
+
         public static string PbReport(int count)
         {
             var type = PluginType("SentisOptimisations", "SentisOptimisationsPlugin.PbLoad");
