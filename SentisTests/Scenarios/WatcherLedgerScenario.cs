@@ -308,6 +308,15 @@ namespace SentisTests.Scenarios
             Track(backpack);
             Track(cargoBag);
 
+            // Fractional amounts: a hand-tool stack is live noise and must not raise bad_amount;
+            // a fractional component still must.
+            var fractions = Spawn("fractions", centre + side * 220, up, side, identity, "LargeBlockSmallContainer").GetFatBlocks().First();
+            var fractionInventory = (MyInventory)fractions.GetInventory(0);
+            fractionInventory.AddItems((MyFixedPoint)(float)1.166667f, new MyObjectBuilder_PhysicalGunObject { SubtypeName = "HandDrillItem" });
+            fractionInventory.AddItems((MyFixedPoint)(float)1.5f, new MyObjectBuilder_Component { SubtypeName = "SteelPlate" });
+            var drillId = new MyDefinitionId(typeof(MyObjectBuilder_PhysicalGunObject), "HandDrillItem");
+            Note($"fractions: drills {fractionInventory.GetItemAmount(drillId)}, plates {fractionInventory.GetItemAmount(SteelPlate)}");
+
             pass = Pass(sweep);
             while (pass.MoveNext()) yield return pass.Current;
             var flush = WaitForSeconds(3, "the records are written");
@@ -328,6 +337,8 @@ namespace SentisTests.Scenarios
                 "an honest inventory raised a bypass alert");
             Check(!alerts.Any(x => (string)x["kind"] == "dupe_transfer"), "an honest transfer raised a dupe alert");
             Check(!alerts.Any(x => (string)x["kind"] == "unknown_source"), "an item came from a path the ledger does not know");
+            Check(!Has("bad_amount", "HandDrillItem"), "a fractional hand tool raised a bad_amount alert");
+            Check(Has("bad_amount", "SteelPlate"), "a fractional component raised no bad_amount alert");
             var pilotAlerts = ((List<Dictionary<string, object>>)anomalies["alerts"]).Where(x => x["actor"] as string == pilotIdentity.ToString()).ToList();
             foreach (var alert in pilotAlerts) Note($"pilot's alert {alert["kind"]}: {alert["detail"]}");
             Check(!pilotAlerts.Any(x => (string)x["kind"] == "unknown_source"), "the fixed ship's pilot got items from a path the ledger does not know");
