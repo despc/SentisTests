@@ -76,6 +76,15 @@
               <EntityId>109203266169122609</EntityId>
               <Min x="0" y="3" z="0" />
             </MyObjectBuilder_CubeBlock>
+            <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_ButtonPanel">
+              <SubtypeName>ButtonPanelLarge</SubtypeName>
+              <EntityId>120000000000000101</EntityId>
+              <Min x="0" y="4" z="0" />
+              <Toolbar>
+                <SelectedIndex>0</SelectedIndex>
+                <Slots />
+              </Toolbar>
+            </MyObjectBuilder_CubeBlock>
             <MyObjectBuilder_CubeBlock xsi:type="MyObjectBuilder_ExtendedPistonBase">
               <SubtypeName>LargePistonBase</SubtypeName>
               <EntityId>105828862911703379</EntityId>
