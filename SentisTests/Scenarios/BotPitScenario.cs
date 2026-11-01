@@ -27,19 +27,21 @@ namespace SentisTests.Scenarios
     /// </remarks>
     public sealed class BotPitScenario : TestScenario
     {
-        public const string ScenarioName = "bot_pit", ClosedName = "bot_pit_closed", FarName = "bot_pit_far";
-        private readonly bool _closed, _far;
+        public const string ScenarioName = "bot_pit", ClosedName = "bot_pit_closed", FarName = "bot_pit_far", OldSiteName = "bot_pit_old_site";
+        private readonly bool _closed, _far, _oldSite;
 
-        public BotPitScenario(bool closed = false, bool far = false)
+        public BotPitScenario(bool closed = false, bool far = false, bool oldSite = false)
         {
             _closed = closed || far;
             _far = far;
+            _oldSite = oldSite;
         }
         private const double ShaftDepthM = 26, ChamberRadiusM = 3.5;
         private const int WatchSeconds = 360;
 
-        public override string Name => _far ? FarName : _closed ? ClosedName : ScenarioName;
-        public override int TimeoutSeconds => WatchSeconds + 120;
+        public override string Name => _oldSite ? OldSiteName : _far ? FarName : _closed ? ClosedName : ScenarioName;
+        public override int TimeoutSeconds => WatchSeconds + (_oldSite ? 480 : 120);
+        public override bool KeepsNewGrids => true;
 
         private MyPlanet _planet;
         private Vector3D _site;
@@ -54,7 +56,9 @@ namespace SentisTests.Scenarios
                                                                                      !(p.Controller?.ControlledEntity is MyShipController) &&
                                                                                      MyGamePruningStructure.GetClosestPlanet(p.Character.PositionComp.GetPosition()) != null &&
                                                                                      // (not on its way to charge or fill up: a walk to its kit that has gone on for minutes ends in a respawn at it)
-                                                                                     !BusyCharging(p));
+                                                                                     !BusyCharging(p) && (!_oldSite ||
+                     SentisAiBot(p)?.GetType().GetProperty("Phase")?.GetValue(SentisAiBot(p))?.ToString() == "Mining" &&
+                     (double)MyEntityExtensions.GetInventory(p.Character).CurrentVolume < 0.1 * (double)MyEntityExtensions.GetInventory(p.Character).MaxVolume));
                 return bot != null;
             }, "a bot on foot on a planet", 300);
             while (found.MoveNext()) yield return found.Current;
@@ -77,7 +81,7 @@ namespace SentisTests.Scenarios
             away -= up * Vector3D.Dot(away, up);
             if (away.LengthSquared() < 1) away = Vector3D.CalculatePerpendicularVector(up);
             away.Normalize();
-            var site = ground.Ground(at + away * (_closed ? 350 : 25));
+            var site = ground.Ground(at + away * (_closed ? 350 : _oldSite ? 100 : 25));
             _site = site;
             up = ground.Up(site);
 
@@ -118,12 +122,28 @@ namespace SentisTests.Scenarios
             var pockets = MyEntityExtensions.GetInventory(bot.Character);
             var stone = new VRage.Game.MyDefinitionId(typeof(VRage.Game.MyObjectBuilder_Ore), "Stone");
             var room = pockets.ComputeAmountThatFits(stone);
-            if (room > 1) pockets.AddItems(room * 0.95f, new VRage.Game.MyObjectBuilder_Ore { SubtypeName = "Stone" });
+            if (!_oldSite && room > 1) pockets.AddItems(room * 0.95f, new VRage.Game.MyObjectBuilder_Ore { SubtypeName = "Stone" });
+            if (_oldSite)
+            {
+                // The bot has rejected a ramp mouth at the bottom, with almost empty pockets.
+                var ai = SentisAiBot(bot);
+                const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+                foreach (var field in new[] { "_atStone", "_rampBack", "_rareTrip", "_homeFirst" })
+                    ai.GetType().GetField(field, flags).SetValue(ai, false);
+                foreach (var field in new[] { "_stoneSite", "_stoneSearch", "_entrance", "_rampDir", "_route", "_walkTo", "_hoverDetour", "_climbOut", "_unstick" })
+                    ai.GetType().GetField(field, flags).SetValue(ai, null);
+                // The scenario moved the body to a new discarded pit. Do not retain an escape target from its old location.
+                var recovery = ai.GetType().GetField("_stoneRecovery", flags)?.GetValue(ai);
+                recovery?.GetType().GetProperty("Target")?.GetSetMethod(true)?.Invoke(recovery, new object[] { null });
+                var phase = ai.GetType().GetProperty("Phase");
+                phase.SetValue(ai, System.Enum.Parse(phase.PropertyType, "Mining"));
+            }
             var hydrogen = MyCharacterOxygenComponent.HydrogenId;
-            bot.Character.OxygenComponent.UpdateStoredGasLevel(ref hydrogen, 0f);
-            yield return WaitForTicks(120);
-            Check(Depth() > ShaftDepthM - 2, $"{name} is not in the pit two seconds after being put there ({Depth():0.0} m down)");
-            Note($"{name}: put {Depth():0.0} m down at the foot of a {ShaftDepthM:0} m shaft {Vector3D.Distance(site, at):0} m from where it stood, energy {bot.Character.SuitEnergyLevel * 100:0}%, hydrogen 0%");
+            bot.Character.OxygenComponent.UpdateStoredGasLevel(ref hydrogen, _oldSite ? 1f : 0f);
+            var startingStone = pockets.GetItemAmount(stone);
+            yield return WaitForTicks(_oldSite ? 1 : 120);
+            Check(Depth() > ShaftDepthM - 2, $"{name} is not in the pit after being put there ({Depth():0.0} m down)");
+            Note($"{name}: put {Depth():0.0} m down at the foot of a {ShaftDepthM:0} m shaft {Vector3D.Distance(site, at):0} m from where it stood, energy {bot.Character.SuitEnergyLevel * 100:0}%, hydrogen {(_oldSite ? 100 : 0)}%");
 
             var outAt = -1;
             var deaths = 0;
@@ -143,6 +163,16 @@ namespace SentisTests.Scenarios
             Note(outAt >= 0 ? $"{name}: out on the surface after {outAt} s" : $"{name}: still {Depth():0.0} m down after {WatchSeconds} s");
             Check(deaths == 0, $"{name} died or respawned in the pit");
             Check(outAt >= 0, $"{name} did not get out of a {ShaftDepthM:0} m pit on foot in {WatchSeconds} s ({Depth():0.0} m down)");
+            if (_oldSite)
+            {
+                var mined = Wait(() =>
+                {
+                    Check(bot.Character != null && !bot.Character.IsDead && bot.Character.EntityId == body0, "bot respawned instead of resuming mining");
+                    return MyEntityExtensions.GetInventory(bot.Character).GetItemAmount(stone) > startingStone + 1;
+                }, "new stone collected after leaving the discarded pit", 300);
+                while (mined.MoveNext()) yield return mined.Current;
+                Note("same body left the old pit and collected new stone");
+            }
         }
 
         /// <summary>The SentisAi bot playing the player (its plugin's manager, by reflection: no reference to it here).</summary>

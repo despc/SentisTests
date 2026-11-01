@@ -83,6 +83,9 @@ namespace SentisTests
                 ScenarioRegistry.Register(BotPitScenario.ScenarioName, () => new BotPitScenario());
                 ScenarioRegistry.Register(BotPitScenario.ClosedName, () => new BotPitScenario(closed: true));
                 ScenarioRegistry.Register(BotPitScenario.FarName, () => new BotPitScenario(far: true));
+                ScenarioRegistry.Register(BotPitScenario.OldSiteName, () => new BotPitScenario(oldSite: true));
+                ScenarioRegistry.Register(AiLoadScenario.ScenarioName, () => new AiLoadScenario());
+                ScenarioRegistry.Register(AiVoxelClashScenario.ScenarioName, () => new AiVoxelClashScenario());
                 ScenarioRegistry.Register(BotCliffScenario.ScenarioName, () => new BotCliffScenario());
                 ScenarioRegistry.Register(BotCliffScenario.WithHydrogenName, () => new BotCliffScenario(withHydrogen: true));
                 ScenarioRegistry.Register(BotSeatFinishScenario.ScenarioName, () => new BotSeatFinishScenario());
@@ -394,10 +397,10 @@ namespace SentisTests
             ScenarioRegistry.Needs(Integrations.AnomalyZone, AnomalyZoneScenario.ScenarioName, AnomalyRewardsScenario.ScenarioName, AnomalyGpsScenario.ScenarioName, AnomalySafeZoneScenario.ScenarioName);
 
             ScenarioRegistry.Needs(Integrations.Ai,
-                AiStatusUiScenario.ScenarioName,
+                AiStatusUiScenario.ScenarioName, AiLoadScenario.ScenarioName,
                 BotRadiationScenario.ScenarioName,
                 BotRefuelScenario.ScenarioName,
-                BotPitScenario.ScenarioName, BotPitScenario.ClosedName, BotPitScenario.FarName,
+                BotPitScenario.ScenarioName, BotPitScenario.ClosedName, BotPitScenario.FarName, BotPitScenario.OldSiteName,
                 BotCliffScenario.ScenarioName, BotCliffScenario.WithHydrogenName,
                 BotSeatFinishScenario.ScenarioName,
                 BotNoDuplicateScenario.ScenarioName,
