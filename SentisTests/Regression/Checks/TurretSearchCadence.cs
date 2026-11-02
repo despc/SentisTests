@@ -7,6 +7,9 @@ using Sandbox.Game.Entities;
 using Sandbox.Game.Entities.Cube;
 using Sandbox.ModAPI.Interfaces;
 using SentisTests.Game;
+using Torch.API.Managers;
+using Torch.Managers.PatchManager;
+using VRage.Game.Entity;
 using VRageMath;
 using NormalTurret = SpaceEngineers.Game.Entities.Weapons.MyLargeGatlingTurret;
 using NormalApi = Sandbox.ModAPI.Ingame.IMyLargeTurretBase;
@@ -37,6 +40,106 @@ namespace SentisTests.Regression.Checks
         private bool _attached;
         private static ulong Now => Sandbox.MySandboxGame.Static.SimulationFrameCounter;
 
+        // Who took a watched turret's target away: the call stack of every SetTarget(null) while it had one, so a
+        // lost target in the cadence window says which of the game's paths (stuck rotors, an invalid target, a search
+        // that came back empty) dropped it.
+        private static readonly object LossGate = new object();
+        private static readonly HashSet<object> Watched = new HashSet<object>();
+        private static readonly List<string> Losses = new List<string>();
+        private static readonly FieldInfo SystemOfController = typeof(SpaceEngineers.Game.Entities.Blocks.MyTurretControlBlock)
+            .GetField("m_targetingSystem", BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly FieldInfo SystemOfTurret = typeof(Sandbox.Game.Weapons.MyLargeTurretBase)
+            .GetField("m_targetingSystem", BindingFlags.Instance | BindingFlags.NonPublic);
+        private PatchManager _patches;
+        private PatchContext _patchContext;
+
+        private static void SetTargetPrefix(Sandbox.Game.Weapons.MyLargeTurretTargetingSystem __instance, MyEntity target)
+        {
+            try
+            {
+                if (target != null || __instance.Target == null) return;
+                lock (LossGate)
+                {
+                    if (!Watched.Contains(__instance) || Losses.Count >= 20) return;
+                    var frames = new System.Diagnostics.StackTrace(1, false).GetFrames() ?? new System.Diagnostics.StackFrame[0];
+                    Losses.Add("frame " + Now + " thread " + System.Threading.Thread.CurrentThread.ManagedThreadId + " lost " +
+                               __instance.Target.EntityId + " <- " + string.Join(" <- ", frames.Take(8).Select(f =>
+                                   f.GetMethod() == null ? "?" : f.GetMethod().DeclaringType?.Name + "." + f.GetMethod().Name)));
+                }
+            }
+            catch { /* a diagnostic only */ }
+        }
+
+        private void WatchTargets(IEnumerable<MyCubeBlock> blocks)
+        {
+            lock (LossGate)
+            {
+                Losses.Clear();
+                foreach (var block in blocks)
+                {
+                    var system = block is SpaceEngineers.Game.Entities.Blocks.MyTurretControlBlock
+                        ? SystemOfController?.GetValue(block) : SystemOfTurret?.GetValue(block);
+                    if (system != null) Watched.Add(system);
+                }
+            }
+            var setTarget = typeof(Sandbox.Game.Weapons.MyLargeTurretTargetingSystem).GetMethod("SetTarget",
+                BindingFlags.Instance | BindingFlags.NonPublic, null, new[] { typeof(MyEntity), typeof(bool) }, null);
+            _patches = SentisTestsPlugin.TorchInstance.Managers.GetManager<PatchManager>();
+            if (setTarget == null || _patches == null) return;
+            _patchContext = _patches.AcquireContext();
+            _patchContext.GetPattern(setTarget).Prefixes.Add(typeof(TurretSearchCadenceCheck).GetMethod(nameof(SetTargetPrefix),
+                BindingFlags.Static | BindingFlags.NonPublic));
+            _patches.Commit();
+        }
+
+        /// <summary>
+        /// Which blocks of the turret's grids reach into blocks of another grid (its own other grids, or anything near)
+        /// and which characters stand within them: what can hold a rotor that is told to turn.
+        /// </summary>
+        private static string Touching(List<MyCubeGrid> own)
+        {
+            var found = new List<string>();
+            var box = own.Select(g => g.PositionComp.WorldAABB).Aggregate((a, b) => a.Include(b)).Inflate(2);
+            var near = MyEntities.GetEntitiesInAABB(ref box, true).ToList();
+            foreach (var grid in own)
+            foreach (var other in near.OfType<MyCubeGrid>())
+            {
+                if (other == grid || other.Physics == null || own.IndexOf(other) >= 0 && own.IndexOf(other) <= own.IndexOf(grid)) continue;
+                if (!grid.PositionComp.WorldAABB.Intersects(other.PositionComp.WorldAABB)) continue;
+                foreach (var a in grid.GetBlocks())
+                {
+                    var ab = a.WorldAABB;
+                    // a shared cell face is a touch, not a reach: shrink a little
+                    ab = ab.Inflate(-0.05);
+                    foreach (var b in other.GetBlocks())
+                        if (ab.Intersects(b.WorldAABB.Inflate(-0.05)))
+                        {
+                            if (found.Count < 12)
+                                found.Add(grid.DisplayName + "/" + a.BlockDefinition.Id.SubtypeName + a.Position + " x " +
+                                          (own.Contains(other) ? "" : "FOREIGN ") + other.DisplayName + "/" + b.BlockDefinition.Id.SubtypeName + b.Position);
+                        }
+                }
+            }
+            foreach (var character in near.OfType<Sandbox.Game.Entities.Character.MyCharacter>())
+                found.Add("character " + character.DisplayName + " at " + character.PositionComp.GetPosition().ToString("F1"));
+            near.Clear();
+            return found.Count == 0 ? "nothing" : string.Join(", ", found);
+        }
+
+        private static string LossReport()
+        {
+            lock (LossGate) return Losses.Count == 0 ? "no SetTarget(null) seen" : string.Join(" | ", Losses);
+        }
+
+        private void UnwatchTargets()
+        {
+            lock (LossGate) Watched.Clear();
+            if (_patchContext == null) return;
+            _patches.FreeContext(_patchContext);
+            _patchContext = null;
+            _patches.Commit();
+        }
+
         // Called on the search path: no game API, no logging, no exception can escape to the weapon update.
         private void Observe(long id, ulong frame, bool target, bool normal)
         {
@@ -66,7 +169,11 @@ namespace SentisTests.Regression.Checks
         public override void Cleanup()
         {
             try { RestoreObserver(); }
-            finally { base.Cleanup(); }
+            finally
+            {
+                try { UnwatchTargets(); }
+                finally { base.Cleanup(); }
+            }
         }
 
         protected override IEnumerator Check()
@@ -102,6 +209,9 @@ namespace SentisTests.Regression.Checks
             {
                 ob.PositionAndOrientation = new VRage.MyPositionAndOrientation(ob.PositionAndOrientation.Value.GetMatrix() * move);
                 foreach (var block in ob.CubeBlocks) { block.Owner = Identity; block.BuiltBy = Identity; }
+                // the seat of the fixture stands where the launcher swings to aim at this check's station: a launcher
+                // pressed into it holds the azimuth rotor, and the game's stuck test (CheckBeingStuck) drops the target
+                ob.CubeBlocks.RemoveAll(b => b.SubtypeName == "LargeBlockCockpitSeat");
             }
             var grids = group.Select(WorldApi.SpawnGrid).ToList();
             foreach (var grid in grids) { Track(grid); WorldApi.ChargeBatteries(grid); }
@@ -192,12 +302,40 @@ namespace SentisTests.Regression.Checks
                 station.DestructibleBlocks = false;
                 yield return Until(() => all.Count(HasTarget), n => n == all.Count,
                     "all turrets holding the protected cadence target", 15, Status);
+                WatchTargets(all);
                 var activeStart = Now;
+                // the custom turret's rotors frame by frame: what the game's stuck test (CheckBeingStuck) looked at
+                var rotors = new Queue<string>();
+                var aimed = typeof(SpaceEngineers.Game.Entities.Blocks.MyTurretControlBlock).GetProperty("IsAimed");
+                var unstepped = AppDomain.CurrentDomain.GetAssemblies()
+                    .Select(a => a.GetType("Optimizer.Optimizations.SelectivePhysicsBodies", false)).FirstOrDefault(t => t != null)
+                    ?.GetMethod("InUnstepped", BindingFlags.Static | BindingFlags.NonPublic);
+                var havokMotor = typeof(Sandbox.Game.Entities.Cube.MyMotorStator).GetField("m_motor", BindingFlags.Instance | BindingFlags.NonPublic);
+                string Motor(Sandbox.ModAPI.IMyMotorStator m) => m == null ? "" :
+                    " (havok " + (havokMotor?.GetValue(m) is object hm ? hm.GetType().GetProperty("VelocityTarget")?.GetValue(hm)?.ToString() : "-") +
+                    ", updates " + ((VRage.Game.Entity.MyEntity)m).NeedsUpdate + ", " + (m.IsWorking ? "working" : "NOT WORKING") + (m.Enabled ? "" : " off") + (m.IsAttached ? "" : " detached") +
+                    (m.RotorLock ? " locked" : "") + ", top spin " + (m.TopGrid?.Physics == null ? "-" : m.TopGrid.Physics.AngularVelocity.Length().ToString("F3")) +
+                    ", top static " + (m.TopGrid?.IsStatic) + ", " + (m.CubeGrid as MyCubeGrid)?.GridSystems?.ResourceDistributor?.ResourceStateByType(
+                        Sandbox.Game.EntityComponents.MyResourceDistributorComponent.ElectricityId) + ")";
+                string Stepped(MyCubeGrid g) => g == null || unstepped == null ? "" : (bool)unstepped.Invoke(null, new object[] { g }) ? " NOT STEPPED" : "";
                 for (var frame = 0; frame < 120; frame++)
                 {
-                    Check(all.All(HasTarget), "target lost during the active cadence window: " + Status());
+                    var azimuth = custom.AzimuthRotor as Sandbox.ModAPI.IMyMotorStator;
+                    var elevation = custom.ElevationRotor as Sandbox.ModAPI.IMyMotorStator;
+                    rotors.Enqueue((Now - activeStart) + ": aimed " + aimed?.GetValue(controller) + Stepped(controller.CubeGrid) +
+                                   Stepped((azimuth?.TopGrid) as MyCubeGrid) + ", azimuth " +
+                                   (azimuth == null ? "-" : azimuth.Angle.ToString("F5") + " at " + azimuth.TargetVelocityRPM.ToString("F3") + Motor(azimuth) +
+                                    (azimuth.TopGrid?.Physics?.IsActive == false ? " asleep" : "")) + ", elevation " +
+                                   (elevation == null ? "-" : elevation.Angle.ToString("F5") + " at " + elevation.TargetVelocityRPM.ToString("F3") + Motor(elevation) +
+                                    (elevation.TopGrid?.Physics?.IsActive == false ? " asleep" : "")));
+                    if (rotors.Count > 10) rotors.Dequeue();
+                    if (!all.All(HasTarget))
+                        Check(false, "target lost during the active cadence window, frame " + (Now - activeStart) + ": " +
+                                     string.Join(", ", all.Where(b => !HasTarget(b)).Select(b => b.EntityId + " (" + b.GetType().Name + ")")) +
+                                     "; who dropped it: " + LossReport() + "; touching: " + Touching(grids) + "; the custom turret's rotors: " + string.Join(" / ", rotors) + "; " + Status());
                     yield return null;
                 }
+                UnwatchTargets();
                 var active = Samples(activeStart, Now);
                 foreach (var block in all)
                 {
