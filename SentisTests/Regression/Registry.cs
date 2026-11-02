@@ -87,6 +87,7 @@ namespace SentisTests.Regression
             Add(() => new WindCheck());
             Add(() => new HydrogenCheck());
             Add(() => new HydrogenThrustCheck());
+            Add(() => new GasBalanceCheck());
             Add(() => new TankStockpileCheck());
             Add(() => new ThrusterFlameCheck());
             Add(() => new BottleCheck());

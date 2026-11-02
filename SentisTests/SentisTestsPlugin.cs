@@ -120,6 +120,7 @@ namespace SentisTests
                     () => new MultigridProjectorClustersScenario(), Integrations.MultigridProjector);
                 ScenarioRegistry.Register(FrozenRadiusWeldScenario.ScenarioName, () => new FrozenRadiusWeldScenario());
                 ScenarioRegistry.Register(WelderPerfScenario.ScenarioName, () => new WelderPerfScenario());
+                ScenarioRegistry.Register(PowerRecomputePaceScenario.ScenarioName, () => new PowerRecomputePaceScenario());
                 ScenarioRegistry.Register(WelderPerfScenario.DetachScenarioName,
                     () => new WelderPerfScenario(WelderPerfScenario.DetachScenarioName, inZone: false, dynamicPlatform: true, detach: true));
                 ScenarioRegistry.Register(WelderSpreadScenario.ScenarioName, () => new WelderSpreadScenario());
@@ -327,6 +328,8 @@ namespace SentisTests
                 ScenarioRegistry.Register(StructThisGcScenario.ScenarioName, () => new StructThisGcScenario());
                 ScenarioRegistry.Register(MixedWeldScenario.ScenarioName, () => new MixedWeldScenario());
                 ScenarioRegistry.Register(HandWeldScenario.ScenarioName, () => new HandWeldScenario());
+                ScenarioRegistry.Register(DeathCounterChatScenario.ScenarioName, () => new DeathCounterChatScenario(), DeathCounterChatScenario.PluginName);
+                ScenarioRegistry.Register(DeathCounterBotsScenario.ScenarioName, () => new DeathCounterBotsScenario(), DeathCounterBotsScenario.PluginName);
                 ScenarioRegistry.Register(TranslatorChatScenario.ScenarioName, () => new TranslatorChatScenario());
                 ScenarioRegistry.Register(TranslatorChatScenario.RestartName, () => new TranslatorChatScenario(restart: true));
                 ScenarioRegistry.Register(JoinLeaveBurstScenario.ScenarioName, () => new JoinLeaveBurstScenario());

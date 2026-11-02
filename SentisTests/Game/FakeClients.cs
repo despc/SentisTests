@@ -260,6 +260,32 @@ namespace SentisTests.Game
             }
         }
 
+        /// <summary>
+        /// Remove only a caller-owned suffix, without RemoveAll's world-wide leftover purge.
+        /// Exact Steam IDs are checked before anything is removed. Game thread only.
+        /// </summary>
+        public static void RemoveOwnedTail(int firstIndex, IReadOnlyList<ulong> steamIds)
+        {
+            if (firstIndex < 0 || firstIndex + steamIds.Count != _clientCount)
+                throw new InvalidOperationException("FakeClients owned tail changed; refusing broad cleanup");
+            for (var i = 0; i < steamIds.Count; i++)
+                if (_clients[firstIndex + i].Id.Value != steamIds[i])
+                    throw new InvalidOperationException("FakeClients owned Steam ID changed; refusing cleanup");
+            for (var i = firstIndex; i < _clientCount; i++)
+            {
+                var client = _clients[i];
+                var player = client.Player;
+                var identity = player?.Identity.IdentityId;
+                var character = player?.Character;
+                if (character != null && !character.MarkedForClose) character.Close();
+                Quit(i);
+                if (identity.HasValue) Sync.Players.RemoveIdentity(identity.Value,
+                    new Sandbox.Game.World.MyPlayer.PlayerId(client.Id.Value, 0));
+            }
+            _clients = _clients.Take(firstIndex).ToArray();
+            _clientCount = firstIndex;
+        }
+
         public static void SetProfile(NetworkProfile profile) => _profile = profile;
 
         /// <summary>The respawn ships' cooldowns of a Steam id's players (MySpaceRespawnComponent.m_globalRespawnTimesMs). Game thread.</summary>

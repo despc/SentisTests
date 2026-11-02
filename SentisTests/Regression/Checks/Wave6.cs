@@ -56,6 +56,57 @@ public void Main(string argument, UpdateType update) { if ((update & UpdateType.
     }
 
     /// <summary>
+    /// Two full tanks feed one empty tank: every unit leaving the two sources has to arrive at the destination,
+    /// including a batch left pending when the optimisation is switched off.
+    /// </summary>
+    public sealed class GasBalanceCheck : RegressionCheck
+    {
+        public override string Name => Prefix + "gas_balance";
+        private SentisTests.Scenarios.ConfigOverride _gasOptimisation;
+
+        protected override IEnumerator Check()
+        {
+            yield return Arrive(Site.At(0, 8, 10));
+            var grid = Build("gas-balance", Site.Origin, true,
+                new Part("OxygenTank/LargeHydrogenTankSmall", 0, 0, 0).With(b => ((MyObjectBuilder_GasTank)b).FilledRatio = 1f),
+                new Part("OxygenTank/LargeHydrogenTankSmall", 1, 0, 0).With(b => ((MyObjectBuilder_GasTank)b).FilledRatio = 1f),
+                new Part("OxygenTank/LargeHydrogenTankSmall", 2, 0, 0));
+            var tanks = Blocks<MyGasTank>(grid);
+            var before = tanks.Sum(t => (double)t.FilledRatio * t.Capacity);
+            _gasOptimisation = new SentisTests.Scenarios.ConfigOverride();
+            _gasOptimisation.Set("GasTankOptimisation", true);
+            yield return null;
+            yield return Until(() => tanks.Sum(t => (double)t.FilledRatio * t.Capacity) - before,
+                d => Math.Abs(d) < 0.01, "the total hydrogen in the three tanks while transferring", 60,
+                () => string.Join(", ", tanks.Select(t => t.FilledRatio.ToString("F5"))));
+            var balanced = tanks.Sum(t => (double)t.FilledRatio * t.Capacity);
+            Check(Math.Abs(balanced - before) < 0.01, "three-tank transfer changed the hydrogen total by " + F(balanced - before));
+
+            var third = tanks[2];
+            var credit = (double)third.FilledRatio * third.Capacity;
+            if (credit > 0)
+            {
+                ((Sandbox.ModAPI.IMyGasTank)third).ChangeFilledRatio(0f, true);
+                _gasOptimisation?.Restore();
+                _gasOptimisation = null;
+                yield return Seconds(2);
+                var flushed = tanks.Sum(t => (double)t.FilledRatio * t.Capacity);
+                Check(Math.Abs(flushed - (before - credit)) < 0.01,
+                    "the pending " + F(credit) + " hydrogen was neither delivered nor returned when batching was disabled; total " +
+                    F(flushed) + " instead of " + F(before - credit));
+            }
+            Result("three-tank hydrogen total " + F(before) + "; after transfer " + F(balanced));
+        }
+
+        public override void Cleanup()
+        {
+            _gasOptimisation?.Restore();
+            _gasOptimisation = null;
+            base.Cleanup();
+        }
+    }
+
+    /// <summary>
     /// A hydrogen tank set to stockpile gives nothing out: the hydrogen thrusters on it get no gas and the ship does not
     /// move; stockpile off, it goes.
     /// </summary>
