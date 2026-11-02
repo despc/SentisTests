@@ -143,6 +143,8 @@ namespace SentisTests.Regression
             Add(() => new TurretControllerCheck());
             Add(() => new RailTurretShipCheck());
             Add(() => new TurretSearchCadenceCheck());
+            Add(() => new TurretGridConnectionsCheck());
+            Add(() => new EnumNameCacheCheck());
             Add(() => new FunctionalThresholdCheck());
             Add(() => new HackCheck());
             Add(() => new FallDamageCheck());
