@@ -166,6 +166,14 @@ namespace SentisTests.Scenarios
             return value;
         }
 
+        /// <summary>A setting changed with nothing noted for a restore (a string is parsed to the setting's type).</summary>
+        public static void SetUnnoted(string plugin, string property, object value)
+        {
+            var config = Config(plugin);
+            var prop = config.GetType().GetProperty(property) ?? throw new InvalidOperationException(plugin + " has no setting " + property);
+            prop.SetValue(config, value is string text && prop.PropertyType != typeof(string) ? Parse(prop, text) : value);
+        }
+
         /// <summary>The setting as it is now, read only (nothing noted for a restore).</summary>
         public static object Get(string plugin, string property)
         {

@@ -191,6 +191,13 @@ namespace SentisTests
                 ScenarioRegistry.Register(WheelPerfScenario.DetachScenarioName, () => new WheelPerfScenario(1, detach: true));
                 ScenarioRegistry.Register(GearProbeScenario.ScenarioName, () => new GearProbeScenario());
                 ScenarioRegistry.Register(FreezerPhysicsScenario.ScenarioName, () => new FreezerPhysicsScenario());
+                ScenarioRegistry.Register(FreezerRexScenario.ScenarioName, () => new FreezerRexScenario());
+                ScenarioRegistry.Register(FreezerRexScenario.InvulnerableName, () => new FreezerRexScenario(invulnerable: true));
+                ScenarioRegistry.Register(FreezerRexScenario.DockedName, () => new FreezerRexScenario(docked: true));
+                ScenarioRegistry.Register(FreezerRexScenario.SeedName, () => new FreezerRexScenario(mode: FreezerRexScenario.Mode.Seed));
+                ScenarioRegistry.Register(FreezerRexScenario.ReleaseName, () => new FreezerRexScenario(mode: FreezerRexScenario.Mode.Release));
+                ScenarioRegistry.Register(FreezerRexScenario.ReleaseUnarmedName, () => new FreezerRexScenario(mode: FreezerRexScenario.Mode.Release, unarmed: true));
+                ScenarioRegistry.Register(FreezerRexScenario.ReleaseVulnerableName, () => new FreezerRexScenario(mode: FreezerRexScenario.Mode.Release, vulnerable: true));
                 ScenarioRegistry.Register(RoverThawScenario.ScenarioName, () => new RoverThawScenario());
                 ScenarioRegistry.Register(RoverSpawnProbeScenario.ScenarioName, () => new RoverSpawnProbeScenario());
                 ScenarioRegistry.Register(ChatReachScenario.ScenarioName, () => new ChatReachScenario());

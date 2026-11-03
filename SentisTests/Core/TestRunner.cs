@@ -242,6 +242,7 @@ namespace SentisTests.Core
                     if (!ename.StartsWith(Game.WorldApi.EntityPrefix) && !LegacyNames.Contains(ename)) continue;
                     // left on purpose for the run after the restart (thaw_seed -> thaw_release)
                     if (ename.StartsWith(Scenarios.ThawRestartScenario.Prefix)) continue;
+                    if (ename.StartsWith(Scenarios.FreezerRexScenario.KeepPrefix)) continue;
                     if (entity.MarkedForClose) continue;
                     entity.Close();
                     closed++;

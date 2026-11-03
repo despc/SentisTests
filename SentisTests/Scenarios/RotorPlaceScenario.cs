@@ -295,7 +295,8 @@ namespace SentisTests.Scenarios
             ((VRage.ModAPI.IMyEntity)top.CubeGrid).SetWorldMatrix(moved);
             var check = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(x => x.GetName().Name == "SentisOptimisations")
                 ?.GetType("SentisOptimisationsPlugin.CrashFix.MechanicalTopCheck");
-            var problem = check?.GetMethod("Problem");
+            // (two overloads: the one with the matrix only)
+            var problem = check?.GetMethod("Problem", new[] { typeof(Sandbox.Game.Entities.Blocks.MyMechanicalConnectionBlockBase), typeof(long), typeof(MatrixD).MakeByRefType() });
             if (problem != null)
             {
                 var args = new object[] { stator, top.EntityId, null };

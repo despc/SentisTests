@@ -109,6 +109,7 @@
     <EmbeddedResource Include="Resources\DrillTest.xml" />
     <EmbeddedResource Include="Resources\WheelTest.xml" />
     <EmbeddedResource Include="Resources\FreezerTest.xml" />
+    <EmbeddedResource Include="Resources\RexT24M.xml" />
     <EmbeddedResource Include="Resources\GrinderTest.xml" />
     <EmbeddedResource Include="Resources\ShipToGrind.xml" />
     <EmbeddedResource Include="Resources\MixedShip.xml" />
