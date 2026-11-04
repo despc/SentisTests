@@ -387,6 +387,7 @@ namespace SentisTests.Regression
             Add(() => new AsteroidMaterialCheck());
             Add(() => new EntityStoreCheck());
             Add(() => new EntityLoadOnGameThreadCheck());
+            Add(() => new SubgridNamesCheck());
 
             foreach (var make in Added)
                 Add(make);
