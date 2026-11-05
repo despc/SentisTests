@@ -390,6 +390,7 @@ namespace SentisTests.Regression
             Add(() => new SubgridNamesCheck());
             Add(() => new HeadLeftWorldCheck());
             Add(() => new WatcherConveyorCheck());
+            Add(() => new TurretShootIdleCheck());
 
             foreach (var make in Added)
                 Add(make);
