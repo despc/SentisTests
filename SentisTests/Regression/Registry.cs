@@ -389,6 +389,7 @@ namespace SentisTests.Regression
             Add(() => new EntityLoadOnGameThreadCheck());
             Add(() => new SubgridNamesCheck());
             Add(() => new HeadLeftWorldCheck());
+            Add(() => new WatcherConveyorCheck());
 
             foreach (var make in Added)
                 Add(make);
