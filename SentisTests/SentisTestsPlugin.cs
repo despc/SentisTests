@@ -193,6 +193,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(FreezerPhysicsScenario.ScenarioName, () => new FreezerPhysicsScenario());
                 ScenarioRegistry.Register(FreezerRexScenario.ScenarioName, () => new FreezerRexScenario());
                 ScenarioRegistry.Register(FixShipPuffyScenario.ScenarioName, () => new FixShipPuffyScenario());
+                ScenarioRegistry.Register(TorpedoRefillScenario.ScenarioName, () => new TorpedoRefillScenario());
                 ScenarioRegistry.Register(FreezerRexScenario.InvulnerableName, () => new FreezerRexScenario(invulnerable: true));
                 ScenarioRegistry.Register(FreezerRexScenario.DockedName, () => new FreezerRexScenario(docked: true));
                 ScenarioRegistry.Register(FreezerRexScenario.SeedName, () => new FreezerRexScenario(mode: FreezerRexScenario.Mode.Seed));

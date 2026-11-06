@@ -391,6 +391,7 @@ namespace SentisTests.Regression
             Add(() => new HeadLeftWorldCheck());
             Add(() => new WatcherConveyorCheck());
             Add(() => new TurretShootIdleCheck());
+            Add(() => new TankWeldFillCheck());
 
             foreach (var make in Added)
                 Add(make);
