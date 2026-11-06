@@ -57,6 +57,7 @@ namespace SentisTests.Regression
             Add(() => new ShipGrindCheck(VRage.Game.MyCubeSize.Small));
             Add(() => new HandToolTiersCheck());
             Add(() => new ProjectorCheck());
+            Add(() => new ProjectionFollowsCheck());
             Add(() => new SubgridProjectionCheck());
             Add(() => new PaintCheck());
             Add(() => new HandDrillCheck());
@@ -100,6 +101,8 @@ namespace SentisTests.Regression
             Add(() => new CooperativeAssemblyCheck());
             Add(() => new SurvivalKitStoneCheck());
             Add(() => new GeneratorPullsIceCheck());
+            Add(() => new GeneratorIceWaitCheck());
+            Add(() => new ReplicableNoGroupsCheck());
             Add(() => new TankRefillCheck());
             Add(() => new OxygenFarmCheck());
             Add(() => new GasTanksFillCheck());
