@@ -105,6 +105,7 @@ namespace SentisTests.Regression
             Add(() => new GeneratorIceWaitCheck());
             Add(() => new ReplicableNoGroupsCheck());
             Add(() => new GridUpdateThrowsCheck());
+            Add(() => new WorldLockLeftCheck());
             Add(() => new TankRefillCheck());
             Add(() => new OxygenFarmCheck());
             Add(() => new GasTanksFillCheck());
@@ -418,6 +419,7 @@ namespace SentisTests.Regression
             ScenarioRegistry.Register(ProjectileDetachCheck.ScenarioName, () => new ProjectileDetachCheck());
             ScenarioRegistry.Register(ClusterStressCheck.ScenarioName, () => new ClusterStressCheck());
             ScenarioRegistry.Register(ClusterFlightCheck.ScenarioName, () => new ClusterFlightCheck());
+            ScenarioRegistry.Register(PlanetPhysicsChurnCheck.ScenarioName, () => new PlanetPhysicsChurnCheck());
             ScenarioRegistry.Register(ClusterCrashCheck.ScenarioName, () => new ClusterCrashCheck());
             ScenarioRegistry.Register(JumpProbeCheck.ScenarioName, () => new JumpProbeCheck());
         }
