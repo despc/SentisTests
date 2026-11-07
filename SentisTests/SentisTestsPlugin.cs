@@ -244,6 +244,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(CharacterPerfScenario.ScenarioName, () => new CharacterPerfScenario());
                 ScenarioRegistry.Register(PlanetFlightScenario.ScenarioName, () => new PlanetFlightScenario());
                 ScenarioRegistry.Register(PlanetReorderScenario.ScenarioName, () => new PlanetReorderScenario());
+                ScenarioRegistry.Register(FreezerMovingPilotScenario.ScenarioName, () => new FreezerMovingPilotScenario());
                 ScenarioRegistry.Register(ThawFallScenario.ScenarioName, () => new ThawFallScenario());
                 ScenarioRegistry.Register(ThawFallScenario.FarScenarioName, () => new ThawFallScenario(far: true));
                 ScenarioRegistry.Register(ThawFallScenario.NoSectorScenarioName, () => new ThawFallScenario(noSector: true));
