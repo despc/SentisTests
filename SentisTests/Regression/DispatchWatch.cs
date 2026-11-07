@@ -40,6 +40,24 @@ namespace SentisTests.Regression
 
         public static void Stop() => Recording = false;
 
+        // what a check throws on purpose (reg_grid_update_throws): an exception carrying one of these is not counted
+        private static readonly ConcurrentDictionary<string, byte> Excused = new ConcurrentDictionary<string, byte>();
+
+        /// <summary>Exceptions whose message, or an inner one's, holds <paramref name="marker"/> are not counted.</summary>
+        public static void Excuse(string marker) => Excused[marker] = 0;
+
+        private static bool IsExcused(Exception e, int depth = 0)
+        {
+            if (e == null || depth > 8 || Excused.IsEmpty) return false;
+            if (Excused.Keys.Any(m => (e.Message ?? "").Contains(m))) return true;
+            if (IsExcused(e.InnerException, depth + 1)) return true;
+            // ParallelTasks.TaskException: the exceptions of the task's items
+            if (e.GetType().GetProperty("InnerExceptions")?.GetValue(e) is IEnumerable<Exception> inner)
+                foreach (var x in inner)
+                    if (IsExcused(x, depth + 1)) return true;
+            return false;
+        }
+
         /// <summary>Each kind of exception (type, message, the first frames of its stack) with how many times it came.</summary>
         public static List<string> Report() =>
             Seen.OrderByDescending(p => p.Value).Select(p => p.Value + "x " + p.Key).ToList();
@@ -49,6 +67,7 @@ namespace SentisTests.Regression
             if (__exception == null || !Recording) return __exception;
             try
             {
+                if (IsExcused(__exception)) return __exception;
                 var e = __exception.GetBaseException();
                 var frames = (e.StackTrace ?? "").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).Take(6);
                 Seen.AddOrUpdate(e.GetType().Name + ": " + e.Message + " @ " + string.Join(" <- ", frames), 1, (k, n) => n + 1);
