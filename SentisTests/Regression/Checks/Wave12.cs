@@ -26,13 +26,20 @@ namespace SentisTests.Regression.Checks
 
         protected IEnumerator FilledRoom()
         {
+            yield return BuiltRoom(1f);
+            yield return Until(() => Vent.GetOxygenLevel(), v => v > 0.9, "the room's air", 30, () => "tank " + Tank.FilledRatio.ToString("F4") + ", " + State((MyCubeBlock)Vent));
+        }
+
+        /// <summary>The room built with its tank this full, airtight for the vent.</summary>
+        protected IEnumerator BuiltRoom(float tankFill)
+        {
             var settings = MySession.Static.Settings;
             SkipUnless(settings.EnableOxygen && settings.EnableOxygenPressurization, "oxygen pressurization is off in this world");
             var vent = new Part("AirVent/", 0, 0, 0).Facing(Direction.Up, Direction.Backward);
             Part tank = null;
             yield return ConveyorNeighbour(vent, "OxygenTank/", p => Cells(p).All(c => c.Y < 0 || Math.Abs(c.X) > 1 || Math.Abs(c.Z) > 1), p => tank = p);
             var tankCells = Cells(tank);
-            var parts = new List<Part> { vent, tank.With(b => ((MyObjectBuilder_GasTank)b).FilledRatio = 1f) };
+            var parts = new List<Part> { vent, tank.With(b => ((MyObjectBuilder_GasTank)b).FilledRatio = tankFill) };
             for (var x = -1; x <= 1; x++)
             for (var y = 0; y <= 2; y++)
             for (var z = -1; z <= 1; z++)
@@ -48,7 +55,44 @@ namespace SentisTests.Regression.Checks
             Tank = (IMyGasTank)Block<MyGasTank>(Room);
             Vent.Depressurize = false;
             yield return Until(() => Vent.CanPressurize ? 1 : 0, v => v > 0, "the room airtight for the vent", 10);
-            yield return Until(() => Vent.GetOxygenLevel(), v => v > 0.9, "the room's air", 30, () => "tank " + Tank.FilledRatio.ToString("F4") + ", " + State((MyCubeBlock)Vent));
+        }
+    }
+
+    /// <summary>
+    /// An air vent in an airtight room with an empty tank has no gas to give and is updated once in 100 frames
+    /// (SentisOptimisations' AirVentIdle); gas put into the tank wakes it, and the room fills as it would, the vent
+    /// updated in full once in 10 frames and moving its gas in the others.
+    /// </summary>
+    public sealed class AirVentIdleCheck : VentRoomCheck
+    {
+        public override string Name => Prefix + "air_vent_idle";
+
+        protected override IEnumerator Check()
+        {
+            var idle = AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("SentisOptimisationsPlugin.AirVentIdle", false)).FirstOrDefault(t => t != null);
+            SkipUnless(idle != null, "SentisOptimisations' AirVentIdle is not loaded");
+            var skipped = idle.GetField("Skipped");
+            var skippedActive = idle.GetField("SkippedActive");
+            yield return Arrive(Site.At(0, 6, -8));
+            yield return BuiltRoom(0f);
+            yield return Seconds(2);
+            var before = (long)skipped.GetValue(null);
+            var frame = MySession.Static.GameplayFrameCounter;
+            yield return Seconds(5);
+            var left = (long)skipped.GetValue(null) - before;
+            var frames = MySession.Static.GameplayFrameCounter - frame;
+            // once in 100 frames it runs, the rest left out (other idle vents of the world only add to the count); the
+            // clusters do not update every block every frame, so 275 of 300 came (the stand, 08.11.2026) - and none without
+            Check(left >= frames * 0.5, "the idle vent's updates were not left out: " + left + " in " + frames + " frames (" + State((MyCubeBlock)Vent) + ")");
+            Check(Vent.GetOxygenLevel() < 0.01, "the room got air from an empty tank (" + F(Vent.GetOxygenLevel() * 100) + " %)");
+            var activeBefore = (long)skippedActive.GetValue(null);
+            ((Sandbox.ModAPI.IMyGasTank)Tank).ChangeFilledRatio(1f, true);
+            var woken = DateTime.UtcNow;
+            yield return Until(() => Vent.GetOxygenLevel(), v => v > 0.9, "the room's air once the tank is full", 30, () => "tank " + Tank.FilledRatio.ToString("F4") + ", " + State((MyCubeBlock)Vent));
+            var active = (long)skippedActive.GetValue(null) - activeBefore;
+            // while the gas came in, the full update ran once in 10 frames and the frames between only moved the gas
+            Check(active > 0, "the vent moving gas ran its full update every frame");
+            Result(left + " updates left out in " + frames + " frames while idle; the tank filled, the room's air " + F(Vent.GetOxygenLevel() * 100) + " % in " + F((DateTime.UtcNow - woken).TotalSeconds) + " s, " + active + " frames of it with the gas only");
         }
     }
 

@@ -112,7 +112,7 @@
 | Распределение по приоритету, выключатель питания грида | `power_priority`, `grid_power_switch` | Покрыто |
 | Генератор O2/H2: лёд по конвейеру, баки, заправка баллонов, запас бака | `generator_pulls_ice`, `gas_tanks_fill`, `tank_refill`, `tank_stockpile` | Покрыто |
 | Кислородная ферма | `oxygen_farm` | Покрыто |
-| Вентиляция, герметичность, пробоина, двери | `air_vent`, `air_vent_depressurize`, `hull_breach`, `airtight_door`, `hangar_door`, `life_support` | Покрыто |
+| Вентиляция, герметичность, пробоина, двери | `air_vent`, `air_vent_depressurize`, `air_vent_idle`, `hull_breach`, `airtight_door`, `hangar_door`, `life_support` | Покрыто |
 | Очистители: все руды | `refinery_all_ores` | Покрыто |
 | Сборщик: все компоненты, повтор, кооператив, разборка | `assembler`, `assembler_all_components`, `assembler_repeat`, `assembler_cooperative` | Покрыто |
 | Модули улучшения | `upgrade_modules` | Покрыто |

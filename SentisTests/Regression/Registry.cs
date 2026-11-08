@@ -206,6 +206,7 @@ namespace SentisTests.Regression
             Add(() => new FarmPlotCheck());
             Add(() => new RadiationCheck());
             Add(() => new AirVentDepressurizeCheck());
+            Add(() => new AirVentIdleCheck());
             Add(() => new HullBreachCheck());
             Add(() => new TurretAmmoConveyorCheck());
             Add(() => new GrindContainerCheck());
