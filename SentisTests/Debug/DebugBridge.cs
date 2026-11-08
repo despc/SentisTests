@@ -322,6 +322,9 @@ namespace SentisTests.Debug
                 case "/tool-radii":
                     SendJson(ctx, 200, RunGameThread(ToolRadii));
                     break;
+                case "/welder-state":
+                    SendJson(ctx, 200, RunGameThread(() => WelderState(long.Parse(qkey("id")))));
+                    break;
                 case "/freezer":
                     SendJson(ctx, 200, RunGameThread(FreezerState));
                     break;
@@ -650,6 +653,76 @@ namespace SentisTests.Debug
             return Obj("cells", pg.CubeBlocks.Count,
                 "min", min.ToString("F1"), "max", max.ToString("F1"),
                 "layers", ys.Count, "ys", string.Join(",", ys), "samples", samples.ToString(Newtonsoft.Json.Formatting.None));
+        }
+
+        /// <summary>
+        /// A grid's welders as SentisOptimisations' welder tweaks see them: the counters, each welder's idle state and
+        /// reach of each preview, and the search state of each preview in reach (the ready queue's head: its check, its
+        /// first component and whether the welder holds one).
+        /// </summary>
+        private static JObject WelderState(long gridId)
+        {
+            var g = MyEntities.GetEntityById(gridId) as MyCubeGrid;
+            if (g == null) return Err("grid " + gridId + " not found");
+            const BindingFlags all = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            var so = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "SentisOptimisations");
+            var opt = so?.GetType("Optimizer.Optimizations.WelderOptimization");
+            var diag = so?.GetType("Optimizer.Optimizations.WelderDiagnostics");
+            if (opt == null || diag == null) return Err("SentisOptimisations' welder types not found");
+            var outp = new JObject { ["counters"] = (string)diag.GetMethod("Snapshot", all).Invoke(null, null) };
+            var idle = (System.Collections.IDictionary)opt.GetField("IdleStates", all).GetValue(null);
+            var reaches = (System.Collections.IDictionary)opt.GetField("Reaches", all).GetValue(null);
+            var fronts = (System.Collections.IDictionary)opt.GetField("ProjectionFrontiers", all).GetValue(null);
+            object F(object o, string name) => o?.GetType().GetField(name, all)?.GetValue(o);
+            var frame = Sandbox.Game.World.MySession.Static.GameplayFrameCounter;
+            var welders = new JArray();
+            foreach (var welder in Game.WorldApi.FindFunctionals<SpaceEngineers.Game.Entities.Blocks.MyShipWelder>(g))
+            {
+                var w = Obj("id", welder.EntityId, "enabled", (bool)welder.Enabled, "working", welder.IsWorking, "owner", welder.OwnerId,
+                    "activations", diag.GetField("ActivationsByWelder", all).GetValue(null) is System.Collections.Concurrent.ConcurrentDictionary<long, long> a && a.TryGetValue(welder.EntityId, out var n) ? n : 0,
+                    "idleSkips", diag.GetField("IdleSkipsByWelder", all).GetValue(null) is System.Collections.Concurrent.ConcurrentDictionary<long, long> sk && sk.TryGetValue(welder.EntityId, out var m) ? m : 0,
+                    "frame", frame);
+                if (idle != null && idle.Contains(welder.EntityId))
+                {
+                    var st = idle[welder.EntityId];
+                    w["idle"] = $"empty {F(st, "EmptyActivations")}, next frame {F(st, "NextFrame")}, slow {F(st, "Slow")}";
+                }
+                var inv = welder.GetInventory(0);
+                w["inventory"] = string.Join(", ", inv.GetItems().Select(it => it.Content.SubtypeName + " " + ((double)it.Amount).ToString("0")));
+                var rs = new JArray();
+                foreach (System.Collections.DictionaryEntry e in reaches)
+                {
+                    var key = e.Key.ToString();
+                    if (!key.StartsWith("(" + welder.EntityId + ",")) continue;
+                    var cells = (System.Collections.ICollection)F(e.Value, "Cells");
+                    var cursor = F(e.Value, "Cursor");
+                    rs.Add($"{key}: cells {cells?.Count}, radius {F(e.Value, "Radius"):0.0}, frame {F(e.Value, "Frame")}, cursor next {F(cursor, "_next")} of {F(cursor, "_count")}");
+                }
+                w["reaches"] = rs;
+                welders.Add(w);
+            }
+            outp["welders"] = welders;
+            var previews = new JArray();
+            var firstWelder = Game.WorldApi.FindFunctionals<SpaceEngineers.Game.Entities.Blocks.MyShipWelder>(g).FirstOrDefault();
+            foreach (System.Collections.DictionaryEntry e in fronts)
+            {
+                var preview = F(e.Value, "Preview") as MyCubeGrid;
+                if (preview?.Projector == null || preview.Projector.CubeGrid != g) continue;
+                var ready = ((System.Collections.IEnumerable)F(e.Value, "Ready")).Cast<Vector3I>().ToList();
+                var head = new JArray();
+                foreach (var position in ready.Take(12))
+                {
+                    var block = preview.GetCubeBlock(position);
+                    if (block == null) { head.Add(position + " gone"); continue; }
+                    var first = block.BlockDefinition.Components?.FirstOrDefault()?.Definition.Id;
+                    var held = first != null && firstWelder != null && firstWelder.GetInventory(0).ContainItems(1, first.Value);
+                    head.Add($"{position} {block.BlockDefinition.Id.SubtypeName}: {preview.Projector.CanBuild(block, true)}, first {first?.SubtypeName}, held {held}");
+                }
+                previews.Add(Obj("preview", preview.EntityId, "cells", ((System.Collections.ICollection)F(e.Value, "Positions")).Count,
+                    "ready", ready.Count, "lastSeen", F(e.Value, "LastSeenFrame"), "head", head));
+            }
+            outp["previews"] = previews;
+            return outp;
         }
 
         private static JObject Projector(long gridId)
