@@ -57,6 +57,7 @@ namespace SentisTests.Scenarios
         private MethodInfo _peekPending, _peekTaken, _peekApplied;
         private IDictionary<long, DateTime> _wakeUps;
         private object _wakeUpLock;
+        private MethodInfo _cpuLoad;
 
         public override string Name => ScenarioName;
         public override int TimeoutSeconds => (int)(FrozenMinutes * 60 + 600);
@@ -104,6 +105,8 @@ namespace SentisTests.Scenarios
             yield return WaitForTicks(30);
 
             _config.Set("FreezerEnabled", true);
+            // the wake-up on schedule even on a loaded stand: over the freezer's CPU load limit it is put off by 10-20 min
+            _config.Set("WakeUpMaxCpuLoad", 0);
             // short from the start: a group queued for freezing keeps the delay it was queued with
             _config.Set("DelayBeforeFreezeSec", 5);
             _config.Set("FreezeDistanceStatic", FreezeDistanceM);
@@ -169,10 +172,16 @@ namespace SentisTests.Scenarios
             Pace("frozen");
             Note("the far sites froze; they wake up in " + FrozenMinutes + " minutes");
 
+            var lastNote = DateTime.UtcNow;
             while (asleep.Any(Frozen))
             {
                 if ((DateTime.UtcNow - frozenAt).TotalMinutes > FrozenMinutes + 5)
-                    throw new ScenarioFailedException("the far sites did not wake up");
+                    throw new ScenarioFailedException("the far sites did not wake up: " + WakeState(asleep));
+                if ((DateTime.UtcNow - lastNote).TotalSeconds >= 60)
+                {
+                    lastNote = DateTime.UtcNow;
+                    Note("asleep: " + WakeState(asleep));
+                }
                 for (var i = 0; i < 30; i++) yield return null;
             }
             var frozenSeconds = (DateTime.UtcNow - frozenAt).TotalSeconds;
@@ -284,6 +293,23 @@ namespace SentisTests.Scenarios
             return value == null ? 0UL : Convert.ToUInt64(value);
         }
 
+        /// <summary>The freezer's view of the wake-up: its average CPU load (over WakeUpMaxCpuLoad the wake-up is put off) and when each site is due.</summary>
+        private string WakeState(IEnumerable<Site> sites)
+        {
+            var load = _cpuLoad?.Invoke(null, null);
+            var due = new List<string>();
+            Monitor.Enter(_wakeUpLock);
+            try
+            {
+                foreach (var site in sites)
+                    due.Add(site.Label + (_wakeUps.TryGetValue(site.Grid.EntityId, out var at) ? " due in " + (at - DateTime.Now).TotalSeconds.ToString("F0") + " s" : " not scheduled") +
+                            (Frozen(site) ? "" : " (awake)"));
+            }
+            finally { Monitor.Exit(_wakeUpLock); }
+            return "freezer CPU load " + (load == null ? "?" : Convert.ToDouble(load).ToString("F0")) + "%, game CPU load " +
+                   Sandbox.MySandboxGame.Static.CPULoad.ToString("F0") + "%; " + string.Join(", ", due);
+        }
+
         private void ResolveApi()
         {
             Type tracker = null, logic = null;
@@ -299,6 +325,7 @@ namespace SentisTests.Scenarios
             _peekApplied = tracker.GetMethod("PeekAppliedFrames", flags);
             _wakeUps = logic.GetField("WakeUpDatas", BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null) as IDictionary<long, DateTime>;
             _wakeUpLock = logic.GetField("_wakeUpLock", BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null);
+            _cpuLoad = logic.GetMethod("GetAvgCpuLoad", flags);
             Check(_peekPending != null && _peekTaken != null && _peekApplied != null && _wakeUps != null && _wakeUpLock != null,
                 "the freezer's diagnostics API is not what this scenario knows");
         }

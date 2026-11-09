@@ -116,9 +116,15 @@ namespace SentisTests.Scenarios
         public override string Name { get { return ScenarioName; } }
         public override int TimeoutSeconds { get { return 1380; } }     // a frozen group wakes 600-1200 s after it froze
 
+        private readonly ConfigOverride _config = new ConfigOverride();
+
         public override IEnumerator Run()
         {
             ResolveFreezerApi();
+            // the wake-ups on schedule even on a loaded stand: over the freezer's CPU load limit they are put off by 10-20 min
+            _config.Set("WakeUpMaxCpuLoad", 0);
+            // and the interval the timeout is made for (600-1200 s); the stand's own is 1000 (1000-2000 s)
+            _config.Set("MinWakeUpIntervalInSec", 600);
             var probes = new List<Probe>(GridCount);
             var origin = TestRunner.RunOrigin ?? new Vector3D(5000, 0, 0);
             Note("spawning " + GridCount + " independent 5x production grids");
@@ -476,6 +482,12 @@ namespace SentisTests.Scenarios
             var owner = slim.FatBlock as IMyInventoryOwner;
             Check(owner != null && owner.HasInventory, slim.BlockDefinition.Id.SubtypeName + " has no inventory");
             return owner.GetInventory(index);
+        }
+
+        public override void Cleanup()
+        {
+            try { base.Cleanup(); }
+            finally { _config.Restore(); }
         }
 
         public override void CleanupLeftovers()

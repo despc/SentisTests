@@ -119,6 +119,8 @@ namespace SentisTests.Scenarios
             yield return WaitForTicks(30);
 
             _config.Set("FreezerEnabled", true);
+            // the wake-up on schedule even on a loaded stand: over the freezer's CPU load limit it is put off by 10-20 min
+            _config.Set("WakeUpMaxCpuLoad", 0);
             // short from the start: a group queued for freezing keeps the delay it was queued with
             _config.Set("DelayBeforeFreezeSec", 5);
             _config.Set("FreezeDistanceStatic", FreezeDistanceM);
