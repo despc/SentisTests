@@ -80,6 +80,7 @@ namespace SentisTests.Regression
             Add(() => new GridStreamOrderCheck());
             Add(() => new PcuCommandCheck());
             Add(() => new GridCleanCommandCheck());
+            Add(() => new VoxelRestoreCommandCheck());
             Add(() => new ConnectorCheck());
             Add(() => new MergeCheck());
             Add(() => new DropPickupCheck());
