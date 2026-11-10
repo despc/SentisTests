@@ -78,6 +78,8 @@ namespace SentisTests.Regression
             Add(() => new SmallConveyorCheck());
             Add(() => new SorterCheck());
             Add(() => new GridStreamOrderCheck());
+            Add(() => new PcuCommandCheck());
+            Add(() => new GridCleanCommandCheck());
             Add(() => new ConnectorCheck());
             Add(() => new MergeCheck());
             Add(() => new DropPickupCheck());
