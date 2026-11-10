@@ -207,6 +207,7 @@ namespace SentisTests.Regression
             Add(() => new HungerCheck());
             Add(() => new FoodProcessorCheck());
             Add(() => new FarmPlotCheck());
+            Add(() => new FarmWaterSyncCheck());
             Add(() => new RadiationCheck());
             Add(() => new AirVentDepressurizeCheck());
             Add(() => new AirVentIdleCheck());
