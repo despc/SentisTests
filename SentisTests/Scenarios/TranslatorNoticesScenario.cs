@@ -65,6 +65,18 @@ namespace SentisTests.Scenarios
             _b = FakeClients.PlayerOf(1).Id.SteamId;
             _ia = FakeClients.PlayerOf(0).Identity.IdentityId;
             _ib = FakeClients.PlayerOf(1).Identity.IdentityId;
+            // the plugin sends only to players Torch can address (ChatHook.Reachable: a connected client, since v0.3.3); the
+            // fake players have no client: taken as reachable while the scenario runs
+            _reachableFakes = new HashSet<long> { _ia, _ib };
+            if (_harmony == null)
+            {
+                var reachable = Integrations.TypeOf(TranslatorChatScenario.PluginName, "SentisTranslator.ChatHook")?.GetMethod("Reachable", Any);
+                if (reachable != null)
+                {
+                    _harmony = new HarmonyLib.Harmony("SentisTests.TranslatorNotices");
+                    _harmony.Patch(reachable, prefix: new HarmonyLib.HarmonyMethod(typeof(TranslatorNoticesScenario).GetMethod(nameof(ReachablePrefix), BindingFlags.Static | BindingFlags.NonPublic)));
+                }
+            }
 
             foreach (var name in Settings) _saved[name] = Get(name);
             var real = MySession.Static.Players.GetOnlinePlayers().Select(p => p.Id.SteamId).Where(s => s != 0 && s != _a && s != _b);
@@ -233,8 +245,19 @@ namespace SentisTests.Scenarios
 
         private void Set(string name, object value) => _config.GetType().GetProperty(name).SetValue(_config, value);
 
+        private static HarmonyLib.Harmony _harmony;
+        private static volatile HashSet<long> _reachableFakes = new HashSet<long>();
+
+        private static bool ReachablePrefix(long identity, ref bool __result)
+        {
+            if (!_reachableFakes.Contains(identity)) return true;
+            __result = true;
+            return false;
+        }
+
         public override void Cleanup()
         {
+            _reachableFakes = new HashSet<long>();
             try
             {
                 if (_event != null && _listener != null) _event.RemoveEventHandler(null, _listener);

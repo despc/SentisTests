@@ -81,7 +81,7 @@ namespace SentisTests.Scenarios
         private static Harmony _harmony;
 
         private static readonly string[] Settings =
-            { "AutoRestartServer", "Enabled", "TranslateGlobal", "TranslateFaction", "TranslatePrivate", "InlineMode", "OptedOutReceivers", "NativeLanguages", "ChosenLanguages" };
+            { "AutoRestartServer", "Enabled", "TranslateGlobal", "TranslateFaction", "TranslatePrivate", "InlineMode", "OptedOutReceivers", "NativeLanguages", "ChosenLanguages", "WrittenLanguages" };
 
         private readonly Dictionary<string, object> _saved = new Dictionary<string, object>();
         private readonly List<long> _factions = new List<long>();
@@ -131,6 +131,9 @@ namespace SentisTests.Scenarios
             Set("InlineMode", false);
             Set("OptedOutReceivers", string.Join(";", real));
             Set("NativeLanguages", $"{_steam[A]}=ru;{_steam[B]}=en;{_steam[C]}=en;{_steam[D]}=ru");
+            // the fake players' ids are the same run after run: what they wrote in an earlier run would weigh in
+            Set("WrittenLanguages", "");
+            Set("ChosenLanguages", "");
             Patch();
 
             if (_restart)
@@ -413,8 +416,12 @@ namespace SentisTests.Scenarios
             try
             {
                 SEDiscordBridge.DiscordBridge.Discord_MessageCreated((IChatManagerServer)_chat, author, text, 0);
-                var got = Wait(() => Captured.Count(c => c.Author == author && c.Text != text && _fakes.Contains(c.To)) >= 2, what + ": combined to B and C", TranslateSeconds);
-                while (got.MoveNext()) yield return got.Current;
+                var waited = DateTime.UtcNow;
+                while (Captured.Count(c => c.Author == author && c.Text != text && _fakes.Contains(c.To)) < 2 && (DateTime.UtcNow - waited).TotalSeconds < TranslateSeconds)
+                    yield return null;
+                Check(Captured.Count(c => c.Author == author && c.Text != text && _fakes.Contains(c.To)) >= 2,
+                    what + ": combined to B and C not in " + TranslateSeconds + " s; B reads " + Native(B) + ", C " + Native(C) + "; sent: " +
+                    string.Join(" / ", Captured.Select(c => Who(c.To) + " <" + c.Author + "|" + c.Font + "> " + c.Text)));
                 var quiet = WaitForSeconds(QuietSeconds, what + ": nothing more");
                 while (quiet.MoveNext()) yield return quiet.Current;
             }
@@ -560,8 +567,19 @@ namespace SentisTests.Scenarios
                     new[] { typeof(string), typeof(string), typeof(Color), typeof(ulong), typeof(string) });
                 if (asOther != null)
                     context.GetPattern(asOther).Prefixes.Add(typeof(TranslatorChatScenario).GetMethod(nameof(AsOtherPrefix), BindingFlags.Static | BindingFlags.NonPublic));
+                // a held Discord message goes on as the scripted chat message SendMessageAsOther would make, straight (the
+                // plugin since c0303bd: one line of the chat log for it); by Torch too: the plugin's NoticeHook has a Torch
+                // prefix on it, which a Harmony patch would undo for the rest of the session
+                var scripted = typeof(Sandbox.Engine.Multiplayer.MyMultiplayerBase).GetMethod("SendScriptedChatMessage", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (scripted != null)
+                    context.GetPattern(scripted).Prefixes.Add(typeof(TranslatorChatScenario).GetMethod(nameof(ScriptedPrefix), BindingFlags.Static | BindingFlags.NonPublic));
                 patches.Commit();
             }
+            // the plugin sends only to players Torch can address (ChatHook.Reachable: a connected client, since v0.3.3); the
+            // fake players have no client: taken as reachable while the scenario runs
+            var reachable = Integrations.TypeOf(PluginName, "SentisTranslator.ChatHook")?.GetMethod("Reachable", Any);
+            if (reachable != null)
+                _harmony.Patch(reachable, prefix: new HarmonyMethod(typeof(TranslatorChatScenario).GetMethod(nameof(ReachablePrefix), BindingFlags.Static | BindingFlags.NonPublic)));
             var asPlayer = Integrations.TypeOf(PluginName, "SentisTranslator.ChatHook")?.GetMethod("SendAsPlayer", Any);
             if (asPlayer != null)
                 _harmony.Patch(asPlayer, prefix: new HarmonyMethod(typeof(TranslatorChatScenario).GetMethod(nameof(SendAsPlayerPrefix), BindingFlags.Static | BindingFlags.NonPublic)));
@@ -576,6 +594,19 @@ namespace SentisTests.Scenarios
         private static void DialogPrefix(Torch.Mod.Messages.MessageBase message, ulong target)
         {
             if (_capturing && message is Torch.Mod.Messages.DialogMessage dialog) Dialogs.Enqueue(new KeyValuePair<ulong, string>(target, dialog.Content ?? ""));
+        }
+
+        private static void ScriptedPrefix(ref Sandbox.Engine.Multiplayer.ScriptedChatMsg msg)
+        {
+            if (!_capturing || !_asOther || msg.Author == null || !msg.Author.StartsWith("[D]")) return;
+            Captured.Enqueue(new Sent { Text = msg.Text ?? "", Author = msg.Author, To = msg.Target, Font = "Scripted" });
+        }
+
+        private static bool ReachablePrefix(long identity, ref bool __result)
+        {
+            if (!_capturing || !_fakes.Contains(identity)) return true;
+            __result = true;
+            return false;
         }
 
         private static void SendAsPlayerPrefix(System.Collections.IEnumerable readers, string text, object author)

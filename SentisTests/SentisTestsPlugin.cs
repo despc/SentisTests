@@ -351,6 +351,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(TranslatorSayScenario.InlineName, () => new TranslatorSayScenario(inline: true));
                 ScenarioRegistry.Register(TranslatorSayScenario.DiscordName, () => new TranslatorSayScenario(discord: true));
                 ScenarioRegistry.Register(TranslatorNoticesScenario.ScenarioName, () => new TranslatorNoticesScenario());
+                ScenarioRegistry.Register(TranslatorMultilangScenario.ScenarioName, () => new TranslatorMultilangScenario());
                 ScenarioRegistry.Register(TranslatorLoadScenario.ScenarioName, () => new TranslatorLoadScenario());
                 ScenarioRegistry.Register(Regression.Checks.GridStorageSaveCheck.ScenarioName, () => new Regression.Checks.GridStorageSaveCheck());
                 // not in the suite: they change a setting of the whole server (the checks beside them would see it)
@@ -474,7 +475,7 @@ namespace SentisTests
 
             ScenarioRegistry.Needs(Integrations.Adventures, NpcSpawnScenario.ScenarioName);
             ScenarioRegistry.Needs(Integrations.Garage, GarageRoundtripScenario.ScenarioName);
-            ScenarioRegistry.Needs(Integrations.Translator, TranslatorChatScenario.ScenarioName, TranslatorChatScenario.RestartName, TranslatorSayScenario.ScenarioName, TranslatorSayScenario.InlineName, TranslatorSayScenario.DiscordName, TranslatorNoticesScenario.ScenarioName, TranslatorLoadScenario.ScenarioName);
+            ScenarioRegistry.Needs(Integrations.Translator, TranslatorChatScenario.ScenarioName, TranslatorChatScenario.RestartName, TranslatorSayScenario.ScenarioName, TranslatorSayScenario.InlineName, TranslatorSayScenario.DiscordName, TranslatorNoticesScenario.ScenarioName, TranslatorLoadScenario.ScenarioName, TranslatorMultilangScenario.ScenarioName);
 
             // One pass over the world per plugin that sweeps it: the scenario needs all three.
             ScenarioRegistry.Needs(new[] { Integrations.Adventures, Integrations.Gameplay, Integrations.Optimisations },
