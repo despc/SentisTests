@@ -94,6 +94,9 @@ namespace SentisTests.Regression
         /// </summary>
         public virtual bool NeedsOwnCluster => false;
 
+        /// <summary>Run only when named in the focus, not in the whole suite: it changes what the checks beside it see.</summary>
+        public virtual bool OnlyWhenAsked => false;
+
         /// <summary>
         /// Steel plates enough to weld a light armor block whole by hand, with some over: what its definition asks (25 in
         /// the game, 50 on the modded V5), 30 at least.

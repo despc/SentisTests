@@ -13,11 +13,15 @@ namespace SentisTests.Regression.Checks
     /// violation with nothing in its log, once while reg_projection_follows moved its projector): 20 static grids with a
     /// projector each, all moved and turned every few frames for a minute - from half a millimetre to 60 m, up to 45
     /// degrees - each hologram checked at its cells after each move, and every 10 s one rig deleted with its projection
-    /// and built again. focus "rigs=N", "seconds=N".
+    /// and built again; SentisOptimisations' "no welder near: once a second" held off.
+    /// focus "rigs=N", "seconds=N".
     /// </summary>
     public sealed class ProjectionFollowsManyCheck : ProjectorRigCheck
     {
         public override string Name => Prefix + "projection_follows_many";
+
+        // 20 rigs built on a loaded stand, then a minute of moves
+        public override int TimeoutSeconds => 300;
 
         private sealed class Rig
         {
@@ -39,6 +43,7 @@ namespace SentisTests.Regression.Checks
             {
                 var home = Site.Origin + Site.Right * (i % 5 * 40) - Site.Forward * (i / 5 * 40);
                 yield return Project("follows-many-" + i, home);
+                HoldOffIdleProjection(Projector);
                 rigs.Add(new Rig { Grid = Grid, Projector = Projector, Cells = Cells, Home = home });
             }
             for (var i = 0; i < count; i++) yield return Make(i);

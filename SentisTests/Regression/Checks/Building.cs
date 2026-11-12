@@ -186,7 +186,10 @@ namespace SentisTests.Regression.Checks
         /// <summary>The hologram's cells in the projector's grid, along its X.</summary>
         protected List<Vector3I> Cells;
 
-        protected IEnumerator Project(string name, Vector3D at, long? owner = null)
+        protected IEnumerator Project(string name, Vector3D at, long? owner = null) => Project(name, at, owner, true);
+
+        /// <summary>The rig as <see cref="Project(string, Vector3D, long?)"/>, dynamic or static, with more parts on its grid.</summary>
+        protected IEnumerator Project(string name, Vector3D at, long? owner, bool isStatic, params Part[] more)
         {
             var blueprint = new MyObjectBuilder_CubeGrid
             {
@@ -207,7 +210,8 @@ namespace SentisTests.Regression.Checks
                     projector.ProjectionsRemaining = 1;
                     projector.Scale = 1;
                 }) };
-            var grid = owner.HasValue ? BuildFor(owner.Value, name, at, parts) : Build(name, at, true, parts);
+            if (more.Length > 0) parts = parts.Concat(more).ToArray();
+            var grid = owner.HasValue ? BuildFor(owner.Value, name, at, parts) : Build(name, at, isStatic, parts);
             Put(Inventory(Block<MyReactor>(grid)), "Ingot/Uranium", 5);
             var projectorBlock = Block<MyProjectorBase>(grid);
             yield return Until(() => projectorBlock.IsWorking && projectorBlock.ProjectedGrid != null ? 1 : 0, v => v > 0, "the projection up", 30);
@@ -235,6 +239,48 @@ namespace SentisTests.Regression.Checks
             Grid = grid;
             Projector = projectorBlock;
             Cells = cells;
+        }
+
+        /// <summary>
+        /// An enabled ship welder near the projection, empty and facing away from it: SentisOptimisations moves a projection
+        /// with no enabled welder within reach of its buildable blocks once a second (60 frames), with one every frame.
+        /// Seen within 60 frames, so waited for that long.
+        /// </summary>
+        private static System.Collections.Concurrent.ConcurrentDictionary<long, byte> IdleOffFor => AppDomain.CurrentDomain.GetAssemblies()
+            .Select(a => a.GetType("SentisOptimisations.Slowdowns.ProjectionSlowdown", false)).FirstOrDefault(t => t != null)
+            ?.GetField("IdleOffFor", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)?.GetValue(null) as System.Collections.Concurrent.ConcurrentDictionary<long, byte>;
+
+        private readonly List<long> _idleHeldOff = new List<long>();
+
+        /// <summary>
+        /// SentisOptimisations' "a projection with no welder near follows once a second" held off for this projector: for
+        /// checks of how Multigrid Projector follows its projector (reg_projection_idle checks the rule itself).
+        /// </summary>
+        protected void HoldOffIdleProjection(MyProjectorBase projector)
+        {
+            var set = IdleOffFor;
+            if (set == null || projector == null) return;
+            set[projector.EntityId] = 0;
+            _idleHeldOff.Add(projector.EntityId);
+        }
+
+        public override void Cleanup()
+        {
+            var set = IdleOffFor;
+            if (set != null) foreach (var id in _idleHeldOff) set.TryRemove(id, out _);
+            _idleHeldOff.Clear();
+            base.Cleanup();
+        }
+
+        /// <summary>The welder of the last <see cref="WelderBy"/>.</summary>
+        protected SpaceEngineers.Game.Entities.Blocks.MyShipWelder Welder;
+
+        protected IEnumerator WelderBy(string name, Vector3D at, bool wait = true)
+        {
+            var rig = ToolRig(name, "ShipWelder/LargeShipWelder", at, Site.Up);
+            Welder = Block<SpaceEngineers.Game.Entities.Blocks.MyShipWelder>(rig);
+            Switch(Welder, true);
+            if (wait) yield return WaitForTicks(130);
         }
     }
 

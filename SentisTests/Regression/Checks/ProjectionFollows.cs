@@ -9,7 +9,8 @@ namespace SentisTests.Regression.Checks
     /// its cell of the projector's grid is. MultigridProjector sets the hologram's place only when it is not there
     /// already within a millimetre (a ship at rest trembles by less, and every block of its holograms was moved with it
     /// every frame: prod 06.11.2026, 9 ms a second): the moves here are big and small, down to half a millimetre, and the
-    /// hologram is never more than that millimetre off.
+    /// hologram is never more than that millimetre off. SentisOptimisations' "no welder near: once a second" is held off
+    /// for it (reg_projection_idle checks that).
     /// </summary>
     public sealed class ProjectionFollowsCheck : ProjectorRigCheck
     {
@@ -19,6 +20,7 @@ namespace SentisTests.Regression.Checks
         {
             yield return Arrive(Site.At(0, 10, 10));
             yield return Project("projection-follows", Site.Origin);
+            HoldOffIdleProjection(Projector);
             var grid = Grid;
             var hologram = Projector.ProjectedGrid;
             var cells = Cells;

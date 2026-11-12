@@ -59,6 +59,10 @@ namespace SentisTests.Regression
             Add(() => new ProjectorCheck());
             Add(() => new ProjectionFollowsCheck());
             Add(() => new ProjectionFollowsManyCheck());
+            Add(() => new ProjectionIdleCheck());
+            Add(() => new ProjectionFlyingWeldCheck());
+            Add(() => new ProjectionFlyingWeldCheck(slowdowns: true));
+            Add(() => new TurretBarrelMatrixCheck());
             Add(() => new SubgridProjectionCheck());
             Add(() => new PaintCheck());
             Add(() => new HandDrillCheck());
@@ -81,6 +85,8 @@ namespace SentisTests.Regression
             Add(() => new PcuCommandCheck());
             Add(() => new GridCleanCommandCheck());
             Add(() => new VoxelRestoreCommandCheck());
+            Add(() => new ClientBulkDeleteCheck());
+            Add(() => new SlowdownsCheck());
             Add(() => new ConnectorCheck());
             Add(() => new MergeCheck());
             Add(() => new DropPickupCheck());

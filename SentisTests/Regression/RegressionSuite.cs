@@ -33,6 +33,7 @@ namespace SentisTests.Regression
         public RegressionSuite(bool heavy = false) { _heavy = heavy; }
 
         private readonly List<Running> _runs = new List<Running>();
+        private ConfigOverride _slowdowns;
         private ConfigOverride _gameplay;
         private ConfigOverride _essentials;
         private ConfigOverride _clusters;
@@ -173,11 +174,26 @@ namespace SentisTests.Regression
                 _essentials.Set("BackpackLimit", RegressionCheck.BagLimitOff);
             }
 
+            // SentisOptimisations' slowdowns at the peak load off while the suite runs: the suite is a peak of its own
+            // (the stand at 30% of real time), and the checks measure the game's own cadences; reg_slowdowns holds them
+            // on for itself
+            if (Integrations.IsLoaded(ConfigOverride.Optimisations))
+                try
+                {
+                    _slowdowns = new ConfigOverride(ConfigOverride.Optimisations);
+                    _slowdowns.Set("SlowdownsEnabled", false);
+                }
+                catch (Exception e)
+                {
+                    _slowdowns = null;
+                    Note("SentisOptimisations' slowdowns not held off: " + e.Message);
+                }
+
             // the clusters of the size the sites are laid out for, before any site is built
             _clusters = RegressionCheck.ClustersForTests();
             if (_clusters != null) Note("SentisClusters' clusters " + RegressionCheck.TestClusterSize + " m for the run");
 
-            var made = chosen.Select(entry => entry.Make()).ToList();
+            var made = chosen.Select(entry => entry.Make()).Where(c => focus.Length > 0 || !c.OnlyWhenAsked).ToList();
             // the heavy layout's light sites are the last indices: the checks that need a cluster of their own go there
             if (_heavy) made = made.Where(c => !c.NeedsOwnCluster).Concat(made.Where(c => c.NeedsOwnCluster)).ToList();
             var spaceCount = made.Count(c => c.Kind == SiteKind.Space);
@@ -341,6 +357,8 @@ namespace SentisTests.Regression
             }
             try { _gameplay?.Restore(); }
             catch (Exception e) { Log.Warn("restoring SentisGameplayImprovements' settings failed: {0}", e.Message); }
+            try { _slowdowns?.Restore(); }
+            catch (Exception e) { Log.Warn("restoring SentisOptimisations' slowdowns failed: {0}", e.Message); }
             try { _essentials?.Restore(); }
             catch (Exception e) { Log.Warn("restoring Essentials' settings failed: {0}", e.Message); }
             if (_detachAll)
