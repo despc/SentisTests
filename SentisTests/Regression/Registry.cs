@@ -82,6 +82,7 @@ namespace SentisTests.Regression
             Add(() => new SmallConveyorCheck());
             Add(() => new SorterCheck());
             Add(() => new GridStreamOrderCheck());
+            Add(() => new GridStreamStaleEntryCheck());
             Add(() => new PcuCommandCheck());
             Add(() => new GridCleanCommandCheck());
             Add(() => new VoxelRestoreCommandCheck());
