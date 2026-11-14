@@ -132,6 +132,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(ConveyorReachScenario.ScenarioName, () => new ConveyorReachScenario());
                 ScenarioRegistry.Register(DrillPrintProbeScenario.ScenarioName, () => new DrillPrintProbeScenario());
                 ScenarioRegistry.Register(ConveyorRecomputeScenario.ScenarioName, () => new ConveyorRecomputeScenario());
+                ScenarioRegistry.Register(ClusterStuckUpdateScenario.ScenarioName, () => new ClusterStuckUpdateScenario());
                 ScenarioRegistry.Register(RigShakeScenario.ScenarioName, () => new RigShakeScenario());
                 ScenarioRegistry.Register(OwnershipMissingBlockScenario.ScenarioName, () => new OwnershipMissingBlockScenario());
                 ScenarioRegistry.Register(AiTaskSplitScenario.ScenarioName, () => new AiTaskSplitScenario());
