@@ -56,8 +56,21 @@ namespace SentisTests.Scenarios
 
         private static IMyConveyorEndpointBlock Endpoint(MyCubeBlock block) => block as IMyConveyorEndpointBlock;
 
-        private static bool Vanilla(MyCubeBlock from, MyCubeBlock to, MyDefinitionId? item) =>
-            MyGridConveyorSystem.ComputeCanTransfer(Endpoint(from), Endpoint(to), item);
+        private static System.Reflection.FieldInfo _vanillaFlag;
+
+        /// <summary>The game's own search: ComputeCanTransfer, which SO answers too, asked with SO's ConveyorReach stood aside on this thread.</summary>
+        private static bool Vanilla(MyCubeBlock from, MyCubeBlock to, MyDefinitionId? item)
+        {
+            _vanillaFlag?.SetValue(null, true);
+            try
+            {
+                return MyGridConveyorSystem.ComputeCanTransfer(Endpoint(from), Endpoint(to), item);
+            }
+            finally
+            {
+                _vanillaFlag?.SetValue(null, false);
+            }
+        }
 
         private static string ItemName(MyDefinitionId? item) => item?.SubtypeName ?? "any";
 
@@ -79,6 +92,8 @@ namespace SentisTests.Scenarios
             WorldApi.EnsureUnpaused(Name);
             var reach = Integrations.TypeOf("SentisOptimisations", "Optimizer.Optimizations.ConveyorReach");
             Check(reach != null, "SentisOptimisations' ConveyorReach not found: a build without it");
+            _vanillaFlag = reach.GetField("Vanilla");
+            Check(_vanillaFlag != null, "SentisOptimisations' ConveyorReach has no Vanilla switch: the comparison would be of SO with itself");
             long Counter(string name) => Convert.ToInt64(reach.GetField(name)?.GetValue(null) ?? -1L);
 
             // the items: no item, ore, ingot, small component, large component, tool
@@ -133,6 +148,36 @@ namespace SentisTests.Scenarios
                  $"{patchedMs:0} ms answered, vanilla {vanillaMs:0} ms; searches {Counter("Searches") - searches0} for {Counter("Answered") - answered0} answers");
             var worldWrong = _wrong.Count;
             Check(groups.Count > 0 && pairs > 0, "no conveyor network with inventories in the world");
+
+            // the game's own question (ComputeCanTransfer, what a block's pull or push asks on a worker), from workers at once:
+            // SO's answer against vanilla's on the same worker and against the game thread's
+            {
+                var sample = groups[0].Take(30).ToList();
+                var jobs = new List<(MyCubeBlock From, MyCubeBlock To, MyDefinitionId? Item, bool Game)>();
+                foreach (var item in items)
+                foreach (var to in sample.Take(6))
+                foreach (var from in sample)
+                    jobs.Add((from, to, item, Vanilla(from, to, item)));
+                var offThread0 = Counter("AnsweredOffGameThread");
+                var differ = new System.Collections.Concurrent.ConcurrentQueue<string>();
+                var watch = Stopwatch.StartNew();
+                // in the thread pool as a whole: Parallel.For runs some of its iterations on the thread that calls it
+                System.Threading.Tasks.Task.Run(() => System.Threading.Tasks.Parallel.For(0, jobs.Count, new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = 6 }, i =>
+                {
+                    var job = jobs[i];
+                    var so = MyGridConveyorSystem.ComputeCanTransfer(Endpoint(job.From), Endpoint(job.To), job.Item);
+                    var vanilla = Vanilla(job.From, job.To, job.Item);
+                    if (so != vanilla || so != job.Game)
+                        differ.Enqueue($"worker: {job.From.DisplayNameText} -> {job.To.DisplayNameText}, {ItemName(job.Item)}: SO {so}, vanilla here {vanilla}, on the game thread {job.Game}");
+                })).Wait();
+                var offThread = Counter("AnsweredOffGameThread") - offThread0;
+                Note($"CONVEYOR REACH | workers: {jobs.Count} questions on 6 threads in {watch.ElapsedMilliseconds} ms, {offThread} answered by SO off the game thread, differing {differ.Count}");
+                foreach (var line in differ.Take(20)) _wrong.Add(line);
+                // a block to itself is answered before any search or count, as vanilla's search starts on its target
+                var counted = jobs.Count(j => j.From != j.To);
+                if (offThread < counted) _wrong.Add($"workers: only {offThread} of {counted} questions answered by SO off the game thread");
+                worldWrong = _wrong.Count;
+            }
 
             // the switch on the settings page, at once: off - vanilla answers, no search of SO's; on again - SO's, the same answers
             {
