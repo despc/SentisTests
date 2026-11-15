@@ -429,6 +429,8 @@ namespace SentisTests.Regression
             ScenarioRegistry.Register(JumpDetachCheck.ScenarioName, () => new JumpDetachCheck());
             ScenarioRegistry.Register(RaycastDetachCheck.ScenarioName, () => new RaycastDetachCheck());
             ScenarioRegistry.Register(ProjectileDetachCheck.ScenarioName, () => new ProjectileDetachCheck());
+            // SentisWatcher's battle records: their cost and counts, with the clusters' loops off and on
+            ScenarioRegistry.Register(WatcherBattlePerfCheck.ScenarioName, () => new WatcherBattlePerfCheck());
             ScenarioRegistry.Register(ClusterStressCheck.ScenarioName, () => new ClusterStressCheck());
             ScenarioRegistry.Register(ClusterFlightCheck.ScenarioName, () => new ClusterFlightCheck());
             ScenarioRegistry.Register(PlanetPhysicsChurnCheck.ScenarioName, () => new PlanetPhysicsChurnCheck());
