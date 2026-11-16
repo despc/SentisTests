@@ -231,6 +231,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(AnomalyGpsScenario.ScenarioName, () => new AnomalyGpsScenario());
                 ScenarioRegistry.Register(AnomalySafeZoneScenario.ScenarioName, () => new AnomalySafeZoneScenario());
                 ScenarioRegistry.Register(AnomalyCenterScenario.ScenarioName, () => new AnomalyCenterScenario());
+                ScenarioRegistry.Register(SafeZoneWatchScenario.ScenarioName, () => new SafeZoneWatchScenario());
                 ScenarioRegistry.Register(FreezerStressScenario.ScenarioName, () => new FreezerStressScenario());
                 ScenarioRegistry.Register(FreezerStressScenario.ProfileScenarioName, () => new FreezerStressScenario(profile: true));
                 ScenarioRegistry.Register(GrinderPerfScenario.ScenarioName, () => new GrinderPerfScenario());
