@@ -43,6 +43,11 @@ namespace SentisTests.Regression.Checks
             var weapons = MyDefinitionManager.Static.GetAllDefinitions().OfType<MyWeaponBlockDefinition>()
                 .Where(d => d.Public && !(d.Id.TypeId.ToString().EndsWith("Searchlight")))
                 .OrderBy(d => d.Id.SubtypeName).ToList();
+            // a fixed gun that fires only at a target its pilot locked on (the torpedo launchers since the game of 16.11.2026,
+            // TargetLockRequirementEnabled) does not fire when told to alone: left out here, the lock is reg_target_lock's
+            var locked = weapons.Where(d => d.TargetLockRequirementEnabled && !(d is MyLargeTurretBaseDefinition)).ToList();
+            weapons = weapons.Except(locked).ToList();
+            if (locked.Count > 0) Note("left out, firing only at a locked target: " + string.Join(", ", locked.Select(d => d.Id.SubtypeName)));
             Check(weapons.Count > 0, "no weapon blocks in this game");
             yield return Arrive(Site.At(0, -40, 0));
             var lanes = new List<Lane>();

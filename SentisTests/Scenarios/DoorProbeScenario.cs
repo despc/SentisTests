@@ -58,9 +58,8 @@ namespace SentisTests.Scenarios
             var s = $"{door.EntityId} '{door.CustomName}' on '{grid.DisplayName}' ({(door.PositionComp.GetPosition() - at).Length():0.0} m): open={door.Open} status={((Sandbox.ModAPI.Ingame.IMyDoor)door).Status} " +
                     $"ratio={door.OpenRatio:0.00} speed={Field<float>(door, "m_currSpeed"):0.00} working={door.IsWorking} enabled={door.Enabled} needs={door.NeedsUpdate}; ";
             if (body == null) return s + "grid without physics";
-            s += $"grid static={grid.IsStatic} bodyStatic={body.IsStatic} inWorld={body.IsInWorld} welded={body.IsWelded}" +
-                 (body.IsWelded ? $" to {(body.WeldInfo.Parent.Entity as MyEntity)?.DisplayName ?? "?"}" : "") +
-                 $" weldChildren={body.WeldInfo.Children.Count} system={body.HavokCollisionSystemID} body={Filter(body.RigidBody)} motion={body.RigidBody?.GetMotionType()}; ";
+            s += $"grid static={grid.IsStatic} bodyStatic={body.IsStatic} inWorld={body.IsInWorld}" +
+                 $" system={body.HavokCollisionSystemID} body={Filter(body.RigidBody)} motion={body.RigidBody?.GetMotionType()}; ";
             foreach (var side in new[] { "Left", "Right" })
             {
                 var part = Field<MyEntitySubpart>(door, "m_" + side.ToLowerInvariant() + "Subpart");

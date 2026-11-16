@@ -193,18 +193,18 @@ namespace SentisTests.Regression.Checks
             yield return Until(() => door.IsWorking ? 1 : 0, v => v > 0, "the door working", 10, () => State(door));
             Check(!door.Open, "the new door is open");
 
-            Request(door, "OpenRequest", true, Identity);
+            Request(door, "OpenRequest", true);
             yield return WaitForTicks(2);
             Check(door.Open, "the owner's request did not open the door");
-            Request(door, "OpenRequest", false, Identity);
+            Request(door, "OpenRequest", false);
             yield return WaitForTicks(2);
             Check(!door.Open, "the owner's request did not close the door");
 
-            RequestAs(other, door, "OpenRequest", true, stranger);
+            RequestAs(other, door, "OpenRequest", true);
             yield return WaitForTicks(2);
             Check(!door.Open, "a player out of the owner's faction opened the door");
             door.AnyoneCanUse = true;
-            RequestAs(other, door, "OpenRequest", true, stranger);
+            RequestAs(other, door, "OpenRequest", true);
             yield return WaitForTicks(2);
             Check(door.Open, "with anyone can use on, the other player did not open the door");
             Result("the owner opened and closed the door; another player could not, until anyone can use was on");

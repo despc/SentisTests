@@ -407,11 +407,11 @@ namespace SentisTests.Regression.Checks
             yield return Sit(seat);
             var locking = Body.TargetLockingComp;
             Check(locking != null, "the character has no target locking");
-            Request(typeof(Sandbox.Game.EntityComponents.MyTargetLockingComponent), "OnTargetRequestServer", target.EntityId);
+            Request(typeof(Sandbox.Game.EntityComponents.MyTargetLockingComponent), "OnTargetRequestServer", target.EntityId, true);
             yield return Until(() => locking.IsTargetLocked ? 1 : 0, v => v > 0, "the lock on the grid ahead", 20,
                 () => "target " + locking.TargetData.TargetId + " (the grid " + target.EntityId + "), progress " + F(locking.TargetData.LockingProgress));
             Check(locking.TargetData.TargetId == target.EntityId, "locked on " + locking.TargetData.TargetId + ", not the grid ahead");
-            Request(typeof(Sandbox.Game.EntityComponents.MyTargetLockingComponent), "OnTargetRequestServer", target.EntityId);
+            Request(typeof(Sandbox.Game.EntityComponents.MyTargetLockingComponent), "OnTargetRequestServer", target.EntityId, true);
             yield return Until(() => locking.TargetData.TargetId == 0 ? 1 : 0, v => v > 0, "the lock let go", 5);
             Result("from the cockpit the grid 300 m ahead locked on and let go on the next request");
         }

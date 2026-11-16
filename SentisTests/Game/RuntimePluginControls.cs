@@ -94,8 +94,8 @@ namespace SentisTests.Game
                 try
                 {
                     var type = PluginType("SentisOptimisations", "Optimizer.Optimizations.StreamingSerializeBudget");
-                    var field = type.GetField("Deferred", BindingFlags.Public | BindingFlags.Static);
-                    return field == null ? -1 : (long)field.GetValue(null);
+                    var deferred = type.GetField("Deferred", BindingFlags.Public | BindingFlags.Static);
+                    return deferred == null ? -1 : (long)deferred.GetValue(null);
                 }
                 catch { return -1; }
             }

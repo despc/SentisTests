@@ -38,6 +38,18 @@ namespace SentisTests.Regression.Checks
             var still = Motion.Speed(ship);
             Check(still < 0.3, "the ship with its space ball's virtual mass at nothing moves at " + F(still) + " m/s in the field");
             settings.VirtualMass = ((Sandbox.Definitions.MySpaceBallDefinition)ball.BlockDefinition).MaxVirtualMass;
+            if (!Sandbox.Game.World.MySession.Static.Settings.AllowGravityDrives)
+            {
+                // the game since 16.11.2026: a gravity generator leaves virtual mass alone unless the world allows gravity
+                // drives (AllowGravityDrives, off by default)
+                yield return Seconds(3);
+                var held = Motion.Speed(ship);
+                Check(held < 0.3, "gravity drives are off in this world, yet the ship with the space ball at its most moves at " + F(held) + " m/s in the field");
+                Check(Math.Abs(settings.Friction - 0.3f) < 0.01f && Math.Abs(settings.Restitution - 0.7f) < 0.01f,
+                    "the space ball's friction is " + F(settings.Friction) + " and its bounce " + F(settings.Restitution) + ", set 0.3 and 0.7");
+                Result("gravity drives off in this world (AllowGravityDrives): virtual mass 0 " + F(still) + " m/s, " + F(settings.VirtualMass) + " kg " + F(held) + " m/s - the field leaves it alone; friction and bounce as set");
+                yield break;
+            }
             yield return Until(() => Motion.Speed(ship), v => v > 1, "the ship with the space ball's virtual mass falling in the field", 10,
                 () => State(ball) + ", virtual mass " + F(settings.VirtualMass) + ", gravity " + F(generator.GetGravityMultiplier(ship.PositionComp.GetPosition())));
             Check(Math.Abs(settings.Friction - 0.3f) < 0.01f && Math.Abs(settings.Restitution - 0.7f) < 0.01f,

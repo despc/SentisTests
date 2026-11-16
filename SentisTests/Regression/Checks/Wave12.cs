@@ -292,6 +292,16 @@ namespace SentisTests.Regression.Checks
             var still = Motion.Speed(ship);
             Check(still < 0.3, "the ship with its artificial mass off moves at " + F(still) + " m/s in the field");
             Switch(block, true);
+            if (!Sandbox.Game.World.MySession.Static.Settings.AllowGravityDrives)
+            {
+                // the game since 16.11.2026: a gravity generator leaves artificial mass alone unless the world allows
+                // gravity drives (AllowGravityDrives, off by default)
+                yield return Seconds(3);
+                var held = Motion.Speed(ship);
+                Check(held < 0.3, "gravity drives are off in this world, yet the ship with artificial mass on moves at " + F(held) + " m/s in the field");
+                Result("gravity drives off in this world (AllowGravityDrives): artificial mass off " + F(still) + " m/s, on " + F(held) + " m/s - the field leaves it alone");
+                yield break;
+            }
             yield return Until(() => Motion.Speed(ship), v => v > 1, "the ship with artificial mass falling in the field", 10, () => State(block) + ", gravity " + F(generator.GetGravityMultiplier(ship.PositionComp.GetPosition())));
             Result("artificial mass off: " + F(still) + " m/s; on: the ship falls in the field (" + F(Motion.Speed(ship)) + " m/s)");
         }
