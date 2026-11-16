@@ -35,6 +35,134 @@ namespace SentisTests.Regression.Checks
         }
     }
 
+    /// <summary>
+    /// A connector on a piston's head, pushed by the piston to a connector of a station above it, gets in reach of it
+    /// ("Connectable") and connects. Its detector (<c>MyShipConnector.m_connectorDummy</c>, a phantom body held to the head's
+    /// grid by a fixed constraint) is what finds the other grid: it must go with the head as the piston moves (live server,
+    /// 16.11.2026: a connector on a piston sometimes never connected). Told on the way: where the detector is from the
+    /// connector, what it has found.
+    /// </summary>
+    public sealed class ConnectorOnPistonCheck : RegressionCheck
+    {
+        public override string Name => Prefix + "connector_on_piston";
+
+        private static readonly System.Reflection.FieldInfo Dummy = typeof(MyShipConnector).GetField("m_connectorDummy", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        protected override IEnumerator Check()
+        {
+            yield return Arrive(Site.At(6, 4, 0));
+            var grid = Build("connector-piston", Site.Origin, true,
+                new Part("ExtendedPistonBase/LargePistonBase", 0, 0, 0),
+                new Part("BatteryBlock/LargeBlockBatteryBlock", 1, 0, 0).With(b => Motion.Charged(b)));
+            var piston = Block<MyPistonBase>(grid);
+            yield return AddHead(piston);
+            var top = piston.TopGrid;
+            var up = piston.WorldMatrix.Up;
+            // the connector on the head, its port along the piston
+            var topBlock = piston.TopBlock.SlimBlock;
+            var localUp = Base6Directions.GetIntVector(top.WorldMatrix.GetClosestDirection(up));
+            var place = topBlock.Position + localUp;
+            // the block turned so that its port faces along the piston: the game's ConnectDirection (in the block's own
+            // Left/Up/Forward) points into the block, the lock point is on the other side
+            var definition = (Sandbox.Definitions.MyShipConnectorDefinition)Sandbox.Definitions.MyDefinitionManager.Static.GetCubeBlockDefinition(
+                new VRage.Game.MyDefinitionId(typeof(Sandbox.Common.ObjectBuilders.MyObjectBuilder_ShipConnector), "Connector"));
+            var want = -(Vector3)localUp;
+            Direction forward = Direction.Forward, side = Direction.Up;
+            foreach (var f in Base6Directions.EnumDirections)
+            foreach (var u in Base6Directions.EnumDirections)
+            {
+                if (Base6Directions.GetAxis(f) == Base6Directions.GetAxis(u)) continue;
+                new MyBlockOrientation(f, u).GetMatrix(out Matrix m);
+                var port = definition.ConnectDirection.X * m.Left + definition.ConnectDirection.Y * m.Up + definition.ConnectDirection.Z * m.Forward;
+                if (Vector3.Dot(port, want) > 0.9f) { forward = f; side = u; }
+            }
+            var ob = (Sandbox.Common.ObjectBuilders.MyObjectBuilder_ShipConnector)VRage.ObjectBuilders.MyObjectBuilderSerializer.CreateNewObject(
+                typeof(Sandbox.Common.ObjectBuilders.MyObjectBuilder_ShipConnector), "Connector");
+            ob.Min = place;
+            ob.BlockOrientation = new VRage.Game.SerializableBlockOrientation(forward, side);
+            ob.Owner = Identity;
+            ob.BuiltBy = Identity;
+            ob.ShareMode = VRage.Game.MyOwnershipShareModeEnum.Faction;
+            ((VRage.Game.ModAPI.IMyCubeGrid)top).AddBlock(ob, false);
+            yield return Seconds(1); // the connector reads its port from its model in its first update
+            var connector = top.GetCubeBlock(place)?.FatBlock as MyShipConnector;
+            Check(connector != null, "the connector was not put on the piston's head");
+            Vector3D Port(MyShipConnector c) => c.BlockDefinition.ConnectDirection.X * c.WorldMatrix.Left + c.BlockDefinition.ConnectDirection.Y * c.WorldMatrix.Up +
+                                                c.BlockDefinition.ConnectDirection.Z * c.WorldMatrix.Forward;
+            Check(Vector3D.Dot(Port(connector), up) < -0.9, "the head's connector does not face along the piston");
+
+            // the station's connector above, facing down, met when the piston is out 2 m
+            const double Meet = 2;
+            var at = connector.WorldMatrix.Translation + up * (top.GridSize + Meet);
+            var station = Build("connector-piston-dock", at, true, new[]
+            {
+                new Part("ShipConnector/Connector", 0, 0, 0),
+                new Part("BatteryBlock/LargeBlockBatteryBlock", 0, 0, 2).With(b => Motion.Charged(b)),
+            }, forward: -up, up: Vector3D.CalculatePerpendicularVector(up));
+            var dock = (MyShipConnector)station.GetCubeBlock(Vector3I.Zero).FatBlock;
+            yield return Seconds(1);
+            // the station's connector's point where the head's is to come: moved by what is between them
+            var gap = Vector3D.Dot(dock.ConstraintPositionWorld() - connector.ConstraintPositionWorld(), up);
+            Check(gap > 0.5 && gap < 9, "the dock's point " + F(gap) + " m along the piston from the head's connector's (" + F(Meet) + " m meant)");
+
+            var dummy = Dummy.GetValue(connector) as Sandbox.Engine.Physics.MyPhysicsBody;
+            Check(dummy != null, "the head's connector has no detector");
+            // where Havok has the detector (not the block's matrix: the body's own place in its world)
+            Vector3D DummyAt() => dummy.RigidBody != null ? dummy.ClusterToWorld(dummy.RigidBody.Position) : dummy.GetWorldMatrix().Translation;
+            var offset = DummyAt() - connector.PositionComp.GetPosition();
+            string Filter(Havok.HkRigidBody body)
+            {
+                if (body == null) return "none";
+                var info = body.GetCollisionFilterInfo();
+                return "layer " + (info & 31) + " system " + (info >> 16) + " sub " + ((info >> 5) & 31) + " not with " + ((info >> 10) & 31);
+            }
+            string Filters() => "filters: detector " + Filter(dummy.RigidBody) + "; head " + Filter(top.Physics?.RigidBody) + "; dock " + Filter(station.Physics?.RigidBody) +
+                                "; piston's grid " + Filter(grid.Physics?.RigidBody);
+            string Seen() => "detector " + F(Vector3D.Distance(DummyAt() - connector.PositionComp.GetPosition(), offset)) + " m off where it was on the connector" +
+                             (dummy.Enabled ? "" : ", off") + (dummy.IsInWorld ? "" : ", not in world") + (dummy.RigidBody?.IsActive == true ? ", active" : ", asleep") +
+                             "; grids found " + connector.DetectedGridCount + "; status " + ((Sandbox.ModAPI.Ingame.IMyShipConnector)connector).Status +
+                             "; to the dock's point " + F(Vector3D.Dot(dock.ConstraintPositionWorld() - connector.ConstraintPositionWorld(), up)) + " m along, " +
+                             F(Vector3D.Reject(dock.ConstraintPositionWorld() - connector.ConstraintPositionWorld(), up).Length()) + " m aside" +
+                             "; blocks " + connector.Min + ".." + connector.Max + " and " + dock.Min + ".." + dock.Max + "; piston at " +
+                             F(((Sandbox.ModAPI.Ingame.IMyPistonBase)piston).CurrentPosition) + " m";
+
+            Log.Info(Name + ": start: gap " + F(gap) + " m; " + Seen() + "; points from their blocks: head " + F(Vector3D.Dot(connector.ConstraintPositionWorld() - connector.WorldMatrix.Translation, up)) +
+                     ", dock " + F(Vector3D.Dot(dock.ConstraintPositionWorld() - dock.WorldMatrix.Translation, up)) + " m up; ports head " + F(Vector3D.Dot(Port(connector), up)) +
+                     ", dock " + F(Vector3D.Dot(Port(dock), up)) + "; ConnectDirection " + connector.BlockDefinition.ConnectDirection + "; head grid " + (connector.CubeGrid == top) + ", piston up " + up + ", top " + F(Vector3D.Dot(top.PositionComp.GetPosition() - piston.PositionComp.GetPosition(), up)) + " m up the piston");
+            var terminal = (Sandbox.ModAPI.IMyTerminalBlock)piston;
+            terminal.SetValueFloat("UpperLimit", (float)gap);
+            var worst = 0.0;
+            var rounds = new System.Collections.Generic.List<string>();
+            // out and back at the speeds a player sets, each time to lock and let go (the second time round, after the
+            // detector saw the dock leave, as much as the first)
+            foreach (var speed in new[] { 0.5f, 0.5f, 2f, 2f })
+            {
+                var started = top.PositionComp.GetPosition();
+                var frames = 0;
+                Log.Info(Name + ": before " + speed + " m/s: " + Filters());
+                terminal.SetValueFloat("Velocity", speed);
+                yield return Until(() =>
+                {
+                    frames++;
+                    worst = Math.Max(worst, Vector3D.Distance(DummyAt() - connector.PositionComp.GetPosition(), offset));
+                    return ((Sandbox.ModAPI.Ingame.IMyShipConnector)connector).Status == Sandbox.ModAPI.Ingame.MyShipConnectorStatus.Connectable ? 1 : 0;
+                }, v => v > 0, "the head's connector in reach of the dock at " + speed + " m/s", 30,
+                    () => Seen() + "; the head moved " + F(Vector3D.Dot(top.PositionComp.GetPosition() - started, up)) + " m up");
+                Log.Info(Name + ": " + speed + " m/s, in reach: " + Seen());
+                Log.Info(Name + ": " + speed + " m/s, " + Filters());
+                Request(connector, "TryConnect");
+                yield return Until(() => connector.Connected ? 1 : 0, v => v > 0, "the connectors connected at " + speed + " m/s", 10, Seen);
+                Request(connector, "TryDisconnect");
+                yield return Until(() => connector.Connected ? 0 : 1, v => v > 0, "the connectors let go", 10, Seen);
+                terminal.SetValueFloat("Velocity", -5f);
+                yield return Until(() => ((Sandbox.ModAPI.Ingame.IMyPistonBase)piston).CurrentPosition, v => v < 0.05, "the piston back in", 15, Seen);
+                yield return Until(() => connector.DetectedGridCount, v => v == 0, "the detector seeing the dock leave", 10, Seen);
+                rounds.Add(speed + " m/s");
+            }
+            Result("a connector on a piston's head in reach of a station's and connected at " + string.Join(", ", rounds) + "; its detector at most " + F(worst) + " m off it on the way");
+        }
+    }
+
     /// <summary>A hinge on a station, its head added, swings one way and back within its limits.</summary>
     public sealed class HingeCheck : RegressionCheck
     {
