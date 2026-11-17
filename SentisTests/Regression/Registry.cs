@@ -141,6 +141,7 @@ namespace SentisTests.Regression
             Add(() => new BlinkDriveCheck());
             Add(() => new ScriptPackPerfCheck());
             Add(() => new ScriptPackLoadCheck());
+            Add(() => new ScriptPackNetSecurityCheck());
             Add(() => new HingeCheck());
             Add(() => new LandingGearCheck());
             Add(() => new GravityGeneratorCheck());
