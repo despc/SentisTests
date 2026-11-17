@@ -134,6 +134,7 @@ namespace SentisTests.Regression
             Add(() => new PistonCheck());
             Add(() => new ConnectorOnPistonCheck());
             Add(() => new RailgunCapacitorCheck());
+            Add(() => new DamageBlockedCheck());
             Add(() => new HingeCheck());
             Add(() => new LandingGearCheck());
             Add(() => new GravityGeneratorCheck());
