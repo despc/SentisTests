@@ -56,7 +56,8 @@ namespace SentisTests.Regression.Checks
             Check(!MyEntities.EntityExists(originalId), "the ship put into the garage is still in the world");
 
             // 2. the original made again from the file, its ids as they were
-            MyObjectBuilderSerializer.DeserializeXML(file, out MyObjectBuilder_Definitions definitions);
+            // read as the garage reads (the game's own path check is for mods: a garage outside the server's folder failed it)
+            VRage.ObjectBuilders.Private.MyObjectBuilderSerializerKeen.DeserializeXML(file, out MyObjectBuilder_Definitions definitions);
             var builder = definitions.ShipBlueprints[0].CubeGrids[0];
             Check(builder.EntityId == originalId, "the garage file does not keep the ship's id (" + builder.EntityId + " for " + originalId + ")");
             var again = (MyCubeGrid)MyAPIGateway.Entities.CreateFromObjectBuilderAndAdd(builder);
