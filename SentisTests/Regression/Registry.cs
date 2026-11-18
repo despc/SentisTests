@@ -142,6 +142,7 @@ namespace SentisTests.Regression
             Add(() => new ScriptPackPerfCheck());
             Add(() => new ScriptPackLoadCheck());
             Add(() => new ScriptPackNetSecurityCheck());
+            Add(() => new AdminBlocksCheck());
             Add(() => new HingeCheck());
             Add(() => new LandingGearCheck());
             Add(() => new GravityGeneratorCheck());
