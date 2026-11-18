@@ -34,15 +34,17 @@ namespace SentisTests.Regression.Checks
     /// - the nanobot: another's settings of the block are refused; the owner's are taken, the area held to its limit;
     /// - FixShip (SentisGameplayImprovements): another's ship is not fixed; the owner's is; again within the minute it
     ///   is not; a ship docked to another's (a connector's logical link) is not;
-    /// - the trade console (Shipyard_block, VirtualGarage): a non-owner's sale is refused; the owner's puts the garage
-    ///   file on sale; a buyer short of credits and the seller himself are refused; the buyer pays the seller and the
-    ///   ship is in his garage at once, not to be sold on before a world save; !g load takes it out next to the buyer
-    ///   though the garage takes grids out only where they were saved (OnlyLoadBase, in memory); a crash before the
-    ///   world save gives it (taken out) back to the seller's garage, after the save it stays the buyer's; he sells it
-    ///   on, another cannot take it off sale, he can: back in his garage.
+    /// - the trade console (Shipyard_block, VirtualGarage): a non-owner's sale is refused, so is the sale of a ship put
+    ///   into the garage 3 km off the console; the owner's puts the garage file on sale; a buyer short of credits, the
+    ///   seller himself and one of the seller's faction are refused; the buyer pays the seller and the ship is in his
+    ///   garage at once, not to be sold on before a world save; !g load takes it out next to the buyer though the garage
+    ///   takes grids out only where they were saved (OnlyLoadBase, in memory); a crash before the world save gives it
+    ///   (taken out) back to the seller's garage, after the save it stays the buyer's; he sells it on, another cannot
+    ///   take it off sale, he can; the console made again in its place (as FixShip does, the ids remapped) keeps the
+    ///   ship on sale, a console moved or made a ship gives it back to the garage, and a console of a ship sells nothing.
     /// Skipped where the mod is not loaded; a part whose block or plugin is missing is skipped with a note.
     /// </summary>
-    public sealed class ScriptPackNetSecurityCheck : RegressionCheck
+    public sealed class ScriptPackNetSecurityCheck : FactionCheck
     {
         public override string Name => Prefix + "scriptpack_netsec";
         public override int TimeoutSeconds => 300;
@@ -93,7 +95,6 @@ namespace SentisTests.Regression.Checks
         // ------------------------------------------------------------------ the network, as a client's message arrives
 
         private ulong Steam(int client) => FakeClients.PlayerOf(client).Id.SteamId;
-        private long IdentityOf(int client) => FakeClients.PlayerOf(client).Identity.IdentityId;
 
         private static readonly Type ModMultiplayer = typeof(MyModAPIHelper).GetNestedType("MyMultiplayer", Any);
 
@@ -491,6 +492,14 @@ namespace SentisTests.Regression.Checks
             definitions.ShipBlueprints = new[] { blueprint };
             // written as the garage writes (the game's own path check is for mods)
             VRage.ObjectBuilders.Private.MyObjectBuilderSerializerKeen.SerializeXML(file, false, definitions);
+            // and one put into the garage 3 km off the console
+            var farName = name + "-far";
+            var farFile = Path.Combine(Folder(Me), farName + ".sbc");
+            var farModel = Build("netsec-garage-far", Site.At(0, -400, 3000), false, new Part("Cockpit/LargeBlockCockpit", 0, 0, 0));
+            blueprint.CubeGrids = new[] { (MyObjectBuilder_CubeGrid)farModel.GetObjectBuilder(true) };
+            farModel.Close();
+            VRage.ObjectBuilders.Private.MyObjectBuilderSerializerKeen.SerializeXML(farFile, false, definitions);
+            _files.AddRange(new[] { farFile, farFile + "_market", farFile + "B5" });
             var listed = file + "_market";
             var bought = Path.Combine(Folder(_buyer), name + "_bought.sbc");
             var takenOut = bought + "_spawned_unsaved";
@@ -507,10 +516,14 @@ namespace SentisTests.Regression.Checks
                 ToServer(client, channel, Bytes(message));
             }
 
-            // 1. a non-owner's sale, the owner's
+            // 1. a non-owner's sale, the sale of a ship put into the garage far off, the owner's
             Ask(_thief, 2, name, 1);
             yield return Seconds(0.5);
             if (!File.Exists(file)) Fail("trade console: a non-owner put the owner's ship on sale");
+            Ask(Me, 2, farName, 1);
+            yield return Seconds(1);
+            Note("trade console: a ship put into the garage 3 km off: " + (File.Exists(farFile + "_market") ? "on sale" : "not on sale"));
+            if (!File.Exists(farFile) || File.Exists(farFile + "_market")) Fail("trade console: a ship put into the garage 3 km off the console was put on sale");
             Ask(Me, 2, name, 1000);
             yield return Seconds(1);
             Note("trade console: the sale: " + (File.Exists(listed) ? "the file on sale" : "the file not moved"));
@@ -526,6 +539,13 @@ namespace SentisTests.Regression.Checks
             yield return Seconds(0.5);
             if (!File.Exists(listed) || Balance(Identity) != 10000) Fail("trade console: the seller bought his own ship");
             GiveCredits(IdentityOf(_buyer), 5000);
+            var faction = Found(Me);
+            Enter(_buyer, faction, Me);
+            Ask(_buyer, 3);
+            yield return Seconds(1);
+            Note("trade console: a buyer of the seller's faction: " + (File.Exists(listed) && Balance(IdentityOf(_buyer)) == 5000 ? "refused" : "bought"));
+            if (!File.Exists(listed) || Balance(IdentityOf(_buyer)) != 5000) Fail("trade console: one of the seller's faction bought his ship");
+            Leave(_buyer, faction);
             Ask(_buyer, 3);
             yield return Seconds(1);
             var garage = Garage(_buyer);
@@ -606,6 +626,41 @@ namespace SentisTests.Regression.Checks
             Ask(_buyer, 4);
             yield return Seconds(0.5);
             if (!File.Exists(bought)) Fail("trade console: taken off sale, the ship is not back in the garage");
+
+            // 8. the console's place: made again in it (FixShip remaps the ids), moved, made a ship
+            var listings = (IList)market.GetField("_listings", Any).GetValue(null);
+            void Watch() => market.GetMethod("Watch").Invoke(null, null);
+            bool OnSaleAt(MyProjectorBase c) => listings.Cast<object>().Any(l => !(bool)Get(l, "Pending") && (long)Get(l, "ShipyardId") == c.EntityId);
+            Ask(_buyer, 2, Title(bought), 300);
+            yield return Seconds(1);
+            var oldId = console.EntityId;
+            var ob = (MyObjectBuilder_CubeGrid)station.GetObjectBuilder(true);
+            station.Close();
+            MyAPIGateway.Entities.RemapObjectBuilder(ob);
+            station = (MyCubeGrid)MyAPIGateway.Entities.CreateFromObjectBuilderAndAdd(ob);
+            Track(station);
+            console = station.GetFatBlocks().OfType<MyProjectorBase>().First();
+            yield return Seconds(1);
+            Watch();
+            Note("trade console: made again as " + console.EntityId + " (was " + oldId + "): " + (OnSaleAt(console) && File.Exists(bought + "_market") ? "the ship still on sale on it" : "the ship not on sale on it"));
+            if (!File.Exists(bought + "_market") || !OnSaleAt(console)) Fail("trade console: made again in its place (as by FixShip) it lost its ship");
+
+            station.PositionComp.SetPosition(station.PositionComp.GetPosition() + Site.Right * 5);
+            Watch();
+            Note("trade console: moved by 5 m: the ship " + (File.Exists(bought) ? "back in the garage" : "still on sale"));
+            if (!File.Exists(bought) || File.Exists(bought + "_market")) Fail("trade console: moved by 5 m it still sells its ship");
+
+            Ask(_buyer, 2, Title(bought), 300);
+            yield return Seconds(1);
+            if (!File.Exists(bought + "_market")) Fail("trade console: the ship was not put on sale again where the console stands now");
+            station.OnConvertToDynamic();
+            yield return Seconds(0.5);
+            Watch();
+            Note("trade console: made a ship: the ship " + (File.Exists(bought) ? "back in the garage" : "still on sale"));
+            if (!File.Exists(bought) || File.Exists(bought + "_market")) Fail("trade console: made a ship it still sells its ship");
+            Ask(_buyer, 2, Title(bought), 300);
+            yield return Seconds(1);
+            if (File.Exists(bought + "_market")) Fail("trade console: a console of a ship put a ship on sale");
         }
     }
 }

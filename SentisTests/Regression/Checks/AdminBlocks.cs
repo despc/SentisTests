@@ -248,13 +248,19 @@ namespace SentisTests.Regression.Checks
             var offItems = Items(offStore);
             Note("admin store: " + string.Join(", ", items.Select(i => i.ItemId + " x" + i.Amount + " at " + i.PricePerUnit)) + "; the stock: ore " + ore + " (was 50, +6), ingots " + ingot +
                  " (was 30, -6); the store switched off: " + offItems.Count + " items; the empty CustomData became «" + example.Replace("\n", " | ") + "»");
-            // the price of 50 of 10..100 (the middle 55 at 55): 60; of 30 ingots: 80 (the float rounding may take one off)
-            Expect(offer.Amount == 50 && offer.PricePerUnit >= 59 && offer.PricePerUnit <= 60, "admin store's offer: 50 iron at 60",
-                "admin store's offer: " + offer.Amount + " iron ore at " + offer.PricePerUnit + ", not 50 at 60");
-            Expect(order.Amount == 70 && order.PricePerUnit >= 79 && order.PricePerUnit <= 80, "admin store's order: 70 ingots at 80",
-                "admin store's order: " + order.Amount + " iron ingots at " + order.PricePerUnit + ", not 70 at 80");
-            Expect(ore == 56, "admin store's production added 6 (10 in 5 min, a recount of 3 min)", "admin store's production: the iron ore 50 -> " + ore + ", not 56");
-            Expect(ingot == 24, "admin store's negative production took 6", "admin store's negative production: the ingots 30 -> " + ingot + ", not 24");
+            // The server's own recount (every 3 min) may come in the same seconds: the stock then moved twice. Each
+            // recount makes 6 more ore and 6 fewer ingots, and puts the stock it saw on sale at its price: 50 ore of
+            // 10..100 (the middle 55 at 55) at 60, 30 ingots at 80 (the float rounding may take one off).
+            var recounts = (int)Math.Round((ore - 50) / 6);
+            Expect(ore == 50 + 6 * recounts && recounts >= 1 && recounts <= 2 && ingot == 30 - 6 * recounts,
+                "admin store's production added 6 ore and took 6 ingots a recount (" + recounts + ")",
+                "admin store's production: the iron ore 50 -> " + ore + ", the ingots 30 -> " + ingot + " (not 6 a recount)");
+            var seenOre = 50 + 6 * (recounts - 1);
+            var seenIngots = 30 - 6 * (recounts - 1);
+            Expect(offer.Amount == seenOre && Math.Abs(offer.PricePerUnit - StorePrice(seenOre)) <= 1, "admin store's offer: " + seenOre + " iron at " + StorePrice(seenOre),
+                "admin store's offer: " + offer.Amount + " iron ore at " + offer.PricePerUnit + ", not " + seenOre + " at " + StorePrice(seenOre));
+            Expect(order.Amount == 100 - seenIngots && Math.Abs(order.PricePerUnit - StorePrice(seenIngots)) <= 1, "admin store's order: " + (100 - seenIngots) + " ingots at " + StorePrice(seenIngots),
+                "admin store's order: " + order.Amount + " iron ingots at " + order.PricePerUnit + ", not " + (100 - seenIngots) + " at " + StorePrice(seenIngots));
             Expect(offItems.Count == 0, "admin store switched off sells nothing", "admin store switched off has " + offItems.Count + " items");
             Expect(example.Contains("type=STATION_SELL;item=Ore_Iron") && example.Contains("type=STATION_BUY;item=Ingot_Iron"),
                 "admin store's empty CustomData got the example", "admin store's empty CustomData became «" + example + "»");
@@ -279,6 +285,18 @@ namespace SentisTests.Regression.Checks
             Note("admin store: /reset_stores of a player: " + byPlayer + " items, of an admin: " + byAdmin);
             Expect(byPlayer == 0, "admin store: a player's /reset_stores does nothing", "admin store: a player's /reset_stores recounted the stores");
             Expect(byAdmin > 0, "admin store: an admin's /reset_stores recounts", "admin store: an admin's /reset_stores put nothing on sale");
+        }
+
+        /// <summary>The store's price of a stock for minCount 10, maxCount 100, minPrice 10, maxPrice 100 (the mod's formula).</summary>
+        private static long StorePrice(int count)
+        {
+            if (count == 0) return 100;
+            const int defaultCount = 55, defaultPrice = 55;
+            var onePercent = (defaultCount - 10) / 100f;
+            var deltaPercent = Math.Abs((defaultCount - count) / onePercent);
+            var priceOnePercent = (100f - defaultPrice) / 100f;
+            var price = (int)(count > defaultCount ? defaultPrice - priceOnePercent * deltaPercent : defaultPrice + priceOnePercent * deltaPercent);
+            return Math.Max(10, Math.Min(100, price));
         }
 
         private static List<Sandbox.ModAPI.Ingame.MyStoreQueryItem> Items(IMyStoreBlock store)
