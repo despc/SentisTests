@@ -467,7 +467,7 @@ namespace SentisTests.Regression
             var character = Body;
             StandAt(seat.PositionComp.GetPosition() + seat.WorldMatrix.Backward * 1.5, seat.PositionComp.GetPosition());
             FakeClients.SetFree(Me, true);
-            Request(seat, "AttachPilotEvent", VRage.Game.Entity.UseObject.UseActionEnum.Manipulate, character.EntityId, -1);
+            Request(seat, "AttachPilotEvent", VRage.Game.Entity.UseObject.UseActionEnum.Manipulate, -1);
             yield return Until(() => seat.Pilot == character ? 1 : 0, v => v > 0, "the player seated", 10,
                 () => "pilot " + (((MyCockpit)seat).Pilot?.DisplayName ?? "none"));
             yield return Until(() => Player.Controller.ControlledEntity == seat ? 1 : 0, v => v > 0, "the player controlling the seat", 10);

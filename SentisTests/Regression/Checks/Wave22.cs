@@ -48,7 +48,7 @@ namespace SentisTests.Regression.Checks
             FakeClients.MoveTo(sitter, stand);
             sitterBody.PositionComp.SetWorldMatrix(MatrixD.CreateWorld(stand, Vector3D.Normalize(seat.PositionComp.GetPosition() - stand), seat.WorldMatrix.Up));
             FakeClients.SetFree(sitter, true);
-            RequestAs(sitter, seat, "AttachPilotEvent", VRage.Game.Entity.UseObject.UseActionEnum.Manipulate, sitterBody.EntityId, -1);
+            RequestAs(sitter, seat, "AttachPilotEvent", VRage.Game.Entity.UseObject.UseActionEnum.Manipulate, -1);
             yield return Until(() => seat.Pilot == sitterBody ? 1 : 0, v => v > 0, "the second player seated", 10);
             yield return Seconds(1);
             var walkerAt = walkerBody.PositionComp.GetPosition();
