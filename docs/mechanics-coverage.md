@@ -94,6 +94,7 @@
 | --- | --- | --- |
 | Терминал: имена, настройки, действия | `terminal` | Покрыто |
 | Перенос предметов между инвентарями | `inventory_transfer` | Покрыто |
+| Инвентари недоступных игроку блоков не отправляются (SentisAnticheat) | `inventory_hidden` | Покрыто |
 | Конвейеры большие и малые, проталкивание, выключенный «Use conveyor» | `conveyor`, `small_conveyor`, `conveyor_push`, `use_conveyor_off` | Покрыто |
 | Сортировщик | `sorter` | Покрыто |
 | Коннектор: стыковка, выброс, торговый режим, разрушение | `connector`, `connector_throw_out`, `small_connector_throw_out`, `connector_trading`, `connector_destroy` | Покрыто |

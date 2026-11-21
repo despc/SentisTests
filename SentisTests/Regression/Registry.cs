@@ -116,7 +116,9 @@ namespace SentisTests.Regression
             Add(() => new GeneratorIceWaitCheck());
             Add(() => new ReplicableNoGroupsCheck());
             Add(() => new GridUpdateThrowsCheck());
-            Add(() => new WorldLockLeftCheck());
+            // WorldLockLeftCheck leaves a Havok world locked on purpose; clusters (the real source of the leak) are gone,
+            // and the check itself crashed the stand (AV in Havok, FATAL in IterateBodies). Not in the common run.
+            // Add(() => new WorldLockLeftCheck());
             Add(() => new TankRefillCheck());
             Add(() => new OxygenFarmCheck());
             Add(() => new GasTanksFillCheck());
