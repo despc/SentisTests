@@ -100,6 +100,21 @@ namespace SentisTests.Scenarios
             Note("armor broken: " + Reps());
             Check(factions.All(f => afterArmor[f] == start[f]), "breaking a light armor block changed the reputation: " + Reps());
 
+            // a block shot at or ground but not broken: nothing - neither the plugin's nor the game's own charge
+            int GameNow(long factionId) => MySession.Static.Factions.GetRelationBetweenPlayerAndFaction(me, factionId).Item2;
+            var gameStart = factions.ToDictionary(f => f, GameNow);
+            Hit(battery, character);
+            foreach (var type in new[] { Sandbox.Game.Multiplayer.MyReputationDamageType.Damaging, Sandbox.Game.Multiplayer.MyReputationDamageType.GrindingWelding,
+                                         Sandbox.Game.Multiplayer.MyReputationDamageType.KillingNpc })
+                MySession.Static.Factions.DamageFactionPlayerReputation(me, faction.FounderId, type, 1000f);
+            yield return WaitForSeconds(2, "the reputation settles");
+            var afterHit = factions.ToDictionary(f => f, Rep);
+            var gameAfterHit = factions.ToDictionary(f => f, GameNow);
+            Note("the battery hit once (" + (battery.Integrity / battery.MaxIntegrity * 100).ToString("F0") + "% left) and the game's charges for damaging, grinding, " +
+                 "an NPC killed: plugin " + Reps() + ", game " + string.Join(", ", factions.Select(f => GameNow(f))));
+            Check(factions.All(f => afterHit[f] == start[f]), "a hit short of breaking or the game's charges changed the plugin's reputation: " + Reps());
+            Check(factions.All(f => gameAfterHit[f] == gameStart[f]), "the game's charges for damaging or grinding went through: " + string.Join(", ", factions.Select(f => GameNow(f))));
+
             // the battery: down past its critical integrity, then one hit more on the broken block
             var hits = 0;
             while (battery.IsFunctional && hits++ < 30)
@@ -124,8 +139,42 @@ namespace SentisTests.Scenarios
                 var otherTag = MySession.Static.Factions.TryGetFactionById(r.Id)?.Tag ?? r.Id.ToString();
                 Check(after[r.Id] == wanted, otherTag + ": " + start[r.Id] + " -> " + after[r.Id] + ", expected " + wanted);
             }
+            // the game's reputation is the same (the factions screen, the NPCs' relation)
+            int Game(long factionId) => MySession.Static.Factions.GetRelationBetweenPlayerAndFaction(me, factionId).Item2;
+            string Games() => string.Join(", ", factions.Select(f => (MySession.Static.Factions.TryGetFactionById(f)?.Tag ?? "?") + " " + Game(f)));
+            Note("the game's reputation: " + Games());
+            Check(factions.All(f => Game(f) == after[f]), "the game's reputation is not the plugin's: game " + Games() + ", plugin " + Reps());
+
+            // the game's own charge for hostility (a block damaged, an NPC killed) does not touch a faction of the plugin
+            var refused = !MySession.Static.Factions.AddFactionPlayerReputation(me, faction.FactionId, -100, ReputationChangeReason.Hostility, propagate: false);
+            yield return WaitForSeconds(1, "the game's hostility");
+            Check(refused && Game(faction.FactionId) == after[faction.FactionId] && Rep(faction.FactionId) == after[faction.FactionId],
+                "the game's -100 for hostility went through: game " + Games() + ", plugin " + Reps());
+            Note("the game's -100 for hostility with " + tag + ": refused");
+
+            // another change of the game's (a contract) comes to the plugin and moves the related factions
+            var gameDelta = -100;
+            MySession.Static.Factions.AddFactionPlayerReputation(me, faction.FactionId, gameDelta, ReputationChangeReason.Contract, propagate: false);
+            yield return WaitForSeconds(1, "the plugin takes the game's change");
+            var taken = factions.ToDictionary(f => f, Rep);
+            Note("the game took " + gameDelta + " with " + tag + ": plugin " + Reps() + "; game " + Games());
+            var takenMain = Clamp(registered, after[faction.FactionId] + gameDelta);
+            Check(taken[faction.FactionId] == takenMain, tag + " after the game's " + gameDelta + ": " + taken[faction.FactionId] + ", expected " + takenMain);
+            var takenDelta = takenMain - after[faction.FactionId];
+            foreach (var r in related)
+            {
+                var other = repo.GetType().GetMethod("GetFactionById").Invoke(repo, new object[] { r.Id });
+                var wanted = after[r.Id] + (int)Math.Round(takenDelta * (double)r.Q, MidpointRounding.AwayFromZero);
+                wanted = other == null ? wanted : Clamp(other, wanted);
+                var otherTag = MySession.Static.Factions.TryGetFactionById(r.Id)?.Tag ?? r.Id.ToString();
+                Check(taken[r.Id] == wanted, otherTag + " after the game's change with " + tag + ": " + taken[r.Id] + ", expected " + wanted);
+            }
+            Check(factions.All(f => Game(f) == taken[f]), "after the game's change the game's reputation is not the plugin's: game " + Games() + ", plugin " + Reps());
+
             Note("VR DAMAGE OK | " + tag + " " + delta + "; " + string.Join(", ", related.Select(r =>
-                (MySession.Static.Factions.TryGetFactionById(r.Id)?.Tag ?? "?") + " " + (after[r.Id] - start[r.Id]))));
+                (MySession.Static.Factions.TryGetFactionById(r.Id)?.Tag ?? "?") + " " + (after[r.Id] - start[r.Id]))) +
+                 "; the game the same; the game's " + gameDelta + " taken: " + string.Join(", ", factions.Select(f =>
+                (MySession.Static.Factions.TryGetFactionById(f)?.Tag ?? "?") + " " + (taken[f] - after[f]))));
         }
 
         private static int Clamp(object faction, int rep)
