@@ -107,6 +107,8 @@ namespace SentisTests
                 ScenarioRegistry.Register(WcClustersScenario.ScenarioName, () => new WcClustersScenario());
                 ScenarioRegistry.Register(WcWeaponsScenario.ScenarioName, () => new WcWeaponsScenario());
                 ScenarioRegistry.Register(VirtualRepDamageScenario.ScenarioName, () => new VirtualRepDamageScenario());
+                ScenarioRegistry.Register(AdventuresRandomNpcScenario.ScenarioName, () => new AdventuresRandomNpcScenario());
+                ScenarioRegistry.Register(AdventuresSectorScenario.ScenarioName, () => new AdventuresSectorScenario());
                 ScenarioRegistry.Register(PbScriptLoadScenario.IimName, PbScriptLoadScenario.Iim);
                 ScenarioRegistry.Register(PbScriptLoadScenario.IimWatchName, PbScriptLoadScenario.IimWatch);
                 ScenarioRegistry.Register(PbSaveOffThreadScenario.ScenarioName, () => new PbSaveOffThreadScenario());
