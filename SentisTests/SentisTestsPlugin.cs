@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using NLog;
 using SentisTests.Core;
@@ -105,6 +105,8 @@ namespace SentisTests
                 ScenarioRegistry.Register(ParallelPasteScenario.ScenarioName, () => new ParallelPasteScenario());
                 ScenarioRegistry.Register(WeaponCoreCensusScenario.ScenarioName, () => new WeaponCoreCensusScenario());
                 ScenarioRegistry.Register(WcClustersScenario.ScenarioName, () => new WcClustersScenario());
+                ScenarioRegistry.Register(WcWeaponsScenario.ScenarioName, () => new WcWeaponsScenario());
+                ScenarioRegistry.Register(VirtualRepDamageScenario.ScenarioName, () => new VirtualRepDamageScenario());
                 ScenarioRegistry.Register(PbScriptLoadScenario.IimName, PbScriptLoadScenario.Iim);
                 ScenarioRegistry.Register(PbScriptLoadScenario.IimWatchName, PbScriptLoadScenario.IimWatch);
                 ScenarioRegistry.Register(PbSaveOffThreadScenario.ScenarioName, () => new PbSaveOffThreadScenario());
