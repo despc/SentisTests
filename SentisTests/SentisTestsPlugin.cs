@@ -163,6 +163,9 @@ namespace SentisTests
                 ScenarioRegistry.Register(AsteroidResendScenario.AsteroidName, () => new AsteroidResendScenario(false));
                 ScenarioRegistry.Register(AsteroidResendScenario.GridName, () => new AsteroidResendScenario(true));
                 ScenarioRegistry.Register(DrillDockScenario.ScenarioName, () => new DrillDockScenario());
+                ScenarioRegistry.Register(ShuttleFlightScenario.ScenarioName, () => new ShuttleFlightScenario());
+                ScenarioRegistry.Register(ShuttleFlightScenario.OrbitName, () => new ShuttleFlightScenario(ShuttleFlightScenario.OrbitName));
+                ScenarioRegistry.Register(BotShuttleScenario.ScenarioName, () => new BotShuttleScenario());
                 ScenarioRegistry.Register(ConnectorConnectableScenario.ScenarioName, () => new ConnectorConnectableScenario());
                 ScenarioRegistry.Register(MergeNpcClaimScenario.ScenarioName, () => new MergeNpcClaimScenario());
                 ScenarioRegistry.Register(DrillDockScenario.MineName, () => new DrillDockScenario(DrillDockScenario.MineName));
