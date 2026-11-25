@@ -315,6 +315,8 @@ namespace SentisTests.Regression
             Add(() => new GridStorageCheck());
             Add(() => new GridStorageStaleVoxelCheck());
             Add(() => new VoxelDeadStorageCheck());
+            Add(() => new GpsCleanCheck());
+            Add(() => new NestedProjectionsCheck());
             Add(() => new NpcBuildRefusedCheck());
             Add(() => new LandingGearRefusedCheck());
             Add(() => new BeaconWarningCheck());
