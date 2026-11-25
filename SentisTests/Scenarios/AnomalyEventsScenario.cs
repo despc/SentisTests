@@ -164,6 +164,14 @@ namespace SentisTests.Scenarios
                 while (check.MoveNext()) yield return check.Current;
             }
 
+            if (only == null || Wanted("Edge"))
+            {
+                var reset = Reset();
+                while (reset.MoveNext()) yield return reset.Current;
+                var check = EdgeShip(problems);
+                while (check.MoveNext()) yield return check.Current;
+            }
+
             if (only == null || Wanted("Hydrogen"))
             {
                 var reset = Reset();
@@ -535,6 +543,59 @@ namespace SentisTests.Scenarios
             storage.WriteRange(data, VRage.Voxels.MyStorageDataTypeFlags.ContentAndMaterial, min, max);
             var corner = above + new Vector3D(-256, -120, -256);
             return MyAPIGateway.Session.VoxelMaps.CreateVoxelMap(WorldApi.EntityPrefix + "ae-rock", storage, corner, 0) as MyVoxelBase;
+        }
+
+        /// <summary>
+        /// A ship at the zone's edge (25.11.2026): its cockpit, the pilot in it, 2 m inside the sphere, its middle outside - the
+        /// capture counts him, and the events must find the ship: a gravity shift is started (it needs a ship in the zone;
+        /// before, the events looked at a ship's middle only and it "had nobody") and the ship must be pulled. The other two
+        /// ships are taken out of the zone meanwhile.
+        /// </summary>
+        private IEnumerator EdgeShip(List<string> problems)
+        {
+            for (var i = 1; i < 3; i++)
+            {
+                var away = _ships[i].WorldMatrix;
+                away.Translation = _site + new Vector3D(0, 0, Radius + 3000 + i * 100);
+                _ships[i].Teleport(away);
+            }
+            var ship = _ships[0];
+            var d = Vector3D.Normalize(new Vector3D(1, 0.2, 0.3));
+            var up = Vector3D.Normalize(Vector3D.CalculatePerpendicularVector(d));
+            var m = MatrixD.CreateWorld(ship.WorldMatrix.Translation, Vector3D.Cross(up, d), up);   // its length (its X) outward
+            ship.Teleport(m);
+            yield return WaitForTicks(2);
+            var seat = Cockpit(ship);
+            m = ship.WorldMatrix;
+            m.Translation += _site + d * (Radius - 2) - seat.PositionComp.GetPosition();
+            ship.Teleport(m);
+            ship.Physics.LinearVelocity = Vector3.Zero;
+            yield return WaitForSeconds(1.5, "the zone sees the pilot");
+            var seatAt = Vector3D.Distance(seat.PositionComp.GetPosition(), _site);
+            var middleAt = Vector3D.Distance(ship.PositionComp.WorldAABB.Center, _site);
+            var line = $"cockpit {seatAt:F1} m from the centre, the ship's middle {middleAt:F1} m (radius {Radius:F0}), pilot seated {seat.Pilot == FakeClients.Character(0)}";
+            if (!(seatAt < Radius && middleAt > Radius) || seat.Pilot != FakeClients.Character(0))
+            {
+                problems.Add("Edge: not set up: " + line);
+                Note("FAIL Edge: not set up: " + line);
+                yield break;
+            }
+            Setting("GravityShiftSeconds", 3.0);
+            Setting("GravityShiftG", 1.0);
+            var why = (string)Call("StartEvent", ZoneId, "GravityShift", true);
+            if (why != null)
+            {
+                problems.Add("Edge: a gravity shift did not start for the ship at the edge: " + why + " (" + line + ")");
+                Note("FAIL Edge: did not start: " + why + " (" + line + ")");
+                yield break;
+            }
+            yield return WaitForSeconds(2.5, "the gravity shift goes on");
+            var speed = ship.Physics.LinearVelocity.Length();
+            line += $"; pulled to {speed:F1} m/s";
+            var ok = speed >= 1.0 * 9.81 * 2.5 * 0.6;
+            if (!ok) problems.Add("Edge: the ship at the edge was not pulled: " + line);
+            Note((ok ? "ok   " : "FAIL ") + "Edge: " + line);
+            yield return Wait(() => Running == null, "the gravity shift ends", 20);
         }
 
         /// <summary>
