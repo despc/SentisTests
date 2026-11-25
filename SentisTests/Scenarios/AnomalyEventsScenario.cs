@@ -172,6 +172,14 @@ namespace SentisTests.Scenarios
                 while (check.MoveNext()) yield return check.Current;
             }
 
+            if (only == null || Wanted("SwarmTurret"))
+            {
+                var reset = Reset();
+                while (reset.MoveNext()) yield return reset.Current;
+                var check = SwarmTurret(problems);
+                while (check.MoveNext()) yield return check.Current;
+            }
+
             if (only == null || Wanted("Hydrogen"))
             {
                 var reset = Reset();
@@ -254,8 +262,16 @@ namespace SentisTests.Scenarios
         {
             if (target is Sandbox.Game.Entities.Character.MyCharacter character)
                 lock (Bodies)
+                {
                     if (Bodies.Contains(character.EntityId)) info.Amount = 0;
+                    else if (TurretShooters.Contains(info.AttackerId))
+                        TurretHits[character.EntityId] = (TurretHits.TryGetValue(character.EntityId, out var had) ? had : 0) + info.Amount;
+                }
         }
+
+        /// <summary>Who counts as the turret when it hits (the turret block, its grid); the damage it did to each character.</summary>
+        private static readonly HashSet<long> TurretShooters = new HashSet<long>();
+        private static readonly Dictionary<long, float> TurretHits = new Dictionary<long, float>();
 
         private IEnumerator Event(string kind, List<string> problems)
         {
@@ -543,6 +559,99 @@ namespace SentisTests.Scenarios
             storage.WriteRange(data, VRage.Voxels.MyStorageDataTypeFlags.ContentAndMaterial, min, max);
             var corner = above + new Vector3D(-256, -120, -256);
             return MyAPIGateway.Session.VoxelMaps.CreateVoxelMap(WorldApi.EntityPrefix + "ae-rock", storage, corner, 0) as MyVoxelBase;
+        }
+
+        /// <summary>
+        /// The swarm's astronauts are a living enemy to the players' turrets (25.11.2026): a gatling turret of player A's
+        /// (its targets: characters too), with power and ammunition, on a station 40 m from A's ship; the swarm comes (grinders
+        /// only, no rockets to break the turret) - the turret must take an astronaut of the swarm for its target and hurt one.
+        /// </summary>
+        private IEnumerator SwarmTurret(List<string> problems)
+        {
+            var owner = FakeClients.PlayerOf(0).Identity.IdentityId;
+            var at = _ships[0].PositionComp.WorldAABB.Center + new Vector3D(0, 40, 0);
+            MyObjectBuilder_CubeBlock Block(MyObjectBuilderType type, string subtype, int x, int y, int z)
+            {
+                var block = (MyObjectBuilder_CubeBlock)MyObjectBuilderSerializer.CreateNewObject(type, subtype);
+                block.Min = new SerializableVector3I(x, y, z);
+                block.Owner = owner;
+                block.BuiltBy = owner;
+                block.ShareMode = MyOwnershipShareModeEnum.Faction;
+                return block;
+            }
+            var turretBuilder = (MyObjectBuilder_TurretBase)Block(typeof(MyObjectBuilder_LargeGatlingTurret), "", 0, 0, 0);
+            turretBuilder.Range = 800;
+            var battery = (MyObjectBuilder_BatteryBlock)Block(typeof(MyObjectBuilder_BatteryBlock), "LargeBlockBatteryBlock", 0, -1, 2);
+            battery.CurrentStoredPower = 3f;
+            battery.MaxStoredPower = 3f;
+            battery.Enabled = true;
+            battery.ProducerEnabled = true;
+            var builder = new MyObjectBuilder_CubeGrid
+            {
+                GridSizeEnum = MyCubeSize.Large,
+                IsStatic = true,
+                DisplayName = WorldApi.EntityPrefix + "ae-turret",
+                CreatePhysics = true,
+                PersistentFlags = MyPersistentEntityFlags2.InScene | MyPersistentEntityFlags2.Enabled,
+                PositionAndOrientation = new MyPositionAndOrientation(at, Vector3.Forward, Vector3.Up),
+                CubeBlocks = new List<MyObjectBuilder_CubeBlock> { turretBuilder, battery }
+            };
+            MyAPIGateway.Entities.RemapObjectBuilder(builder);
+            var station = (MyCubeGrid)MyAPIGateway.Entities.CreateFromObjectBuilderAndAdd(builder);
+            Track(station);
+            var turret = station.GetFatBlocks().OfType<Sandbox.Game.Weapons.MyLargeTurretBase>().FirstOrDefault();
+            if (turret == null)
+            {
+                problems.Add("SwarmTurret: no turret built");
+                yield break;
+            }
+            turret.GetInventory().AddItems(20, (MyObjectBuilder_PhysicalObject)MyObjectBuilderSerializer.CreateNewObject(new MyDefinitionId(typeof(MyObjectBuilder_AmmoMagazine), "NATO_25x184mm")));
+            turret.TargetCharacters = true;
+            lock (Bodies)
+            {
+                TurretShooters.Clear();
+                TurretShooters.Add(turret.EntityId);
+                TurretShooters.Add(station.EntityId);
+                TurretHits.Clear();
+            }
+            yield return WaitForSeconds(1, "the turret comes up");
+            var state = $"turret working {turret.IsWorking}, targets characters {turret.TargetCharacters}";
+
+            Setting("SwarmDistance", 150.0);
+            Setting("SwarmGrinders", 3);
+            Setting("SwarmLaunchers", 0);
+            Setting("SwarmSeconds", 30.0);
+            Setting("SwarmSpeed", 30.0);
+            var why = (string)Call("StartEvent", ZoneId, "Swarm", true);
+            if (why != null)
+            {
+                problems.Add("SwarmTurret: the swarm did not start: " + why);
+                Note("FAIL SwarmTurret: the swarm did not start: " + why);
+                yield break;
+            }
+            var swarm = Call("RunningEventObject", ZoneId);
+            var bodies = swarm == null ? new List<long>() : (List<long>)swarm.GetType().GetProperty("Bodies").GetValue(swarm);
+            var aimed = false;
+            float hurt = 0;
+            for (var t = 0; t < 100 && Running != null; t++)
+            {
+                yield return WaitForSeconds(0.25, "the turret at the swarm");
+                var target = turret.Target;
+                if (target != null && bodies.Contains(target.EntityId)) aimed = true;
+                lock (Bodies) hurt = bodies.Sum(id => TurretHits.TryGetValue(id, out var d) ? d : 0);
+                if (aimed && hurt > 0 && Dead() > 0) break;
+            }
+            int Dead() => bodies.Count(id => !(MyEntities.GetEntityById(id) is Sandbox.Game.Entities.Character.MyCharacter c) || c.IsDead);
+            var dead = Dead();
+            Call("StopEvent", ZoneId);
+            var line = $"{state}; {bodies.Count} astronauts, the turret aimed at one {aimed}, its damage to them {hurt:F0}, dead {dead}";
+            var ok = aimed && hurt > 0;
+            if (!ok) problems.Add("SwarmTurret: the turret did not fight the swarm: " + line);
+            Note((ok ? "ok   " : "FAIL ") + "SwarmTurret: " + line);
+            lock (Bodies) TurretShooters.Clear();
+            yield return Wait(() => Running == null, "the swarm ends", 40);
+            yield return WaitForSeconds(2, "the swarm taken away");
+            station.Close();
         }
 
         /// <summary>
