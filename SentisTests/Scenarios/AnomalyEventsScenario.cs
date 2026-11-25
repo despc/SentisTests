@@ -311,7 +311,7 @@ namespace SentisTests.Scenarios
                     }
                     break;
                 case "Gift":
-                    Setting("GiftItems", "Ingot/Platinum=7; Ingot/Gold=3");
+                    Setting("GiftItems", "Ingot/Platinum=7; Ingot/Gold=3; Component/PrototechFrame=1");   // (a prototech frame in the stand's gift, 24.11.2026)
                     break;
                 case "Swarm":
                     _rock = Slab(_ships[0].PositionComp.WorldAABB.Center);
@@ -451,7 +451,7 @@ namespace SentisTests.Scenarios
                     if (gift == null) Fail("no gift");
                     else
                     {
-                        if (!items.Contains("Platinum x7") || !items.Contains("Gold x3")) Fail("the gift holds " + items);
+                        if (!items.Contains("Platinum x7") || !items.Contains("Gold x3") || !items.Contains("PrototechFrame x1")) Fail("the gift holds " + items);
                         if (!open) Fail("the gift is not open to everyone");
                         if (!inZone) Fail("the gift is outside the zone");
                         gift.Close();

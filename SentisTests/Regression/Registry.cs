@@ -313,6 +313,8 @@ namespace SentisTests.Regression
             Add(() => new WeatherCheck());
             Add(() => new MeteorCheck());
             Add(() => new GridStorageCheck());
+            Add(() => new GridStorageStaleVoxelCheck());
+            Add(() => new VoxelDeadStorageCheck());
             Add(() => new NpcBuildRefusedCheck());
             Add(() => new LandingGearRefusedCheck());
             Add(() => new BeaconWarningCheck());
