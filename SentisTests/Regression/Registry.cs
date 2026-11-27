@@ -138,6 +138,7 @@ namespace SentisTests.Regression
             Add(() => new RailgunCapacitorCheck());
             Add(() => new DamageBlockedCheck());
             Add(() => new GarageDupeCheck());
+            Add(() => new CharacterGhostsCheck());
             Add(() => new MarketWatchCheck());
             Add(() => new ScriptPackFixCheck());
             Add(() => new ScriptPackBlocksCheck());
