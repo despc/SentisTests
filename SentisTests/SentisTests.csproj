@@ -5,6 +5,7 @@
     <AssemblyName>SentisTests</AssemblyName>
     <RootNamespace>SentisTests</RootNamespace>
     <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
@@ -51,6 +52,7 @@
     <Reference Include="ProtoBuf.Net.Core"><HintPath>$(SeDs)\ProtoBuf.Net.Core.dll</HintPath><Private>False</Private></Reference>
     <Reference Include="Sandbox.Common"><HintPath>$(SeDs)\Sandbox.Common.dll</HintPath><Private>False</Private></Reference>
     <Reference Include="Sandbox.Game"><HintPath>$(SeDs)\Sandbox.Game.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="RecastDetourWrapper"><HintPath>$(SeDs)\RecastDetourWrapper.dll</HintPath><Private>False</Private></Reference>
     <Reference Include="Sandbox.Graphics"><HintPath>$(SeDs)\Sandbox.Graphics.dll</HintPath><Private>False</Private></Reference>
     <Reference Include="Sandbox.RenderDirect"><HintPath>$(SeDs)\Sandbox.RenderDirect.dll</HintPath><Private>False</Private></Reference>
     <Reference Include="SpaceEngineers.Game"><HintPath>$(SeDs)\SpaceEngineers.Game.dll</HintPath><Private>False</Private></Reference>

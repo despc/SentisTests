@@ -142,6 +142,7 @@ namespace SentisTests
                 ScenarioRegistry.Register(OwnershipMissingBlockScenario.ScenarioName, () => new OwnershipMissingBlockScenario());
                 ScenarioRegistry.Register(AiTaskSplitScenario.ScenarioName, () => new AiTaskSplitScenario());
                 ScenarioRegistry.Register(ComponentListRaceScenario.ScenarioName, () => new ComponentListRaceScenario());
+                ScenarioRegistry.Register(RecastRaceScenario.ScenarioName, () => new RecastRaceScenario());
                 ScenarioRegistry.Register(GasWeldRefreshScenario.ScenarioName, () => new GasWeldRefreshScenario());
                 ScenarioRegistry.Register(DoorProbeScenario.ScenarioName, () => new DoorProbeScenario());
                 ScenarioRegistry.Register(DockedDoorScenario.ScenarioName, () => new DockedDoorScenario());
